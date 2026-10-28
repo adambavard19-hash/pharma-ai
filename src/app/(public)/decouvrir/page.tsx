@@ -13,6 +13,7 @@ import { loadPublicPricing } from "@/server/services/public-pricing";
 import { formatEuros } from "@/core/billing/subscription";
 import { PricingSection } from "./_components/pricing-section";
 import { FeatureCarousel, type FeatureSlide } from "./_components/feature-carousel";
+import { RoutineShowcase } from "./_components/routine-showcase";
 import { FlowSteps, LoadVisual, Reveal } from "./_components/story";
 import { FAQ } from "./_components/site-content";
 import { HelixBackdrop } from "@/components/app/helix/helix-backdrop";
@@ -203,6 +204,22 @@ export default async function SitePage() {
               <Figure label="Ventes additionnelles" value={formatEuros(live.attributedCents)} />
             </div>
           )}
+        </div>
+      </section>
+
+      {/* ---- 4. La routine (fondateur, 28 oct. 2026 : l'essai B, l'onglet « La routine » seul) : plusieurs produits qui vont
+           ensemble, la vraie bannière à gauche. ---- */}
+      <section id="routine" className="scroll-mt-20 border-t border-border-subtle">
+        <div className="px-5 py-20 md:py-28">
+          <Reveal>
+            <div className="mx-auto mb-12 max-w-3xl text-center">
+              <h2 className="text-[34px] leading-[1.05] font-semibold tracking-[-0.03em] text-text-primary text-balance md:text-[48px]">Un conseil. Et maintenant, une routine.</h2>
+              <p className="mt-4 text-[17px] leading-7 text-text-secondary">Plutôt qu&apos;un seul produit, une prise en charge complète, étape par étape.</p>
+            </div>
+          </Reveal>
+          <Reveal delay={1}>
+            <RoutineShowcase />
+          </Reveal>
         </div>
       </section>
 
