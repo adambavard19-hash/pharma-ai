@@ -5699,7 +5699,8 @@ function readCounterSheet(raw) {
     cut,
     ...sideEffectsOf(value.sideEffects),
     ...askAndPitch(value),
-    ...alternativesOf(value.alternatives)
+    ...alternativesOf(value.alternatives),
+    ...routineOf(value.routine)
   };
 }
 function sideEffectsOf(input) {
@@ -5716,6 +5717,17 @@ function readStockProduct(p) {
     ...typeof p.stock === "string" && STOCKS.has(p.stock) ? { stock: p.stock } : {},
     ...Number.isInteger(p.quantity) && p.quantity >= 0 ? { quantity: p.quantity } : {}
   };
+}
+function routineOf(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return {};
+  const value = input;
+  const key = boundText(value.key, 80).text;
+  const title = boundText(value.title, 80).text;
+  const step = boundText(value.step, 40).text;
+  const index = value.index;
+  const count = value.count;
+  if (!key || !title || !step || !Number.isInteger(index) || !Number.isInteger(count) || index < 0 || count < 1 || count > 8) return {};
+  return { routine: { key, title, step, index, count } };
 }
 function alternativesOf(input) {
   const list = (Array.isArray(input) ? input : []).flatMap((entry) => entry && typeof entry === "object" && !Array.isArray(entry) ? [readStockProduct(entry)] : []).filter((entry) => entry !== null).slice(0, COUNTER_SHEET_LIMITS.alternatives);
@@ -6940,7 +6952,7 @@ function shouldGreet(state) {
 var import_node_fs12 = require("node:fs");
 var import_node_os = require("node:os");
 var import_node_path11 = require("node:path");
-var VERSION = "0.10.31";
+var VERSION = "0.10.32";
 var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path11.join)(process.cwd(), "pharmaboost-connect.json");
 var LOG_PATH = (0, import_node_path11.join)((0, import_node_path11.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;

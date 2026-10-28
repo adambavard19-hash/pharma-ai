@@ -13,6 +13,7 @@ import { sendsToDoctor } from "@/core/counter/answer-filter";
 import { IslandShell } from "./island-shell";
 import { HelixBackdrop } from "@/components/app/helix/helix-backdrop";
 import { islandTheme, MIX_PAPER, PHARMABOOST_GREEN } from "./island-theme";
+import { ROUTINE_CSS, RoutineIsland, RoutineThumbs, type IslandRoutine } from "./routine-island";
 
 /**
  * La bannière « mix » du poste (fondateur, 19 oct. 2026, maquette 5 choisie) : le haut reste toujours à l'écran — le meilleur
@@ -122,7 +123,12 @@ export type HelpExchange = { advice: string; question: string; answer: string; e
 
 export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, onOpen, onClose, onFinish, onAnswer, boxes = [], help, everyAdvice = false, routineChip, routineBeside, headAside, belowHead }: MixIslandProps) {
   const challengedBoxes = boxes.filter((box) => box.challenge);
-  const order = bestOrder(items);
+  // La routine (fondateur, 28 oct. 2026, essai « C » qui clignote) : ses étapes quittent la liste des conseils ; leurs photos
+  // clignotent à droite de la petite bannière et, au survol, la routine s'ouvre dans une deuxième bannière.
+  const routine = routineOf(items, outcomes);
+  const [routineOpen, setRoutineOpen] = useState(false);
+  const allOrder = bestOrder(items);
+  const order = routine && routine.indexes.length < items.length ? allOrder.filter((i) => !routine.indexes.includes(i)) : allOrder;
   const sold = (index: number) => outcomes[index] === "SOLD";
   const soldIndexes = order.filter(sold);
   const firstOpen = order.find((index) => !sold(index)) ?? order[0];
@@ -146,6 +152,8 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
   const width = narrow ? (open ? 330 : 300) : open ? 400 : 400;
 
   return (
+    <>
+    {routine && <style>{ROUTINE_CSS}</style>}
     <IslandShell
       width={width}
       tone="accent"
@@ -202,6 +210,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
             })}
           </div>
           {headAside}
+          {routine && !headAside && <RoutineThumbs routine={routine.view} open={routineOpen} blink onToggle={() => setRoutineOpen((value) => !value)} onHover={() => setRoutineOpen(true)} />}
           <button
             type="button"
             data-ile-client-suivant=""
@@ -361,7 +370,39 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
         )}
       </div>
     </IslandShell>
+    {routine && routineOpen && (
+      <RoutineIsland routine={routine.view} width={width} cards onClose={() => setRoutineOpen(false)} onPointerLeave={() => setRoutineOpen(false)} />
+    )}
+    </>
   );
+}
+
+/**
+ * La routine de la vente : les conseils qui portent une étape de routine (`sheet.routine`), ceux de la première routine
+ * seulement (une vente n'en montre qu'une), rangés dans l'ordre des étapes. `null` sans routine.
+ */
+function routineOf(items: readonly IslandAdvice[], outcomes: readonly (IslandOutcome | undefined)[]): { indexes: number[]; view: IslandRoutine } | null {
+  const first = items.find((item) => item.sheet?.routine)?.sheet?.routine;
+  if (!first) return null;
+  const indexes = items.map((item, index) => ({ item, index })).filter(({ item }) => item.sheet?.routine?.key === first.key).sort((a, b) => (a.item.sheet?.routine?.index ?? 0) - (b.item.sheet?.routine?.index ?? 0));
+  return {
+    indexes: indexes.map(({ index }) => index),
+    view: {
+      title: first.title,
+      drug: indexes[0]?.item.drug,
+      steps: indexes.map(({ item, index }) => ({
+        label: item.sheet?.routine?.step ?? "",
+        name: item.sheet?.name || item.name,
+        // Le prix seulement avec un stock fiable (jamais un chiffre douteux), comme la carte du conseil.
+        price: item.price && item.stock !== "UNKNOWN" ? item.price : undefined,
+        margin: item.margin,
+        stock: item.stock,
+        quantity: item.quantity,
+        image: item.image,
+        sold: outcomes[index] === "SOLD",
+      })),
+    },
+  };
 }
 
 function Tags({ item, margin }: { item: IslandAdvice; /** La marge, pour le pharmacien seul : sur la même ligne que le stock. */ margin?: string }) {

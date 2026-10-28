@@ -19,7 +19,15 @@ export type CounterSheetPatient = "CONCERNED" | "NOT_CONCERNED" | "UNKNOWN";
 
 export type CounterSheetLine = { text: string; detail?: string; patient?: CounterSheetPatient };
 
+/**
+ * L'étape de routine à laquelle appartient un conseil (fondateur, 28 oct. 2026) : la bannière regroupe les étapes d'une même
+ * routine (`key`) dans sa deuxième bannière, dans l'ordre (`index` sur `count`).
+ */
+export type CounterSheetRoutine = { key: string; title: string; step: string; index: number; count: number };
+
 export type CounterSheet = {
+  /** L'étape de routine de ce conseil. Absente : un conseil seul. */
+  routine?: CounterSheetRoutine;
   /** Le nom complet du produit (la carte, elle, l'abrège). */
   name: string;
   /** Pourquoi il est proposé : les phrases de la règle, dans l'ordre où elles se lisent. */
@@ -163,6 +171,7 @@ export function readCounterSheet(raw: unknown): CounterSheet | null {
     ...sideEffectsOf(value.sideEffects),
     ...askAndPitch(value),
     ...alternativesOf(value.alternatives),
+    ...routineOf(value.routine),
   };
 }
 
@@ -182,6 +191,19 @@ function readStockProduct(p: Record<string, unknown>): CounterSheetAlternative |
     ...(typeof p.stock === "string" && STOCKS.has(p.stock) ? { stock: p.stock } : {}),
     ...(Number.isInteger(p.quantity) && (p.quantity as number) >= 0 ? { quantity: p.quantity as number } : {}),
   };
+}
+
+/** L'étape de routine, la forme vérifiée et les textes bornés ; pas de clé quand il n'y en a pas. */
+function routineOf(input: unknown): { routine?: CounterSheetRoutine } {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return {};
+  const value = input as Record<string, unknown>;
+  const key = boundText(value.key, 80).text;
+  const title = boundText(value.title, 80).text;
+  const step = boundText(value.step, 40).text;
+  const index = value.index;
+  const count = value.count;
+  if (!key || !title || !step || !Number.isInteger(index) || !Number.isInteger(count) || (index as number) < 0 || (count as number) < 1 || (count as number) > 8) return {};
+  return { routine: { key, title, step, index: index as number, count: count as number } };
 }
 
 function alternativesOf(input: unknown): { alternatives?: CounterSheetAlternative[] } {

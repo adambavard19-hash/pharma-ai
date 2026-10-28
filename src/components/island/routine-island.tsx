@@ -22,6 +22,8 @@ export type RoutineStep = {
   quantity?: number;
   image?: string;
   benefit?: string;
+  /** Bipé pendant la vente. */
+  sold?: boolean;
 };
 
 export type IslandRoutine = { title: string; drug?: string; steps: RoutineStep[] };
@@ -99,9 +101,9 @@ export function RoutineLine({ routine, open, onToggle }: { routine: IslandRoutin
 }
 
 /** C. Les photos des étapes, en petit et en éventail, avec le mot « Routine » : à droite de la petite bannière. */
-export function RoutineThumbs({ routine, open, onToggle }: { routine: IslandRoutine; open: boolean; onToggle: () => void }) {
+export function RoutineThumbs({ routine, open, onToggle, onHover, blink = false }: { routine: IslandRoutine; open: boolean; onToggle: () => void; /** Survol : la routine s'ouvre sans clic. */ onHover?: () => void; /** Clignote doucement, comme le mot « Routine » (fondateur, 28 oct. 2026). */ blink?: boolean }) {
   return (
-    <button type="button" data-ile-routine-photos="" onClick={onToggle} className="flex shrink-0 flex-col items-center gap-0.5 rounded-xl px-1 py-0.5" aria-label={`Voir la routine : ${routine.title}`}>
+    <button type="button" data-ile-routine-photos="" data-ile-sans-deploiement="" onClick={onToggle} onPointerEnter={onHover} className={`flex shrink-0 flex-col items-center gap-0.5 rounded-xl px-1 py-0.5${blink && !open ? " routine-blink" : ""}`} aria-label={`Voir la routine : ${routine.title}`}>
       <span className="flex -space-x-2.5">
         {routine.steps.map((step, index) => (
           <span key={step.name} className="inline-flex size-[24px] items-center justify-center overflow-hidden rounded-full bg-white ring-2" style={{ zIndex: routine.steps.length - index, ["--tw-ring-color" as string]: open ? ROUTINE_DOT : "#FFFFFF" }}>
@@ -206,7 +208,7 @@ export function RoutineIsland({ routine, width, cards = false, onClose, onPointe
                     <Photo step={step} size={44} />
                     <p className="mt-1 text-[9.5px] font-bold tracking-[0.1em] uppercase" style={{ color: ROUTINE_DOT }}>{step.label}</p>
                     <p className="line-clamp-2 text-[11px] leading-[14px] font-semibold">{step.name}</p>
-                    <p className="mt-0.5 text-[11.5px] font-bold tabular-nums" style={{ color: GREEN }}>{step.price ?? "—"}</p>
+                    <p className="mt-0.5 text-[11.5px] font-bold tabular-nums" style={{ color: GREEN }}>{step.sold ? "✓ Vendu" : (step.price ?? "—")}</p>
                   </div>
                 ))}
               </div>
