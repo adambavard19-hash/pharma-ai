@@ -71,6 +71,94 @@ function Waiting() {
   );
 }
 
+/* ================================================================== ÉTAPE 1 : PROPOSITIONS */
+
+/** La petite croix de pharmacie (celle du scan A), au repos : elle respire doucement. */
+function IdleCross({ size = 22 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 40 40" style={{ width: size, height: size }} className="shrink-0" aria-hidden="true">
+      {[
+        { x: 14, y: 2 },
+        { x: 26, y: 14 },
+        { x: 14, y: 26 },
+        { x: 2, y: 14 },
+      ].map((arm, i) => (
+        <rect key={i} x={arm.x} y={arm.y} width="12" height="12" rx="2.5" fill="#3DDC84" className="idle-arm" style={{ animationDelay: `${i * 0.35}s` }} />
+      ))}
+      <rect x="14" y="14" width="12" height="12" rx="2.5" fill="#3DDC84" />
+    </svg>
+  );
+}
+
+/** A · Le verre vert des cartes, sans ADN : le robot, la phrase, un point citron qui respire. */
+function WaitGlass() {
+  return (
+    <section className="crd-glass relative flex h-11 w-[270px] items-center gap-2 overflow-hidden pr-4 pl-2">
+      <Robot size={28} mood="idle" label="" />
+      <span className="flex-1 text-[14px] leading-[18px] font-bold whitespace-nowrap text-white">En attente de scan…</span>
+      <span className="breathe size-2 rounded-full bg-[#E8FF9C] shadow-[0_0_8px_#E8FF9C]" />
+    </section>
+  );
+}
+
+/** B · La croix du scan, déjà là au repos : elle respire, et s'allumera au scan. */
+function WaitCross() {
+  return (
+    <section className="crd-glass relative flex h-11 w-[270px] items-center gap-2.5 overflow-hidden pr-4 pl-3">
+      <IdleCross />
+      <span className="min-w-0 flex-1">
+        <span className="block text-[14px] leading-[17px] font-bold whitespace-nowrap text-white">En attente de scan…</span>
+        <span className="block text-[10.5px] leading-[13px] text-[#9FCBBB]">Comptoir 1 · connecté</span>
+      </span>
+    </section>
+  );
+}
+
+/** C · Un laser qui balaie doucement le bas de la capsule, comme une douchette prête. */
+function WaitLaser() {
+  return (
+    <section className="crd-glass relative flex h-11 w-[270px] items-center gap-2.5 overflow-hidden pr-4 pl-3">
+      <span className="flex h-5 items-stretch gap-[1.5px] rounded bg-white/90 px-1 py-[3px]" aria-hidden="true">
+        {[2, 1, 3, 1, 2, 1, 3, 2, 1].map((w, i) => <i key={i} className="block bg-[#0F2F2A]" style={{ width: w }} />)}
+      </span>
+      <span className="flex-1 text-[14px] leading-[18px] font-bold whitespace-nowrap text-white">En attente de scan…</span>
+      <span className="idle-laser absolute bottom-0 h-[2px] w-1/3" aria-hidden="true" />
+    </section>
+  );
+}
+
+/** D · Toute petite : la croix et « Prêt » ; au survol, elle s'élargit sur la phrase entière. */
+function WaitMini() {
+  return (
+    <section className="crd-glass group relative flex h-10 w-[120px] items-center gap-2 overflow-hidden pr-3 pl-3 transition-[width] duration-300 hover:w-[250px]">
+      <IdleCross size={20} />
+      <span className="text-[14px] font-bold whitespace-nowrap text-white group-hover:hidden">Prêt</span>
+      <span className="hidden text-[14px] font-bold whitespace-nowrap text-white group-hover:inline">En attente de scan…</span>
+    </section>
+  );
+}
+
+/** E · L'ADN gardé, plus doux : sur le verre vert, l'hélice en transparence. */
+function WaitSoftDna() {
+  return (
+    <section className="crd-glass relative flex h-11 w-[270px] items-center gap-2 overflow-hidden pr-4 pl-2">
+      <span aria-hidden="true" className="adn-bg absolute -inset-[20%] opacity-35" />
+      <span className="relative"><Robot size={28} mood="idle" label="" /></span>
+      <span className="relative flex-1 text-[14px] leading-[18px] font-bold whitespace-nowrap text-white">En attente de scan…</span>
+      <span className="breathe relative size-2 rounded-full bg-[#E8FF9C] shadow-[0_0_8px_#E8FF9C]" />
+    </section>
+  );
+}
+
+const WAITS: { key: string; title: string; text: string; View: () => ReactNode }[] = [
+  { key: "Aujourd'hui", title: "Sur l'ADN", text: "Ce qui s'affiche maintenant : fond noir, l'hélice d'ADN qui bouge.", View: Waiting },
+  { key: "A", title: "Le verre vert, sans ADN", text: "Le même verre vert que les cartes et la croix : tout le parcours a le même habit. Un point citron respire.", View: WaitGlass },
+  { key: "B", title: "La croix, déjà là", text: "Sans ADN. La croix du scan A attend au repos et respire ; au scan, ce sont ses bras qui s'allument. Le comptoir est rappelé dessous.", View: WaitCross },
+  { key: "C", title: "Le laser prêt", text: "Sans ADN. Un petit code-barres et un trait de laser qui balaie doucement le bas : « scannez ».", View: WaitLaser },
+  { key: "D", title: "Toute petite", text: "Sans ADN. Juste la croix et « Prêt » : elle ne cache presque rien de LGPI. Au survol, elle s'élargit sur la phrase.", View: WaitMini },
+  { key: "E", title: "L'ADN plus doux", text: "Avec l'ADN, mais sur le verre vert et en transparence : plus calme que le fond noir.", View: WaitSoftDna },
+];
+
 /* ================================================================== LA FIN DE LA VENTE */
 
 /* ---------------------------------------- La vraie fin de vente du poste (fin 3), figée */
@@ -184,6 +272,12 @@ const SERVED: { key: string; title: string; text: string; View: () => ReactNode 
 ];
 
 const PAGE_CSS = `
+.breathe{animation:breathe 2.4s ease-in-out infinite}
+@keyframes breathe{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
+.idle-arm{animation:idle-arm 2.8s ease-in-out infinite}
+@keyframes idle-arm{0%,100%{opacity:.35}50%{opacity:1}}
+.idle-laser{background:linear-gradient(90deg,transparent,#FF4D5E,transparent);box-shadow:0 0 6px rgba(255,77,94,.8);animation:idle-laser 2.6s ease-in-out infinite alternate}
+@keyframes idle-laser{from{left:-10%}to{left:77%}}
 .scan-screen{background:linear-gradient(180deg,#E9EEF0 0%,#F5F7F8 60%),#F5F7F8;box-shadow:inset 0 1px 0 #fff,inset 0 0 0 1px #DCE3E6}
 .adn-bg{background:url(/poste/adn-helice.jpg) 62% 40%/cover no-repeat;filter:invert(1) hue-rotate(180deg) brightness(1.15) contrast(1.25) saturate(1.3);mix-blend-mode:screen;opacity:.85}
 .pop{animation:pop .4s cubic-bezier(.2,.9,.3,1.4) both}
@@ -197,7 +291,7 @@ const PAGE_CSS = `
 .confetti{position:absolute;left:50%;top:50%;pointer-events:none}
 .confetti i{position:absolute;width:6px;height:6px;margin:-3px;border-radius:2px;background:var(--c);opacity:0;animation:conf 1.1s cubic-bezier(.2,.8,.3,1) both}
 @keyframes conf{0%{opacity:1;transform:rotate(var(--a)) translateY(0)}100%{opacity:0;transform:rotate(var(--a)) translateY(calc(var(--d) * -1)) rotate(180deg)}}
-@media (prefers-reduced-motion:reduce){.pop,.bravo-in,.countdown,.gauge,.confetti i{animation:none}}
+@media (prefers-reduced-motion:reduce){.breathe,.idle-arm,.idle-laser,.pop,.bravo-in,.countdown,.gauge,.confetti i{animation:none}}
 `;
 
 export function SaleEndTrials() {
@@ -210,7 +304,24 @@ export function SaleEndTrials() {
           Chaque étape de la vraie bannière, figée : prenez le temps de tout regarder. Les cartes et la routine se cliquent. Vente d&apos;exemple (vrais produits du stock, photos studio).
         </p>
 
-        <h2 className="mt-8 text-[20px] font-bold text-[#0F2F2A]">1 · Le parcours retenu, du début à la fin</h2>
+        <h2 className="mt-8 text-[20px] font-bold text-[#0F2F2A]">Étape 1 « En attente de scan » : propositions</h2>
+        <p className="mt-1 max-w-3xl text-[14.5px] leading-7 text-[#4D6B64]">Ce qui reste à l&apos;écran entre deux patients. D&apos;abord aujourd&apos;hui, puis cinq propositions, dont quatre sans ADN. Passez la souris sur la D.</p>
+        <div className="mt-4 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          {WAITS.map((wait) => (
+            <article key={wait.key} className="flex flex-col gap-3 rounded-2xl border border-[#DCE7E2] bg-white p-5">
+              <div>
+                <p className="text-[12px] font-bold tracking-[0.12em] text-[#4D6B64] uppercase">{wait.key === "Aujourd'hui" ? wait.key : `Proposition ${wait.key}`}</p>
+                <h3 className="text-[17px] font-bold text-[#0F2F2A]">{wait.title}</h3>
+                <p className="mt-1 text-[13px] leading-6 text-[#4D6B64]">{wait.text}</p>
+              </div>
+              <Screen>
+                <wait.View />
+              </Screen>
+            </article>
+          ))}
+        </div>
+
+        <h2 className="mt-12 text-[20px] font-bold text-[#0F2F2A]">1 · Le parcours retenu, du début à la fin</h2>
         <p className="mt-1 max-w-3xl text-[14.5px] leading-7 text-[#4D6B64]">Scan A (la croix), la bannière en cartes, puis la fin 3. Chaque image est la vraie bannière du poste, figée.</p>
         <div className="mt-4 grid gap-5 lg:grid-cols-2">
           <Frame n="Étape 1" title="En attente de scan" text="Inchangée : la capsule sur l'ADN, dans la police des cartes.">
