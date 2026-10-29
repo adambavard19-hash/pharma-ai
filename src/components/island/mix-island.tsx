@@ -14,6 +14,7 @@ import { IslandShell } from "./island-shell";
 import { HelixBackdrop } from "@/components/app/helix/helix-backdrop";
 import { islandTheme, MIX_PAPER, PHARMABOOST_GREEN } from "./island-theme";
 import { ROUTINE_CSS, RoutineIsland, RoutineThumbs, type IslandRoutine } from "./routine-island";
+import { SCAN_CSS, type ScanLook } from "./scan-capsule";
 
 /**
  * La bannière « mix » du poste (fondateur, 19 oct. 2026, maquette 5 choisie) : le haut reste toujours à l'écran — le meilleur
@@ -124,12 +125,14 @@ export type MixIslandProps = {
    * dont les réponses mènent aux alternatives. Absente : la bannière « mix » d'avant.
    */
   cards?: boolean;
+  /** Le scan qui précède (la croix ou la gélule) : la bannière en cartes entre comme dans l'essai. */
+  enterFrom?: ScanLook;
 };
 
 /** Une question à l'aide et sa réponse (vide tant qu'elle n'est pas arrivée). */
 export type HelpExchange = { advice: string; question: string; answer: string; error?: string };
 
-export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, onOpen, onClose, onFinish, onAnswer, boxes = [], help, startAt, everyAdvice = false, routineChip, routineBeside, headAside, belowHead, cards = false }: MixIslandProps) {
+export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, onOpen, onClose, onFinish, onAnswer, boxes = [], help, startAt, everyAdvice = false, routineChip, routineBeside, headAside, belowHead, cards = false, enterFrom }: MixIslandProps) {
   const challengedBoxes = boxes.filter((box) => box.challenge);
   // La routine (fondateur, 28 oct. 2026, essai « C » qui clignote) : ses étapes quittent la liste des conseils ; leurs photos
   // clignotent à droite de la petite bannière et, au survol, la routine s'ouvre dans une deuxième bannière.
@@ -164,15 +167,16 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
     const total = possibleMargin(unsold.map((i) => items[i]));
     return (
       <>
-        <style>{`${ROUTINE_CSS}\n${CARDS_CSS}`}</style>
+        <style>{`${ROUTINE_CSS}\n${SCAN_CSS}\n${CARDS_CSS}`}</style>
+        {/* Exactement l'essai 1 (fondateur, 29 oct. 2026) : le verre vert, sans l'hélice d'ADN derrière. */}
         <IslandShell
           width={width}
           tone="accent"
-          contentKey={open ? "cartes-ouvert" : "cartes-replie"}
+          className={`crd-glass${enterFrom ? ` crd-enter-${enterFrom}` : ""}`}
+          contentKey="cartes"
           label="Conseils de la vente (cliquez sur un conseil pour l'ouvrir)"
-          backdrop={aurore ? <div data-ile-helice="" className="absolute inset-0 isolate opacity-60"><HelixBackdrop position="contained" framing="app" lazy className="[&_canvas]:scale-[1.6]" /></div> : undefined}
         >
-          <div data-ile-mix="cartes" className="p-2">
+          <div data-ile-cartes="" className="p-2">
             {heads.map((head, row) => {
               const advice = items[head];
               const active = open && head === index;
@@ -238,32 +242,25 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
 
             {belowHead}
 
-            <div className="mx-1.5 my-1.5 h-px bg-white/10" />
-            <div className="flex items-center gap-2 px-1.5">
-              {routine ? (
-                <span className="flex min-w-0 flex-1 items-center gap-2">
-                  <RoutineThumbs routine={routine.view} open={routineOpen} blink onToggle={() => setRoutineOpen((value) => !value)} onHover={() => setRoutineOpen(true)} />
-                  <span className="truncate text-[12px] font-semibold text-white/80">Routine · {routine.view.steps.length} produits</span>
-                </span>
-              ) : (
-                <span className="min-w-0 flex-1 text-[12px] text-white/60">
-                  {total > 0 ? <>Jusqu&apos;à <b className="text-[#E8FF9C] tabular-nums">{eurosOf(total)}</b> sur cette vente</> : soldIndexes.length > 0 ? "Conseils vendus" : ""}
-                </span>
-              )}
-              <button
-                type="button"
-                data-ile-client-suivant=""
-                data-ile-sans-deploiement=""
-                onClick={onFinish}
-                className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-[#E8FF9C] px-3.5 text-[12.5px] font-bold text-[#04261A] transition-[filter] hover:brightness-105"
-              >
-                <Check className="size-3.5" strokeWidth={3} aria-hidden="true" /> Terminer
-              </button>
-            </div>
-            {routine && total > 0 && (
-              <p className="px-1.5 pt-1 text-[11.5px] text-white/55">
-                Jusqu&apos;à <b className="text-[#E8FF9C] tabular-nums">{eurosOf(total)}</b> sur cette vente
-              </p>
+            {/* Plus de bouton « Terminer » (fondateur, 29 oct. 2026 : « tout se passe depuis le LGO ») : la vente se termine quand le
+                logiciel de gestion la valide. Restent la routine et ce que la vente peut rapporter. */}
+            {(routine || total > 0) && (
+              <>
+                <div className="mx-1.5 my-1.5 h-px bg-white/10" />
+                <div className="flex min-h-8 items-center gap-2 px-1.5">
+                  {routine && (
+                    <span className="flex min-w-0 flex-1 items-center gap-2">
+                      <RoutineThumbs routine={routine.view} open={routineOpen} blink onToggle={() => setRoutineOpen((value) => !value)} onHover={() => setRoutineOpen(true)} />
+                      <span className="truncate text-[12px] font-semibold text-white/80">Routine · {routine.view.steps.length} produits</span>
+                    </span>
+                  )}
+                  {total > 0 && (
+                    <span className={`text-[12px] text-white/60 ${routine ? "shrink-0" : "min-w-0 flex-1"}`}>
+                      Jusqu&apos;à <b className="text-[#E8FF9C] tabular-nums">{eurosOf(total)}</b>{routine ? "" : " sur cette vente"}
+                    </span>
+                  )}
+                </div>
+              </>
             )}
           </div>
         </IslandShell>
