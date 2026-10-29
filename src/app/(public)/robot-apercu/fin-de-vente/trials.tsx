@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Check, Sparkles, Trophy } from "lucide-react";
 import { MixIsland } from "@/components/island/mix-island";
 import { CounterIsland } from "@/components/island/counter-island";
@@ -507,7 +507,7 @@ function NeonDots({ step = false }: { step?: boolean }) {
 function NeonPill({ lead, extra, className = "neon", spacing, width }: { lead: ReactNode; extra?: ReactNode; className?: string; spacing?: string; width?: number }) {
   const { over, bind } = useOver();
   return (
-    <span {...bind} className={`${className} relative inline-flex items-center gap-3 overflow-hidden rounded-full bg-[#030504] px-4 transition-all duration-300`} style={{ height: over ? 44 : 36, ...(width && !over ? { width, justifyContent: "center" } : {}) }}>
+    <span {...bind} className={`${className} relative inline-flex items-center gap-3 overflow-hidden rounded-full bg-[#030504] px-4 transition-all duration-300`} style={{ height: over ? 44 : width ? 40 : 36, ...(width && !over ? { width, justifyContent: "center" } : {}) }}>
       {lead}
       {over ? <NeonOpened /> : <><NeonName spacing={spacing} />{extra}</>}
     </span>
@@ -630,7 +630,7 @@ function JourneyRest({ from = 2 }: { from?: number }) {
 const PILL_WIDTH = 214;
 
 /** La croix de pharmacie en citron, la couleur de la bannière : ses bras s'allument un à un pendant l'analyse. */
-function LimeCross({ lit, size = 16, glow = false }: { lit: number; size?: number; glow?: boolean }) {
+function LimeCross({ lit, size = 24, glow = false }: { lit: number; size?: number; glow?: boolean }) {
   return (
     <svg viewBox="0 0 40 40" style={{ width: size, height: size }} className={`shrink-0 ${glow ? "drop-shadow-[0_0_6px_rgba(232,255,156,.9)]" : ""}`} aria-hidden="true">
       {[
@@ -649,7 +649,7 @@ function LimeCross({ lit, size = 16, glow = false }: { lit: number; size?: numbe
 /** Le scan dans la petite bannière néon, à la même taille que l'attente : la croix citron et la boîte (ou « 2 conseils »). */
 function NeonScan({ lit, found = false }: { lit: number; found?: boolean }) {
   return (
-    <span className="neon neon-adn relative inline-flex h-9 items-center justify-center gap-2.5 overflow-hidden rounded-full bg-[#030504] px-4" style={{ width: PILL_WIDTH }}>
+    <span className="neon neon-adn relative inline-flex h-10 items-center justify-center gap-2.5 overflow-hidden rounded-full bg-[#030504] px-4" style={{ width: PILL_WIDTH }}>
       <LimeCross lit={found ? 4 : lit} glow={found} />
       {found ? (
         <span className="pop text-[11px] font-bold tracking-[0.2em] whitespace-nowrap text-[#E8FF9C] uppercase">2 conseils</span>
@@ -657,6 +657,79 @@ function NeonScan({ lit, found = false }: { lit: number; found?: boolean }) {
         <span className="text-[11px] font-bold tracking-[0.14em] whitespace-nowrap text-white uppercase">Curacné 20 mg</span>
       )}
     </span>
+  );
+}
+
+/* ================================================================== LE SCAN COMPLET, QUI SE JOUE */
+
+const PLAY_STEPS = [
+  { title: "En attente", text: "PharmaBoost attend le bip, sur l'ADN.", ms: 4000 },
+  { title: "Scan", text: "La boîte est bipée : la croix s'allume bras par bras.", ms: 3200 },
+  { title: "C'est prêt", text: "Toute la croix s'allume : 2 conseils.", ms: 2600 },
+  { title: "Les cartes", text: "Les conseils de la vente, la routine dessous.", ms: 5000 },
+  { title: "Carte ouverte", text: "« À dire au patient » et les questions.", ms: 6000 },
+  { title: "Bipé", text: "Cicaplast Lèvres passé en caisse : « Vendu ».", ms: 4500 },
+  { title: "E-mail", text: "Vente validée dans LGPI : le bilan par e-mail.", ms: 4500 },
+  { title: "Bravo", text: "Bravo, et qui a servi ce patient ?", ms: 5000 },
+] as const;
+
+/** Le scan qui s'allume : un bras de la croix de plus toutes les 0,7 s (repart de zéro à chaque passage). */
+function LightingScan() {
+  const [lit, setLit] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setLit((value) => Math.min(4, value + 1)), 700);
+    return () => clearInterval(id);
+  }, []);
+  return <NeonScan lit={lit} />;
+}
+
+/** Le scan complet en version néon, joué de bout en bout ; pause et étapes à la main. */
+function ScanPlayer() {
+  const [at, setAt] = useState(0);
+  const [playing, setPlaying] = useState(true);
+  useEffect(() => {
+    if (!playing) return;
+    const id = setTimeout(() => setAt((value) => (value + 1) % PLAY_STEPS.length), PLAY_STEPS[at].ms);
+    return () => clearTimeout(id);
+  }, [at, playing]);
+  const step = PLAY_STEPS[at];
+  return (
+    <article className="flex flex-col gap-4 rounded-2xl border border-[#0E7C5A] bg-white p-5 ring-1 ring-[#0E7C5A]">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-[12px] font-bold tracking-[0.12em] text-[#4D6B64] uppercase">Étape {at + 1} sur 8</p>
+          <h3 className="text-[19px] font-bold text-[#0F2F2A]">{step.title}</h3>
+          <p className="text-[13.5px] text-[#4D6B64]">{step.text}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => { setPlaying(false); setAt((value) => (value + PLAY_STEPS.length - 1) % PLAY_STEPS.length); }} className="h-9 rounded-lg border border-[#DCE7E2] px-3 text-[13px] font-semibold text-[#0F2F2A] hover:bg-[#F4F8F6]">← Précédente</button>
+          <button type="button" onClick={() => setPlaying((value) => !value)} className="h-9 rounded-lg bg-[#0F2F2A] px-4 text-[13px] font-semibold text-white">{playing ? "Pause" : "Lecture"}</button>
+          <button type="button" onClick={() => { setPlaying(false); setAt((value) => (value + 1) % PLAY_STEPS.length); }} className="h-9 rounded-lg border border-[#DCE7E2] px-3 text-[13px] font-semibold text-[#0F2F2A] hover:bg-[#F4F8F6]">Suivante →</button>
+        </div>
+      </div>
+      <div className="flex gap-1.5">
+        {PLAY_STEPS.map((item, i) => (
+          <button key={item.title} type="button" onClick={() => { setPlaying(false); setAt(i); }} aria-label={`Étape ${i + 1} : ${item.title}`} className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#DCE7E2]">
+            <span className="block h-full rounded-full bg-[#0E7C5A]" style={{ width: i < at ? "100%" : i === at ? "100%" : "0%", opacity: i === at ? 1 : i < at ? 0.5 : 0, transition: "opacity .3s" }} />
+          </button>
+        ))}
+      </div>
+      <div className="theme-neon">
+        <div className="scan-screen flex min-h-[520px] flex-col items-center gap-2 rounded-xl px-3 pt-5 pb-6">
+          <div key={at} className="player-in flex flex-col items-center gap-2">
+            {at === 0 && <NeonPill className="neon neon-adn" lead={<LimeCross lit={4} />} width={PILL_WIDTH} />}
+            {at === 1 && <LightingScan />}
+            {at === 2 && <NeonScan lit={4} found />}
+            {at === 3 && <MixIsland cards enterFrom="croix" items={ITEMS} outcomes={[]} open={false} onOpen={noop} onFinish={noop} onAnswer={noop} />}
+            {at === 4 && <MixIsland cards items={ITEMS} outcomes={[]} open startAt={0} onOpen={noop} onFinish={noop} onAnswer={noop} />}
+            {at === 5 && <MixIsland cards items={ITEMS} outcomes={["SOLD"]} open startAt={0} onOpen={noop} onFinish={noop} onAnswer={noop} />}
+            {at === 6 && <RealEnd stage="email" />}
+            {at === 7 && <RealEnd stage="done" />}
+          </div>
+        </div>
+      </div>
+      <p className="text-center text-[11px] font-semibold tracking-[0.12em] text-[#7C948D] uppercase">Exemple · vente d&apos;exemple, produits du stock local</p>
+    </article>
   );
 }
 
@@ -773,6 +846,7 @@ const SERVED: { key: string; title: string; text: string; View: () => ReactNode 
 ];
 
 const PAGE_CSS = `
+.player-in{animation:bravo .45s cubic-bezier(.2,.9,.3,1.1) both}
 .eq{height:4px;animation:eq 1.1s ease-in-out infinite}
 @keyframes eq{0%,100%{height:4px;opacity:.5}50%{height:14px;opacity:1}}
 .ring-spin{background:conic-gradient(from 0deg,transparent 0 55%,#E8FF9C 75%,transparent 95%);animation:spin 3.2s linear infinite;-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2px));mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2px))}
@@ -843,6 +917,10 @@ export function SaleEndTrials() {
         <p className="mt-2 max-w-3xl text-[15px] leading-7 text-[#4D6B64]">
           Chaque étape de la vraie bannière, figée : prenez le temps de tout regarder. Les cartes et la routine se cliquent. Vente d&apos;exemple (vrais produits du stock, photos studio).
         </p>
+
+        <h2 className="mt-8 text-[20px] font-bold text-[#0F2F2A]">Un scan complet, de bout en bout</h2>
+        <p className="mt-1 mb-4 max-w-3xl text-[14.5px] leading-7 text-[#4D6B64]">La version retenue qui se joue toute seule, à un rythme lisible. « Pause » pour regarder, les flèches ou la barre pour aller à une étape.</p>
+        <ScanPlayer />
 
         {/* La version retenue (fondateur, 29 oct. 2026) : l'ADN seulement sur la petite bannière ; le scan à la même taille, la croix en citron. */}
         <h2 className="mt-8 text-[20px] font-bold text-[#0F2F2A]">Le parcours, version retenue</h2>
