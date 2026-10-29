@@ -366,8 +366,9 @@ export function servedWord(saleId: string, userId: string): string | null {
 export function shouldAskServed(view: Pick<PosteView, "island" | "entry">): boolean {
   const entry = view.entry;
   if (view.island.stage !== "done" || !entry) return false;
-  const soldOnScreen = entry.items.some((item, index) => item.outcome === "SOLD" || view.island.outcomes[index] === "SOLD");
-  return soldOnScreen && (entry.team?.length ?? 0) >= 2;
+  // À chaque fin de vente, même sans conseil vendu (fondateur, 29 oct. 2026 : « il n'y a toujours pas, à la fin, pour savoir
+  // qui a servi la vente ») : il faut seulement un collègue à choisir.
+  return (entry.team?.length ?? 0) >= 2;
 }
 
 export function finishWord(saleId: string): string | null {

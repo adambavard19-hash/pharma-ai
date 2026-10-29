@@ -846,7 +846,9 @@ function AdviceIsland({ item, width, sold, onClose, onCancelSold, alternatives, 
   const said = tell.length > 0 ? tell : reason ? [reason] : [];
   const others = item.sheet?.alternatives ?? [];
   return (
-    <IslandShell width={width} tone="accent" contentKey={`conseil-${item.name}`} label={`Conseil : ${item.name}`}>
+    // « crd-light » : blanc et arrondi dès la première image — sur le poste, la fenêtre montrait un rond noir le temps
+    // que la fiche s'affiche (vidéo du 29 oct. 2026).
+    <IslandShell width={width} tone="accent" className="crd-light" contentKey={`conseil-${item.name}`} label={`Conseil : ${item.name}`}>
       <div data-ile-conseil="" className="relative overflow-hidden rounded-[22px] bg-[#EFF3F1]">
         <div className="pointer-events-none absolute inset-0 isolate" aria-hidden="true">
           <HelixBackdrop position="contained" framing="app" lazy className="[&_canvas]:scale-[1.6]" />
@@ -866,7 +868,7 @@ function AdviceIsland({ item, width, sold, onClose, onCancelSold, alternatives, 
                 {item.drug && <p className="text-[10px] font-bold tracking-[0.14em] uppercase" style={{ color: L.green }}>pour {item.drug}</p>}
                 <p className="mt-0.5 text-[17px] leading-[21px] font-bold tracking-[-0.025em] break-words">
                   {item.sheet?.name || item.name}
-                  <span className="ml-2 whitespace-nowrap tabular-nums" style={{ color: L.green }}>{item.price && item.stock !== "UNKNOWN" ? item.price : "—"}</span>
+                  {item.price && item.stock !== "UNKNOWN" && <span className="ml-2 whitespace-nowrap tabular-nums" style={{ color: L.green }}>{item.price}</span>}
                 </p>
               </div>
               {onClose && (
