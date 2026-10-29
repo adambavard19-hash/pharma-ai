@@ -478,6 +478,119 @@ const FUTURES: { key: string; title: string; text: string; View: () => ReactNode
   { key: "F6", title: "Le radar", text: "Comme la base, mais un petit radar qui balaie à la place du signal : il guette le prochain bip.", View: F6Radar },
 ];
 
+/* ================================================================== ÉTAPE 1, AUTOUR DU NÉON (F3) */
+
+/** Le nom en petites capitales espacées, « boost » en citron (F3). */
+function NeonName({ spacing = "0.32em" }: { spacing?: string }) {
+  return <span className="text-[11px] font-bold whitespace-nowrap text-white uppercase" style={{ letterSpacing: spacing }}>Pharma<span className="text-[#E8FF9C]">boost</span></span>;
+}
+
+/** L'ouverture dans l'esprit néon : « Scannez une boîte » en capitales, « Une question ? » au contour citron. */
+function NeonOpened() {
+  return (
+    <>
+      <span className="text-in text-[10.5px] font-bold tracking-[0.2em] whitespace-nowrap text-white uppercase">Scannez une boîte</span>
+      <span className="text-in ml-1 rounded-full border border-[#E8FF9C] px-2.5 py-[3px] text-[10.5px] font-bold tracking-[0.08em] whitespace-nowrap text-[#E8FF9C] uppercase" style={{ animationDelay: "80ms" }}>Une question ?</span>
+    </>
+  );
+}
+
+function NeonDots({ step = false }: { step?: boolean }) {
+  return (
+    <span className="flex items-center gap-[3px]" aria-hidden="true">
+      {[0, 1, 2].map((i) => <i key={i} className={`${step ? "dot-step" : "dot"} block size-[5px] rounded-full bg-[#E8FF9C]`} style={{ animationDelay: `${i * (step ? 0.25 : 0.2)}s` }} />)}
+    </span>
+  );
+}
+
+/** La capsule néon de base, qui s'ouvre au survol. */
+function NeonPill({ lead, extra, className = "neon", spacing }: { lead: ReactNode; extra?: ReactNode; className?: string; spacing?: string }) {
+  const { over, bind } = useOver();
+  return (
+    <span {...bind} className={`${className} relative inline-flex items-center gap-3 overflow-hidden rounded-full bg-[#030504] px-4 transition-all duration-300`} style={{ height: over ? 44 : 36 }}>
+      {lead}
+      {over ? <NeonOpened /> : <><NeonName spacing={spacing} />{extra}</>}
+    </span>
+  );
+}
+
+/** N1 · La croix au néon : la croix de pharmacie, en contour citron, à la place des points. */
+function N1Cross() {
+  return (
+    <NeonPill
+      lead={
+        <svg viewBox="0 0 20 20" className="size-[15px] shrink-0 drop-shadow-[0_0_4px_rgba(232,255,156,.8)]" aria-hidden="true">
+          <path d="M7 1.5h6v5.5h5.5v6H13v5.5H7V13H1.5V7H7z" fill="none" stroke="#E8FF9C" strokeWidth="1.6" strokeLinejoin="round" />
+        </svg>
+      }
+    />
+  );
+}
+
+/** N2 · Le néon en dégradé : un contour qui passe du turquoise au citron en tournant, le nom en dégradé lui aussi. */
+function N2Gradient() {
+  const { over, bind } = useOver();
+  return (
+    <span {...bind} className="neon-grad relative inline-flex rounded-full p-px transition-all duration-300" style={{ height: over ? 44 : 36 }}>
+      <span className="relative inline-flex h-full items-center gap-3 rounded-full bg-[#030504] px-4">
+        <NeonDots />
+        {over ? <NeonOpened /> : <span className="grad-text text-[11px] font-bold tracking-[0.32em] whitespace-nowrap uppercase">Pharmaboost</span>}
+      </span>
+    </span>
+  );
+}
+
+/** N3 · Les points qui avancent l'un après l'autre (« … »), et un trait citron qui file sous le nom. */
+function N3Sweep() {
+  return (
+    <NeonPill
+      lead={<NeonDots step />}
+      extra={<span className="underline-sweep absolute right-4 bottom-[7px] left-[44px] h-px" aria-hidden="true" />}
+    />
+  );
+}
+
+/** N4 · Double contour : un trait fin dedans, la lueur dehors, comme un écran de science-fiction. */
+function N4Double() {
+  return <NeonPill className="neon neon-double" lead={<NeonDots />} spacing="0.4em" />;
+}
+
+/** N5 · Avec le comptoir : « Comptoir 1 », en tout petit, séparé d'un trait. */
+function N5Counter() {
+  return (
+    <NeonPill
+      lead={<NeonDots />}
+      extra={
+        <>
+          <span className="h-3.5 w-px bg-[#E8FF9C]/30" />
+          <span className="text-[9.5px] font-semibold tracking-[0.2em] whitespace-nowrap text-[#9FCBBB] uppercase">Comptoir 1</span>
+        </>
+      }
+    />
+  );
+}
+
+/** N6 · Le battement : le contour bat comme un cœur (deux battements rapprochés, puis une pause). */
+function N6Heart() {
+  return <NeonPill className="neon-heart" lead={<NeonDots />} />;
+}
+
+/** N7 · Néon sur verre fumé : le contour citron de F3 sur la capsule transparente et floue de F1. */
+function N7Glass() {
+  return <NeonPill className="neon bg-[rgba(3,5,4,.6)]! backdrop-blur-xl" lead={<NeonDots />} />;
+}
+
+const NEONS: { key: string; title: string; text: string; View: () => ReactNode }[] = [
+  { key: "F3", title: "Néon fin (rappel)", text: "Celle que tu as aimée : contour citron qui respire, le nom en capitales espacées, trois points. Elle s'ouvre maintenant en capitales, avec « Une question ? » au contour citron.", View: () => <NeonPill lead={<NeonDots />} /> },
+  { key: "N1", title: "La croix au néon", text: "La croix de pharmacie dessinée en néon citron à la place des trois points : on sait tout de suite que c'est la pharmacie.", View: N1Cross },
+  { key: "N2", title: "Néon en dégradé", text: "Le contour passe du turquoise au citron en tournant lentement ; le nom est en dégradé lui aussi.", View: N2Gradient },
+  { key: "N3", title: "Les points qui avancent", text: "Les trois points s'allument l'un après l'autre, et un trait citron file sous le nom : elle attend le bip.", View: N3Sweep },
+  { key: "N4", title: "Double contour", text: "Un trait fin à l'intérieur, la lueur à l'extérieur, le nom encore plus espacé : très science-fiction.", View: N4Double },
+  { key: "N5", title: "Avec le comptoir", text: "« Comptoir 1 » en tout petit à droite, séparé d'un trait : on sait sur quel poste on est.", View: N5Counter },
+  { key: "N6", title: "Le battement", text: "Le contour bat comme un cœur : deux battements rapprochés, puis une pause. Vivant, et santé.", View: N6Heart },
+  { key: "N7", title: "Néon sur verre fumé", text: "Le contour citron de F3 sur la capsule transparente et floue de F1 : le logiciel se devine derrière.", View: N7Glass },
+];
+
 /* ================================================================== LA FIN DE LA VENTE */
 
 /* ---------------------------------------- La vraie fin de vente du poste (fin 3), figée */
@@ -611,6 +724,15 @@ const PAGE_CSS = `
 .holo-border{background:conic-gradient(from var(--ang,0deg),#3DDC84,#5FD3E8,#E8FF9C,#B79CFF,#3DDC84);animation:glow-rot 6s linear infinite;box-shadow:0 14px 34px -14px rgba(0,0,0,.6)}
 .shine{background:linear-gradient(100deg,#fff 40%,#E8FF9C 48%,#B8F5E6 52%,#fff 60%);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shine 4s ease-in-out infinite}
 @keyframes shine{from{background-position:100% 0}to{background-position:-100% 0}}
+.dot-step{animation:dot-step 1.5s ease-in-out infinite}
+@keyframes dot-step{0%,60%,100%{opacity:.25}20%{opacity:1;box-shadow:0 0 6px #E8FF9C}}
+.neon-grad{background:conic-gradient(from var(--ang,0deg),#5FD3E8,#E8FF9C,#3DDC84,#5FD3E8);animation:glow-rot 6s linear infinite;box-shadow:0 0 14px rgba(95,211,232,.25)}
+.grad-text{background:linear-gradient(90deg,#9FF0F5,#E8FF9C);-webkit-background-clip:text;background-clip:text;color:transparent}
+.underline-sweep{background:linear-gradient(90deg,transparent,#E8FF9C,transparent);background-size:40% 100%;background-repeat:no-repeat;animation:usweep 2.4s ease-in-out infinite}
+@keyframes usweep{from{background-position:-40% 0}to{background-position:140% 0}}
+.neon-double{box-shadow:inset 0 0 0 1px rgba(232,255,156,.35),0 0 0 3px #030504,0 0 0 4px rgba(232,255,156,.6),0 0 18px rgba(232,255,156,.3)!important;animation:none}
+.neon-heart{box-shadow:0 0 0 1px rgba(232,255,156,.6),0 0 10px rgba(232,255,156,.2);animation:heartbeat 2.2s ease-in-out infinite}
+@keyframes heartbeat{0%,40%,100%{box-shadow:0 0 0 1px rgba(232,255,156,.45),0 0 6px rgba(232,255,156,.15)}10%,30%{box-shadow:0 0 0 1.5px #E8FF9C,0 0 20px rgba(232,255,156,.5)}20%{box-shadow:0 0 0 1px rgba(232,255,156,.5),0 0 8px rgba(232,255,156,.2)}}
 .radar{background:conic-gradient(from 0deg,rgba(232,255,156,.7),transparent 30%);animation:spin 1.8s linear infinite}
 .breathe{animation:breathe 2.4s ease-in-out infinite}
 @keyframes breathe{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
@@ -631,7 +753,7 @@ const PAGE_CSS = `
 .confetti{position:absolute;left:50%;top:50%;pointer-events:none}
 .confetti i{position:absolute;width:6px;height:6px;margin:-3px;border-radius:2px;background:var(--c);opacity:0;animation:conf 1.1s cubic-bezier(.2,.8,.3,1) both}
 @keyframes conf{0%{opacity:1;transform:rotate(var(--a)) translateY(0)}100%{opacity:0;transform:rotate(var(--a)) translateY(calc(var(--d) * -1)) rotate(180deg)}}
-@media (prefers-reduced-motion:reduce){.text-in,.smoke-wrap,.aurora,.neon,.dot,.holo-border,.shine,.radar,.eq,.ring-spin,.glow-border,.breathe,.idle-arm,.idle-laser,.pop,.bravo-in,.countdown,.gauge,.confetti i{animation:none}}
+@media (prefers-reduced-motion:reduce){.dot-step,.neon-grad,.underline-sweep,.neon-heart,.text-in,.smoke-wrap,.aurora,.neon,.dot,.holo-border,.shine,.radar,.eq,.ring-spin,.glow-border,.breathe,.idle-arm,.idle-laser,.pop,.bravo-in,.countdown,.gauge,.confetti i{animation:none}}
 `;
 
 export function SaleEndTrials() {
@@ -644,7 +766,24 @@ export function SaleEndTrials() {
           Chaque étape de la vraie bannière, figée : prenez le temps de tout regarder. Les cartes et la routine se cliquent. Vente d&apos;exemple (vrais produits du stock, photos studio).
         </p>
 
-        <h2 className="mt-8 text-[20px] font-bold text-[#0F2F2A]">Étape 1 : la base (M3 qui s&apos;ouvre) et de nouvelles pistes</h2>
+        <h2 className="mt-8 text-[20px] font-bold text-[#0F2F2A]">Étape 1 : autour du néon fin (F3)</h2>
+        <p className="mt-1 max-w-3xl text-[14.5px] leading-7 text-[#4D6B64]">Toutes s&apos;ouvrent au survol : passez la souris dessus. Le fond gris clair imite l&apos;écran de LGPI.</p>
+        <div className="mt-4 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          {NEONS.map((item) => (
+            <article key={item.key} className={`flex flex-col gap-3 rounded-2xl border bg-white p-5 ${item.key === "F3" ? "border-[#0E7C5A] ring-1 ring-[#0E7C5A]" : "border-[#DCE7E2]"}`}>
+              <div>
+                <p className="text-[12px] font-bold tracking-[0.12em] text-[#4D6B64] uppercase">{item.key === "F3" ? "Ta préférée" : `Proposition ${item.key}`}</p>
+                <h3 className="text-[17px] font-bold text-[#0F2F2A]">{item.title}</h3>
+                <p className="mt-1 text-[13px] leading-6 text-[#4D6B64]">{item.text}</p>
+              </div>
+              <Screen>
+                <item.View />
+              </Screen>
+            </article>
+          ))}
+        </div>
+
+        <h2 className="mt-12 text-[20px] font-bold text-[#0F2F2A]">Étape 1 : la base (M3 qui s&apos;ouvre) et de nouvelles pistes</h2>
         <p className="mt-1 max-w-3xl text-[14.5px] leading-7 text-[#4D6B64]">Toutes s&apos;ouvrent au survol, comme la M5 : passez la souris dessus.</p>
         <div className="mt-4 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
           {FUTURES.map((item) => (
