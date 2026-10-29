@@ -201,7 +201,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                         <CardPhoto src={advice.image} name={advice.name} />
                         <span className="min-w-0 flex-1">
                           {/* Le nom entier sur deux lignes au plus, jamais coupé à côté de la coche « Vendu » (fondateur, 29 oct. 2026). */}
-                          <span className="flex items-start gap-1.5 text-[14px] leading-[18px] font-bold">
+                          <span className="flex items-start gap-1.5 text-[15.5px] leading-[20px] font-bold">
                             <span className="line-clamp-2">{advice.name}</span>
                             {sold(head) && <Check className="mt-0.5 size-3.5 shrink-0" strokeWidth={3} style={{ color: L.green }} aria-label="Vendu" />}
                           </span>
@@ -218,7 +218,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                         </span>
                         <span className="flex shrink-0 flex-col items-end gap-1 text-right">
                           {/* Le prix seulement avec un stock fiable (jamais un chiffre douteux) ; sinon rien, pas de tiret. */}
-                          {advice.price && advice.stock !== "UNKNOWN" && <span className="block text-[15px] font-bold tabular-nums" style={{ color: L.green }}>{advice.price}</span>}
+                          {advice.price && advice.stock !== "UNKNOWN" && <span className="block text-[18px] font-bold tabular-nums" style={{ color: L.green }}>{advice.price}</span>}
                           {/* « Marge » écrit en toutes lettres (poste du 29 oct. 2026 : « on voit ni le stock ni la marge »). */}
                           {advice.margin && <span className="inline-block rounded-md bg-[#FFE58A] px-1.5 py-0.5 text-[11px] font-bold whitespace-nowrap text-[#4A3500] tabular-nums">Marge {advice.margin}</span>}
                         </span>
@@ -823,11 +823,12 @@ const TELL_MAX = 2;
 
 /** La photo studio du conseil, sur sa tuile blanche ; sans photo studio, une tuile vide (jamais une photo inventée). */
 function CardPhoto({ src, name }: { src?: string; name: string }) {
-  if (!src) return <Monogram name={name} />;
+  // Grandes photos (fondateur, 29 oct. 2026, variante A) : on lit de loin, depuis le comptoir.
+  if (!src) return <Monogram name={name} size={62} />;
   return (
-    <span className="inline-flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white">
+    <span className="inline-flex size-[62px] shrink-0 items-center justify-center overflow-hidden rounded-[14px] bg-white">
       {/* eslint-disable-next-line @next/next/no-img-element -- image locale de l'agent ou du site, déjà dimensionnée */}
-      <img data-ile-mix-photo="" src={src} alt="" width={44} height={44} draggable={false} className="size-full object-contain p-0.5" />
+      <img data-ile-mix-photo="" src={src} alt="" width={58} height={58} draggable={false} className="size-full object-contain p-0.5" />
     </span>
   );
 }
