@@ -535,6 +535,13 @@ export function PosteIsland() {
   // La bannière « mix » (fondateur, 19 oct. 2026) ; l'ancienne reste joignable pour revenir en arrière : `?banniere=ancienne`.
   const mix = useSyncExternalStore(noSubscribe, () => new URLSearchParams(window.location.search).get("banniere") !== "ancienne", () => true);
   // La démo au comptoir montre chaque conseil sur sa ligne de la petite bannière, même pour une seule boîte (fondateur, 28 oct. 2026).
+  // La bannière « cartes photo » et le scan en animation (fondateur, 29 oct. 2026) : la gélule par défaut, `?scan=croix` pour la
+  // croix de pharmacie, `?scan=lignes` pour les lignes cochées d'avant ; `?banniere=mix` pour la bannière mix d'avant.
+  const cards = useSyncExternalStore(noSubscribe, () => !["mix", "ancienne"].includes(new URLSearchParams(window.location.search).get("banniere") ?? ""), () => true);
+  const scanLook = useSyncExternalStore(noSubscribe, () => {
+    const value = new URLSearchParams(window.location.search).get("scan");
+    return value === "croix" ? "croix" : value === "lignes" ? null : "gelule";
+  }, () => "gelule" as const);
   const everyAdvice = useSyncExternalStore(noSubscribe, () => new URLSearchParams(window.location.search).has("tous-les-conseils"), () => false);
 
   // « C'est un autre client ? » : la dernière boîte est arrivée plus de 30 secondes après la précédente (le serveur la marque).
@@ -564,6 +571,7 @@ export function PosteIsland() {
     state: island,
     items,
     drug,
+    ...(scanLook ? { scanLook } : {}),
     alert,
     alertItems: entry?.alerts ?? [],
     movable: true,
@@ -721,6 +729,7 @@ export function PosteIsland() {
             onAnswer={islandProps.onAnswer}
             boxes={entry.boxes ?? []}
             everyAdvice={everyAdvice}
+            cards={cards}
             help={{
               log: helpLog.sale === entry.id ? helpLog.log : [],
               onAsk: (question, advice) => {

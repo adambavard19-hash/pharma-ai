@@ -6,6 +6,8 @@ import { islandTheme, PHARMABOOST_GREEN } from "./island-theme";
 import { BANNER } from "../../../agent/src/banner-design";
 import { SHEET_MISSING, SHEET_PATIENT_LABELS, type CounterSheet, type CounterSheetLine } from "../../../agent/src/counter-sheet";
 import { Robot } from "@/components/robot";
+import { ScanCapsule, SCAN_CSS, SCAN_STEPS, type ScanLook } from "./scan-capsule";
+import { eurosOf, possibleMargin } from "./mix-island";
 import { analysisSteps, allAnswered, followAdviceLink, isTap, registerTap, splitAlert, STAGE_MOOD, STAGE_WIDTH, stageTitle, stageTone, type IslandOutcome, type IslandState } from "@/core/island/banner-flow";
 import { cn } from "@/lib/utils";
 import { IslandShell } from "./island-shell";
@@ -68,6 +70,11 @@ export type IslandPill = { key: string; label: string; value: string; dot?: stri
 
 export type CounterIslandProps = {
   state: IslandState;
+  /**
+   * L'animation du scan (fondateur, 29 oct. 2026) : la gélule ou la croix de pharmacie à la place des lignes qui se cochent ;
+   * absente, les lignes d'avant.
+   */
+  scanLook?: ScanLook;
   items: IslandAdvice[];
   drug: string;
   alert: { title: string; text: string } | null;
@@ -455,7 +462,25 @@ export function CounterIsland(props: CounterIslandProps) {
       </div>
     );
   } else {
-    switch (state.stage) {
+    const scanPhase = props.scanLook ? ({ scan: "scan", analyzing: "analyse", ready: "found" } as const)[state.stage as "scan" | "analyzing" | "ready"] : undefined;
+    if (props.scanLook && scanPhase) {
+      // Les étapes de l'analyse ramenées aux quatre temps de l'animation ; trouvé, le nombre de conseils et la marge possible.
+      const total = analysisSteps(props.drug, count).length;
+      const margin = possibleMargin(items);
+      body = (
+        <>
+          <style>{SCAN_CSS}</style>
+          <ScanCapsule
+            look={props.scanLook}
+            phase={scanPhase}
+            done={Math.round((Math.min(state.stepsDone, total) / Math.max(1, total)) * SCAN_STEPS.length)}
+            drug={/lecture en cours/i.test(props.drug) ? "" : props.drug}
+            count={count}
+            margin={margin > 0 ? eurosOf(margin) : null}
+          />
+        </>
+      );
+    } else switch (state.stage) {
       case "idle":
         body = (
           <div data-ile-repos="" className="flex h-10 items-center gap-2 pr-3.5 pl-1.5">
