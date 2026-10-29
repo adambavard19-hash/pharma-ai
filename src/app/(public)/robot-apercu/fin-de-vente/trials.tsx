@@ -245,6 +245,120 @@ const PODS: { key: string; title: string; text: string; View: () => ReactNode }[
   { key: "D6", title: "Le robot qui s'ouvre", text: "Une pastille avec le robot ; au survol, elle s'ouvre sur « Comptoir 1 · scannez une boîte » et « Une question ? ».", View: PodExpand },
 ];
 
+/* ================================================================== ÉTAPE 1, MÉLANGE D3 + D5 */
+
+/** Le petit signal qui écoute la douchette (D3). */
+function Signal({ bars = 5, tone = "#3DDC84" }: { bars?: number; tone?: string }) {
+  return (
+    <span className="flex h-3.5 items-end gap-[3px]" aria-hidden="true">
+      {Array.from({ length: bars }, (_, i) => <i key={i} className="eq block w-[3px] rounded-full" style={{ animationDelay: `${i * 0.15}s`, background: tone }} />)}
+    </span>
+  );
+}
+
+/** « PharmaBoost » (D5) : Boost en citron. */
+function Wordmark({ size = 13 }: { size?: number }) {
+  return <span className="font-bold tracking-[-0.01em] whitespace-nowrap text-white" style={{ fontSize: size }}>Pharma<span className="text-[#E8FF9C]">Boost</span></span>;
+}
+
+/** La capsule noire de l'île, avec la lumière qui en fait le tour (épaisseur et vitesse réglables). */
+function Island({ children, height = 36, ring = 1.5, slow = false, className = "" }: { children: ReactNode; height?: number; ring?: number; slow?: boolean; className?: string }) {
+  return (
+    <span className={`glow-border relative inline-flex items-center justify-center rounded-full ${slow ? "glow-slow" : ""}`} style={{ padding: ring, height }}>
+      <span className={`relative inline-flex h-full items-center rounded-full bg-[#050807] ${className}`}>{children}</span>
+    </span>
+  );
+}
+
+/** M1 · Tout ensemble : la croix, « PharmaBoost », le signal ; la lumière fait le tour. */
+function MixAll() {
+  return (
+    <Island className="gap-2.5 px-3.5">
+      <IdleCross size={15} />
+      <Wordmark />
+      <Signal />
+    </Island>
+  );
+}
+
+/** M2 · Sans texte : la croix et le signal, la lumière autour. Le plus petit. */
+function MixMini() {
+  return (
+    <Island className="w-[120px] justify-between px-3">
+      <IdleCross size={15} />
+      <Signal />
+    </Island>
+  );
+}
+
+/** M3 · Le nom seul au centre, le signal remplace la croix ; une lumière lente, très calme. */
+function MixName() {
+  return (
+    <Island slow className="gap-2.5 px-4">
+      <Signal bars={4} tone="#E8FF9C" />
+      <Wordmark size={13.5} />
+    </Island>
+  );
+}
+
+/** M4 · La lumière ne court qu'en bas, comme un rayon de douchette ; la croix et le nom au-dessus. */
+function MixScanline() {
+  return (
+    <span className="relative inline-flex h-9 items-center gap-2.5 overflow-hidden rounded-full bg-[#050807] px-3.5 shadow-[0_10px_30px_-10px_rgba(0,0,0,.6),0_0_0_1px_rgba(232,255,156,.12)]">
+      <IdleCross size={15} />
+      <Wordmark />
+      <Signal bars={4} />
+      <span className="idle-laser absolute bottom-0 h-[1.5px] w-1/3" style={{ background: "linear-gradient(90deg,transparent,#E8FF9C,transparent)", boxShadow: "0 0 6px rgba(232,255,156,.8)" }} aria-hidden="true" />
+    </span>
+  );
+}
+
+/** M5 · L'île qui s'ouvre au survol : « Scannez une boîte » et « Une question ? » apparaissent. */
+function MixExpand() {
+  const [over, setOver] = useState(false);
+  return (
+    <span onMouseEnter={() => setOver(true)} onMouseLeave={() => setOver(false)}>
+      <Island height={over ? 44 : 36} className="gap-2.5 px-3.5 transition-all duration-300">
+        <IdleCross size={over ? 18 : 15} />
+        {over ? (
+          <>
+            <span className="pop text-[12.5px] leading-4 font-bold whitespace-nowrap text-white">Scannez une boîte</span>
+            <span className="pop ml-1 rounded-full bg-[#E8FF9C] px-2.5 py-1 text-[11px] font-bold whitespace-nowrap text-[#04261A]">Une question ?</span>
+          </>
+        ) : (
+          <>
+            <Wordmark />
+            <Signal />
+          </>
+        )}
+      </Island>
+    </span>
+  );
+}
+
+/** M6 · Deux lignes : le nom, et le comptoir dessous ; le signal à droite, la lumière autour. */
+function MixTwoLines() {
+  return (
+    <Island height={44} className="gap-2.5 pr-4 pl-3">
+      <IdleCross size={18} />
+      <span className="flex flex-col leading-none">
+        <Wordmark size={13} />
+        <span className="mt-1 text-[10px] font-medium text-[#9FCBBB]">Comptoir 1 · connecté</span>
+      </span>
+      <span className="ml-1"><Signal /></span>
+    </Island>
+  );
+}
+
+const MIXES: { key: string; title: string; text: string; View: () => ReactNode }[] = [
+  { key: "M1", title: "Tout ensemble", text: "La capsule noire de la D3, la lumière qui fait le tour de la D5 : la croix, « PharmaBoost » et le signal qui écoute le bip.", View: MixAll },
+  { key: "M2", title: "La plus petite", text: "Sans texte : la croix et le signal, la lumière autour. Elle ne cache presque rien de LGPI.", View: MixMini },
+  { key: "M3", title: "Le nom et le signal", text: "Le signal citron à la place de la croix, « PharmaBoost » au centre ; la lumière tourne lentement, très calme.", View: MixName },
+  { key: "M4", title: "Le rayon de douchette", text: "La lumière ne court qu'en bas de la capsule, comme le rayon d'une douchette ; la croix, le nom et le signal au-dessus.", View: MixScanline },
+  { key: "M5", title: "Elle s'ouvre au survol", text: "Comme M1 ; au survol, elle grandit un peu : « Scannez une boîte » et « Une question ? » pour demander un conseil sans scan.", View: MixExpand },
+  { key: "M6", title: "Deux lignes", text: "Le nom, et « Comptoir 1 · connecté » dessous : on voit d'un coup d'œil que le poste est branché.", View: MixTwoLines },
+];
+
 /* ================================================================== LA FIN DE LA VENTE */
 
 /* ---------------------------------------- La vraie fin de vente du poste (fin 3), figée */
@@ -365,6 +479,7 @@ const PAGE_CSS = `
 .glow-border{background:conic-gradient(from var(--ang,0deg),rgba(95,165,148,.35),#E8FF9C 20%,rgba(95,165,148,.35) 40%,rgba(95,165,148,.35));animation:glow-rot 4s linear infinite;box-shadow:0 14px 34px -14px rgba(0,0,0,.6)}
 @property --ang{syntax:"<angle>";inherits:false;initial-value:0deg}
 @keyframes glow-rot{to{--ang:360deg}}
+.glow-slow{animation-duration:9s}
 .breathe{animation:breathe 2.4s ease-in-out infinite}
 @keyframes breathe{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
 .idle-arm{animation:idle-arm 2.8s ease-in-out infinite}
@@ -397,7 +512,24 @@ export function SaleEndTrials() {
           Chaque étape de la vraie bannière, figée : prenez le temps de tout regarder. Les cartes et la routine se cliquent. Vente d&apos;exemple (vrais produits du stock, photos studio).
         </p>
 
-        <h2 className="mt-8 text-[20px] font-bold text-[#0F2F2A]">Étape 1 : nouvelles propositions, autour de la D</h2>
+        <h2 className="mt-8 text-[20px] font-bold text-[#0F2F2A]">Étape 1 : le mélange D3 + D5</h2>
+        <p className="mt-1 max-w-3xl text-[14.5px] leading-7 text-[#4D6B64]">La capsule noire très fine et le signal de la D3, la lumière qui fait le tour et « PharmaBoost » de la D5. Passez la souris sur M5.</p>
+        <div className="mt-4 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          {MIXES.map((item) => (
+            <article key={item.key} className="flex flex-col gap-3 rounded-2xl border border-[#DCE7E2] bg-white p-5">
+              <div>
+                <p className="text-[12px] font-bold tracking-[0.12em] text-[#4D6B64] uppercase">Proposition {item.key}</p>
+                <h3 className="text-[17px] font-bold text-[#0F2F2A]">{item.title}</h3>
+                <p className="mt-1 text-[13px] leading-6 text-[#4D6B64]">{item.text}</p>
+              </div>
+              <Screen>
+                <item.View />
+              </Screen>
+            </article>
+          ))}
+        </div>
+
+        <h2 className="mt-12 text-[20px] font-bold text-[#0F2F2A]">Étape 1 : propositions autour de la D</h2>
         <p className="mt-1 max-w-3xl text-[14.5px] leading-7 text-[#4D6B64]">Plus de « En attente de scan », plus de « Prêt » : petites, centrées, modernes. Passez la souris sur D1 et D6.</p>
         <div className="mt-4 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
           {PODS.map((item) => (
