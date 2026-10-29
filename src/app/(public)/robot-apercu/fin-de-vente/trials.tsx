@@ -847,8 +847,8 @@ export function SaleEndTrials() {
         <h2 className="mt-8 text-[20px] font-bold text-[#0F2F2A]">Le parcours, version retenue</h2>
         <p className="mt-1 max-w-3xl text-[14.5px] leading-7 text-[#4D6B64]">L&apos;ADN seulement sur la petite bannière ; le scan garde exactement sa taille, la croix s&apos;allume en citron ; ensuite, le néon sans ADN.</p>
         <div className="theme-neon mt-4 grid gap-5 lg:grid-cols-2">
-          <Frame n="Étape 1" title="PharmaBoost sur l'ADN" text="La petite bannière : le néon fin et l'ADN en citron dedans. Au survol, « Scannez une boîte » et « Une question ? ».">
-            <NeonPill className="neon neon-adn" lead={<NeonDots />} width={PILL_WIDTH} />
+          <Frame n="Étape 1" title="PharmaBoost sur l'ADN" text="La petite bannière : la croix de pharmacie en citron, PHARMABOOST, l'ADN en citron dedans. Au survol, « Scannez une boîte » et « Une question ? ».">
+            <NeonPill className="neon neon-adn" lead={<LimeCross lit={4} />} width={PILL_WIDTH} />
           </Frame>
           <Frame n="Étape 2" title="Scan : la croix s'allume en citron" text="Même taille que l'étape 1. Le nom de la boîte, et un bras de la croix s'allume à chaque étape de l'analyse.">
             <NeonScan lit={2} />
