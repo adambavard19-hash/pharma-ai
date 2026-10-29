@@ -145,7 +145,8 @@ function useBridge(onCommand: (command: HostCommand) => void): { send: (message:
       sendRef.current({ type: "ready" });
       return () => wv.removeEventListener("message", listener);
     }
-    if (window.parent !== window) {
+    // Dans un cadre, la page qui l'entoure pilote la bannière (démo au comptoir) ; la vente d'exemple (`?essai`) joue seule.
+    if (window.parent !== window && !new URLSearchParams(window.location.search).has("essai")) {
       const listener = (event: MessageEvent) => {
         if (event.origin !== window.location.origin) return;
         const data = event.data as { pbIsland?: unknown } | null;
@@ -547,6 +548,13 @@ export function PosteIsland() {
     // vert, `?scan=gelule` pour la gélule, `?scan=lignes` pour les lignes cochées d'avant.
     return value === "croix" ? "croix" : value === "gelule" ? "gelule" : value === "lignes" ? null : "blanc";
   }, () => "blanc" as const);
+  // Les essais d'habillage (fondateur, 29 oct. 2026 : « des exemples d'amélioration présentés comme le poste ») : seulement
+  // avec la vente d'exemple (`?essai=1&variante=a`), jamais sur un vrai poste. Le visuel seul change.
+  const variante = useSyncExternalStore(noSubscribe, () => {
+    const params = new URLSearchParams(window.location.search);
+    const value = params.get("variante");
+    return params.has("essai") && value && /^[a-f]$/.test(value) ? value : null;
+  }, () => null);
   const everyAdvice = useSyncExternalStore(noSubscribe, () => new URLSearchParams(window.location.search).has("tous-les-conseils"), () => false);
 
   // « C'est un autre client ? » : la dernière boîte est arrivée plus de 30 secondes après la précédente (le serveur la marque).
@@ -647,9 +655,10 @@ export function PosteIsland() {
 
   return (
     <>
-      <style>{`${ISLAND_CSS}\n${aurore ? AURORE_CSS : ""}\nhtml,body{background:transparent!important;overflow:hidden;}`}</style>
+      <style>{`${ISLAND_CSS}\n${aurore ? AURORE_CSS : ""}\nhtml,body{background:transparent!important;overflow:hidden;}${variante ? `\n${VARIANTES_CSS}` : ""}`}</style>
       <div
         ref={root}
+        data-variante={variante ?? undefined}
         data-ile-root=""
         title="Glissez pour déplacer la bannière"
         data-ile-place={view.side}
@@ -1038,3 +1047,26 @@ function AskBox({ open, onOpen, onClose, onAsk, typed, light = false }: { open: 
     </form>
   );
 }
+
+/**
+ * Les essais d'habillage de la bannière en cartes, joués sur la vente d'exemple (`/robot-apercu/variantes-poste`). Seule
+ * l'apparence change : contenu, étapes et règles restent ceux de la bannière en ligne.
+ */
+const VARIANTES_CSS = `
+[data-variante=a] [data-ile-cartes] span:has(> [data-ile-mix-photo]),[data-variante=a] [data-ile-cartes] [data-ile-mix-initiales]{width:62px!important;height:62px!important;border-radius:14px}
+[data-variante=a] [data-ile-cartes] .line-clamp-2{font-size:15.5px;line-height:20px}
+[data-variante=a] [data-ile-cartes] [data-ile-mix-ligne] > span:last-child > span:first-child{font-size:18px}
+[data-variante=b] [data-ile-cartes]::before{content:"✚  Conseils PharmaBoost";display:block;margin:-6px -6px 6px;padding:7px 14px;border-radius:16px 16px 0 0;background:linear-gradient(90deg,#0E7C5A,#14A374);color:#fff;font-weight:800;font-size:11.5px;letter-spacing:.12em;text-transform:uppercase}
+[data-variante=c] .crd-frame.crd-frame{background:linear-gradient(160deg,#0E7C5A,#0A5C46)!important}
+[data-variante=c] .crd-frame.crd-frame > div:first-child{opacity:.25;mix-blend-mode:screen}
+[data-variante=c] section.crd-light.crd-light{box-shadow:0 0 0 1px #0A5C46,0 20px 44px -14px rgba(10,92,70,.65)!important}
+[data-variante=d] [data-ile-cartes]{background:#F1FAF6!important}
+[data-variante=d] [data-ile-cartes] [data-ile-mix-ligne]{position:relative;margin:5px 0;background:#fff;box-shadow:0 1px 0 rgba(15,43,38,.05),0 8px 18px -12px rgba(15,43,38,.45)}
+[data-variante=d] [data-ile-cartes] [data-ile-mix-ligne]::before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:4px;border-radius:4px;background:#14A374}
+[data-variante=e] [data-ile-cartes] [data-ile-mix-repere]{font-size:12.5px;gap:6px}
+[data-variante=e] [data-ile-cartes] [data-ile-mix-repere] > span{padding:2px 8px;border-radius:999px}
+[data-variante=e] [data-ile-cartes] .whitespace-nowrap.rounded-md{font-size:13px;padding:3px 9px}
+[data-variante=f] section.crd-light.crd-light{box-shadow:0 0 0 1.5px #3DBF8E,0 0 0 6px rgba(61,191,142,.18),0 22px 46px -14px rgba(14,124,90,.6)!important;animation:var-halo 2.6s ease-in-out infinite}
+@keyframes var-halo{0%,100%{box-shadow:0 0 0 1.5px #3DBF8E,0 0 0 4px rgba(61,191,142,.12),0 22px 46px -14px rgba(14,124,90,.6)}50%{box-shadow:0 0 0 1.5px #3DBF8E,0 0 0 10px rgba(61,191,142,.22),0 22px 46px -14px rgba(14,124,90,.6)}}
+@media (prefers-reduced-motion:reduce){[data-variante=f] section.crd-light.crd-light{animation:none}}
+`;
