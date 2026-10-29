@@ -180,11 +180,11 @@ export function RoutineIsland({ routine, width, cards = false, onClose, onPointe
   const total = routineTotal(routine);
   return (
     <IslandShell width={width} tone="accent" className="crd-light" contentKey={cards ? "routine-cartes" : "routine-liste"} label={`Routine : ${routine.title}`} onPointerLeave={onPointerLeave}>
-      <div data-ile-routine="" className="relative overflow-hidden rounded-[22px] bg-[#EFF3F1]">
+      <div data-ile-routine="" className="relative overflow-hidden rounded-[22px] crd-frame bg-[#EFF3F1]">
         <div className="pointer-events-none absolute inset-0 isolate" aria-hidden="true">
           <HelixBackdrop position="contained" framing="app" lazy className="[&_canvas]:scale-[1.6]" />
         </div>
-        <div className="relative p-2.5">
+        <div className="crd-pad relative p-2.5">
           <div className="rounded-[18px] bg-white p-3 shadow-[0_12px_32px_-18px_rgba(15,43,38,0.55)]" style={{ color: INK }}>
             <div className="flex items-start gap-2">
               <span className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-full" style={{ background: ROUTINE_BG, color: ROUTINE_FG }}>

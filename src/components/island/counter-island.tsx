@@ -339,12 +339,12 @@ function Chip({ bg, fg, children }: { bg: string; fg: string; children: ReactNod
 /** Le fond blanc sur l'ADN des bannières de fin (fondateur, 29 oct. 2026 : « le fond blanc sur toutes les bannières »). */
 function LightPanel({ children }: { children: ReactNode }) {
   return (
-    <div className="relative overflow-hidden rounded-[22px] bg-[#EFF3F1]">
+    <div className="relative overflow-hidden rounded-[22px] crd-frame bg-[#EFF3F1]">
       <style>{SCAN_CSS}</style>
       <div className="pointer-events-none absolute inset-0 isolate" aria-hidden="true">
         <HelixBackdrop position="contained" framing="app" lazy className="[&_canvas]:scale-[1.6]" />
       </div>
-      <div className="relative p-2">
+      <div className="crd-pad relative p-2">
         <div className="rounded-[18px] bg-white shadow-[0_12px_32px_-18px_rgba(15,43,38,0.55)]">{children}</div>
       </div>
     </div>
