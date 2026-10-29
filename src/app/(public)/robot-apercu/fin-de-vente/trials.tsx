@@ -649,7 +649,7 @@ function LimeCross({ lit, size = 16, glow = false }: { lit: number; size?: numbe
 /** Le scan dans la petite bannière néon, à la même taille que l'attente : la croix citron et la boîte (ou « 2 conseils »). */
 function NeonScan({ lit, found = false }: { lit: number; found?: boolean }) {
   return (
-    <span className="neon relative inline-flex h-9 items-center justify-center gap-2.5 overflow-hidden rounded-full bg-[#030504] px-4" style={{ width: PILL_WIDTH }}>
+    <span className="neon neon-adn relative inline-flex h-9 items-center justify-center gap-2.5 overflow-hidden rounded-full bg-[#030504] px-4" style={{ width: PILL_WIDTH }}>
       <LimeCross lit={found ? 4 : lit} glow={found} />
       {found ? (
         <span className="pop text-[11px] font-bold tracking-[0.2em] whitespace-nowrap text-[#E8FF9C] uppercase">2 conseils</span>
@@ -808,7 +808,8 @@ const PAGE_CSS = `
 @keyframes neon-in{0%,100%{box-shadow:inset 0 0 0 1px rgba(232,255,156,.7),inset 0 0 14px rgba(232,255,156,.14)}50%{box-shadow:inset 0 0 0 1px rgba(232,255,156,.3),inset 0 0 4px rgba(232,255,156,.05)}}
 .theme-adn .scan-screen section:not(#_)::after,.neon-adn::after{content:"";position:absolute;inset:-20%;z-index:-1;pointer-events:none;background:url(/poste/adn-helice.jpg) 62% 40%/cover no-repeat;filter:invert(1) grayscale(1) brightness(1.1) contrast(1.4) sepia(1) hue-rotate(28deg) saturate(3.2);mix-blend-mode:screen;opacity:.42;animation:adn-vit 14s ease-in-out infinite alternate}
 .neon-adn{isolation:isolate}
-.neon-adn::after{opacity:.75;inset:-60% -10%}
+.neon-adn::after{opacity:.95;inset:-60% -10%;filter:invert(1) grayscale(1) brightness(1.35) contrast(1.5) sepia(1) hue-rotate(28deg) saturate(3.6)}
+.neon-adn > *{position:relative;text-shadow:0 1px 4px rgba(0,0,0,.85)}
 @keyframes adn-vit{from{transform:translate3d(-6%,-3%,0) scale(1.05) rotate(-2deg)}to{transform:translate3d(6%,3%,0) scale(1.15) rotate(2deg)}}
 .radar{background:conic-gradient(from 0deg,rgba(232,255,156,.7),transparent 30%);animation:spin 1.8s linear infinite}
 .breathe{animation:breathe 2.4s ease-in-out infinite}

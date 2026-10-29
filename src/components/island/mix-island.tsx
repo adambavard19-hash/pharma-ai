@@ -190,9 +190,10 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                   >
                     <CardPhoto src={advice.image} />
                     <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-1.5 text-[14px] leading-[18px] font-bold text-white">
-                        <span className="truncate">{advice.name}</span>
-                        {sold(head) && <Check className="size-3.5 shrink-0 text-[#E8FF9C]" strokeWidth={3} aria-label="Vendu" />}
+                      {/* Le nom entier sur deux lignes au plus, jamais coupé à côté de la coche « Vendu » (fondateur, 29 oct. 2026). */}
+                      <span className="flex items-start gap-1.5 text-[14px] leading-[18px] font-bold text-white">
+                        <span className="line-clamp-2">{advice.name}</span>
+                        {sold(head) && <Check className="mt-0.5 size-3.5 shrink-0 text-[#E8FF9C]" strokeWidth={3} aria-label="Vendu" />}
                       </span>
                       {advice.drug && <span className="block truncate text-[11.5px] text-white/55">pour {advice.drug}</span>}
                       <span data-ile-mix-repere="" className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] font-semibold">
