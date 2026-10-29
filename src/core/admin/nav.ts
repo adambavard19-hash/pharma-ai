@@ -40,7 +40,7 @@ export type AdminNavSpace = {
 };
 
 export const ADMIN_NAV: AdminNavSpace[] = [
-  { key: "home", label: "Accueil", href: "/admin", matches: ["/admin/notifications"], groups: [] },
+  { key: "home", label: "Accueil", href: "/admin", matches: ["/admin/notifications", "/admin/carnet"], groups: [] },
   {
     key: "pharmacies",
     label: "Officines",

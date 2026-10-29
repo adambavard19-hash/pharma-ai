@@ -184,6 +184,7 @@ export type AuditAction =
   | "central_advice.rule_decided"
   | "central_advice.priorities_saved"
   | "advice.modules_saved"
+  | "admin.carnet_changed"
   | "central_advice.rule_created"
   | "central_advice.family_created"
   | "central_advice.family_edited"

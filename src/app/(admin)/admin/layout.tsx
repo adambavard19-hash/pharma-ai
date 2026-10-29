@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { Bell, LogOut } from "lucide-react";
+import { Bell, LogOut, NotebookPen } from "lucide-react";
 import { requirePlatformSession } from "@/server/auth/platform-session";
 import { platformLogoutAction } from "@/server/actions/platform";
 import { Dropdown, DropdownLabel, DropdownSeparator } from "@/components/ui/dropdown";
@@ -8,6 +8,8 @@ import { AdminNav, AdminSectionNav } from "./admin-nav";
 import { countOpenGaps } from "@/server/services/knowledge-gap-store";
 import { AdminIsland } from "./admin-island";
 import { QuickActions } from "./quick-actions";
+import { carnetDueCount } from "@/server/services/admin-carnet";
+import { dayKey } from "@/core/admin/carnet";
 import { countUnreadAdminNotifications } from "@/server/services/sales/notifications";
 import { countSupportToAnswer } from "@/server/services/support";
 import { countContractsToCountersign } from "@/server/services/admin/contracts-admin";
@@ -23,7 +25,7 @@ import { countContractsToCountersign } from "@/server/services/admin/contracts-a
  */
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const session = await requirePlatformSession();
-  const [unread, supportOpen, gapsOpen, toCountersign] = await Promise.all([countUnreadAdminNotifications(), countSupportToAnswer(), countOpenGaps(), countContractsToCountersign()]);
+  const [unread, supportOpen, gapsOpen, toCountersign, carnetDue] = await Promise.all([countUnreadAdminNotifications(), countSupportToAnswer(), countOpenGaps(), countContractsToCountersign(), carnetDueCount(dayKey(new Date()))]);
 
   return (
     <div className="min-h-dvh bg-surface-app">
@@ -44,6 +46,12 @@ export default async function AdminLayout({ children }: { children: ReactNode })
 
           <div className="flex shrink-0 items-center gap-1.5">
             <QuickActions />
+            {/* Le carnet (fondateur, 29 oct. 2026) : à un clic de partout ; la pastille compte ce qui est pour aujourd'hui ou en retard. */}
+            <Link href="/admin/carnet" className="relative flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-semibold text-text-secondary transition-colors hover:bg-surface-sunken hover:text-text-primary" aria-label={carnetDue > 0 ? `Mon carnet : ${carnetDue} pour aujourd'hui ou en retard` : "Mon carnet"}>
+              <NotebookPen className="size-[18px]" aria-hidden="true" />
+              <span className="hidden md:inline">Carnet</span>
+              {carnetDue > 0 && <span className="absolute top-1 right-0.5 min-w-4 rounded-full bg-danger-600 px-1 text-center text-[10px] leading-4 font-semibold text-white tabular-nums">{carnetDue > 99 ? "99+" : carnetDue}</span>}
+            </Link>
             <Link href="/admin/notifications" className="relative flex size-9 items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-surface-sunken hover:text-text-primary" aria-label={unread > 0 ? `Notifications : ${unread} non lue${unread > 1 ? "s" : ""}` : "Notifications"}>
               <Bell className="size-[18px]" aria-hidden="true" />
               {unread > 0 && <span className="absolute top-1 right-1 min-w-4 rounded-full bg-brand-600 px-1 text-center text-[10px] leading-4 font-semibold text-white tabular-nums">{unread > 99 ? "99+" : unread}</span>}
