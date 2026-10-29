@@ -683,8 +683,53 @@ function LightingScan() {
   return <NeonScan lit={lit} />;
 }
 
+/** La petite bannière en blanc sur l'ADN : la croix verte, PHARMABOOST, et au survol l'ouverture. */
+function WhitePill({ lead, label, found = false, hover = true }: { lead: ReactNode; label: ReactNode; found?: boolean; hover?: boolean }) {
+  const { over, bind } = useOver();
+  const open = hover && over;
+  return (
+    <span {...(hover ? bind : {})} className="white-pill white-adn relative inline-flex items-center justify-center gap-2.5 overflow-hidden rounded-full bg-white px-4 transition-all duration-300" style={{ height: open ? 44 : 40, ...(open ? {} : { width: PILL_WIDTH }) }}>
+      {lead}
+      {open ? (
+        <>
+          <span className="text-in text-[10.5px] font-bold tracking-[0.2em] whitespace-nowrap text-[#0F2B26] uppercase">Scannez une boîte</span>
+          <span className="text-in ml-1 rounded-full bg-[#0E8A7B] px-2.5 py-[3px] text-[10.5px] font-bold tracking-[0.08em] whitespace-nowrap text-white uppercase" style={{ animationDelay: "80ms" }}>Une question ?</span>
+        </>
+      ) : (
+        <span className={`${found ? "pop text-[#0E8A7B]" : "text-[#0F2B26]"} text-[11px] font-bold tracking-[0.22em] whitespace-nowrap uppercase`}>{label}</span>
+      )}
+    </span>
+  );
+}
+
+/** La croix verte de la bannière blanche : ses bras s'allument un à un. */
+function GreenCross({ lit, size = 24 }: { lit: number; size?: number }) {
+  return (
+    <svg viewBox="0 0 40 40" style={{ width: size, height: size }} className="shrink-0" aria-hidden="true">
+      {[
+        { x: 14, y: 2 },
+        { x: 26, y: 14 },
+        { x: 14, y: 26 },
+        { x: 2, y: 14 },
+      ].map((arm, i) => (
+        <rect key={i} x={arm.x} y={arm.y} width="12" height="12" rx="2.5" fill={i < lit ? "#0E8A7B" : "rgba(14,138,123,.16)"} style={{ transition: "fill .25s" }} />
+      ))}
+      <rect x="14" y="14" width="12" height="12" rx="2.5" fill="#0E8A7B" className="scn-heart" />
+    </svg>
+  );
+}
+
+function WhiteLighting() {
+  const [lit, setLit] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setLit((value) => Math.min(4, value + 1)), 700);
+    return () => clearInterval(id);
+  }, []);
+  return <WhitePill hover={false} lead={<GreenCross lit={lit} />} label="Curacné 20 mg" />;
+}
+
 /** Le scan complet en version néon, joué de bout en bout ; pause et étapes à la main. */
-function ScanPlayer() {
+function ScanPlayer({ white = false }: { white?: boolean }) {
   const [at, setAt] = useState(0);
   const [playing, setPlaying] = useState(true);
   useEffect(() => {
@@ -714,12 +759,12 @@ function ScanPlayer() {
           </button>
         ))}
       </div>
-      <div className="theme-neon">
+      <div className={white ? "" : "theme-neon"}>
         <div className="scan-screen flex min-h-[520px] flex-col items-center gap-2 rounded-xl px-3 pt-5 pb-6">
           <div key={at} className="player-in flex flex-col items-center gap-2">
-            {at === 0 && <NeonPill className="neon neon-adn" lead={<LimeCross lit={4} />} width={PILL_WIDTH} />}
-            {at === 1 && <LightingScan />}
-            {at === 2 && <NeonScan lit={4} found />}
+            {at === 0 && (white ? <WhitePill lead={<GreenCross lit={4} />} label={<>Pharma<span className="text-[#0E8A7B]">boost</span></>} /> : <NeonPill className="neon neon-adn" lead={<LimeCross lit={4} />} width={PILL_WIDTH} />)}
+            {at === 1 && (white ? <WhiteLighting /> : <LightingScan />)}
+            {at === 2 && (white ? <WhitePill hover={false} found lead={<GreenCross lit={4} />} label="Les 2 conseils" /> : <NeonScan lit={4} found />)}
             {at === 3 && <MixIsland cards enterFrom="croix" items={ITEMS} outcomes={[]} open={false} onOpen={noop} onFinish={noop} onAnswer={noop} />}
             {at === 4 && <MixIsland cards items={ITEMS} outcomes={[]} open startAt={0} onOpen={noop} onFinish={noop} onAnswer={noop} />}
             {at === 5 && <MixIsland cards items={ITEMS} outcomes={["SOLD"]} open startAt={0} onOpen={noop} onFinish={noop} onAnswer={noop} />}
@@ -846,6 +891,9 @@ const SERVED: { key: string; title: string; text: string; View: () => ReactNode 
 ];
 
 const PAGE_CSS = `
+.white-pill{box-shadow:0 14px 32px -14px rgba(15,43,38,.45),0 0 0 1px rgba(14,138,123,.25)}
+.white-adn{isolation:isolate}
+.white-adn::after{content:"";position:absolute;inset:-60% -10%;z-index:-1;pointer-events:none;background:url(/poste/adn-helice.jpg) 62% 40%/cover no-repeat;mix-blend-mode:multiply;opacity:.42;animation:adn-vit 14s ease-in-out infinite alternate}
 .player-in{animation:bravo .45s cubic-bezier(.2,.9,.3,1.1) both}
 .eq{height:4px;animation:eq 1.1s ease-in-out infinite}
 @keyframes eq{0%,100%{height:4px;opacity:.5}50%{height:14px;opacity:1}}
@@ -918,7 +966,11 @@ export function SaleEndTrials() {
           Chaque étape de la vraie bannière, figée : prenez le temps de tout regarder. Les cartes et la routine se cliquent. Vente d&apos;exemple (vrais produits du stock, photos studio).
         </p>
 
-        <h2 className="mt-8 text-[20px] font-bold text-[#0F2F2A]">Un scan complet, de bout en bout</h2>
+        <h2 className="mt-8 text-[20px] font-bold text-[#0F2F2A]">Le scan complet, tout en blanc</h2>
+        <p className="mt-1 mb-4 max-w-3xl text-[14.5px] leading-7 text-[#4D6B64]">Toutes les étapes en fond blanc sur l&apos;ADN, y compris la petite bannière du début. Elle se joue toute seule ; « Pause » et les flèches pour regarder. Passez la souris sur l&apos;étape 1.</p>
+        <ScanPlayer white />
+
+        <h2 className="mt-12 text-[20px] font-bold text-[#0F2F2A]">Un scan complet, de bout en bout (petite bannière noire)</h2>
         <p className="mt-1 mb-4 max-w-3xl text-[14.5px] leading-7 text-[#4D6B64]">La version retenue qui se joue toute seule, à un rythme lisible. « Pause » pour regarder, les flèches ou la barre pour aller à une étape.</p>
         <ScanPlayer />
 
