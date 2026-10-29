@@ -16,6 +16,7 @@ export function LabTabs({ canManagePrograms, canManageBrands }: { canManageProgr
           ? [
               { key: "gammes", label: "Gammes privilégiées", href: "/parametres/laboratoires/gammes" },
               { key: "challenges", label: "Challenges", href: "/parametres/laboratoires/challenges" },
+              { key: "modules", label: "Mes modules", href: "/parametres/laboratoires/modules" },
             ]
           : []),
         ...(canManageBrands ? [{ key: "marques", label: "Mettre en avant · écarter" }] : []),

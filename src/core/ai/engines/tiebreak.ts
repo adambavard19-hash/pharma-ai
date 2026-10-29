@@ -65,6 +65,7 @@ export function compareClinical(a: ScoredRecommendation, b: ScoredRecommendation
 }
 
 export type TiebreakCriterion =
+  | "MODULE"
   | "FORMULE"
   | "PREFERENCE_OFFICINE"
   | "GAMME_PRIVILEGIEE"
@@ -76,6 +77,7 @@ export type TiebreakCriterion =
   | "DISPONIBILITE";
 
 export const TIEBREAK_LABELS: Record<TiebreakCriterion, string> = {
+  MODULE: "module de conseil choisi par l'officine",
   FORMULE: "formule préférée par la règle",
   PREFERENCE_OFFICINE: "préférence déclarée par l'officine",
   GAMME_PRIVILEGIEE: "gamme privilégiée de l'officine",

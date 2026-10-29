@@ -19,6 +19,7 @@ import {
 } from "../understanding";
 import { RECOMMENDATION_MIN_RELEVANCE, RECOMMENDATION_MIN_SCORE } from "@/config/constants";
 import { chooseAmongEquivalents } from "../ai/engines/tiebreak";
+import { productModule, type AdviceModuleCode } from "../ai/advice-modules";
 import { declaredContraindicationFor, suggestionVigilances } from "../ai/engines/population-vigilance";
 import { matchesAny } from "../ai/engines/product-name";
 import { rangeRankFor, type PreferredRangeInput } from "../catalog/preferred-ranges";
@@ -265,6 +266,8 @@ export function runRequestPipeline(params: {
   stockConfigured: boolean;
   /** Gammes privilégiées : départage de références équivalentes, jamais le score. */
   preferredRanges?: PreferredRangeInput[];
+  /** Les modules de conseil de l'officine : une référence admise de ces modules passe devant (core/ai/advice-modules). */
+  adviceModules?: AdviceModuleCode[];
 }): RequestPipelineResult {
   const notes: string[] = [];
   const blocked: string[] = [];
@@ -321,8 +324,12 @@ export function runRequestPipeline(params: {
     // Même règle que pour une ordonnance : la clinique désigne la meilleure
     // référence, les préférences ne départagent que des équivalentes.
     const catalogById = new Map(candidates.map((c) => [c.product.id, c.product]));
-    const best: ScoredRecommendation | null = valid.length
-      ? chooseAmongEquivalents(valid, {
+    // Les modules de l'officine (phytothérapie, aromathérapie, médicaments conseil) : leurs références admises d'abord.
+    const modules = params.adviceModules ?? [];
+    const inModule = modules.length ? valid.filter((item) => { const product = catalogById.get(item.productId); const code = product ? productModule(product) : null; return code !== null && modules.includes(code); }) : [];
+    const pool = inModule.length > 0 ? inModule : valid;
+    const best: ScoredRecommendation | null = pool.length
+      ? chooseAmongEquivalents(pool, {
           formulaRank: (item) => {
             const name = catalogById.get(item.productId)?.name ?? "";
             const prefer = opportunity.productPrefer ?? [];

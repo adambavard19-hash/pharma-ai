@@ -13,6 +13,7 @@ import { medicineTerms, parseHubQuery, type HubFacets } from "@/core/admin/advic
 import type { PatientContext } from "@/core/ai/types";
 import { searchSpecialties } from "./drug-identification";
 import { enrichCatalog, loadCatalogSnapshot, loadNationalDrugCandidates, loadPharmacyRules, loadPreferredRanges } from "./catalog";
+import { loadAdviceModules } from "./advice-modules";
 import { loadCentralAdvice, type CentralAssociationView, type CentralRuleView } from "./central-advice";
 import type { RobotProposalView } from "./robot-proposals";
 
@@ -213,7 +214,7 @@ export async function previewMedicineAdvice(pharmacyId: string, specialtyId: str
   const name = specialty.name.split(",")[0].trim();
 
   const scope = { pharmacyId: pharmacy.id, organizationId: pharmacy.organizationId, userId: "console-preview" };
-  const [pharmacyCatalog, nationalCandidates, rules, preferredRanges, central] = await Promise.all([loadCatalogSnapshot(scope), loadNationalDrugCandidates(scope), loadPharmacyRules(scope), loadPreferredRanges(scope), loadCentralAdvice()]);
+  const [pharmacyCatalog, nationalCandidates, rules, preferredRanges, central, adviceModules] = await Promise.all([loadCatalogSnapshot(scope), loadNationalDrugCandidates(scope), loadPharmacyRules(scope), loadPreferredRanges(scope), loadCentralAdvice(), loadAdviceModules(pharmacy.id)]);
   const catalog = await enrichCatalog(scope, [...pharmacyCatalog, ...nationalCandidates]);
 
   const key = name.toLowerCase();
@@ -229,6 +230,7 @@ export async function previewMedicineAdvice(pharmacyId: string, specialtyId: str
     explanations: [],
     extractionFindings: [],
     preferredRanges,
+    adviceModules,
     understanding,
     usedSimulatedProviders: false,
     disabledRuleKeys: central.removed,

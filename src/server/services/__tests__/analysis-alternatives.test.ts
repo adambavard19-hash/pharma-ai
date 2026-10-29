@@ -51,6 +51,7 @@ vi.mock("../catalog", () => ({
   loadValidationHistory: async () => ({}),
   enrichCatalog: mocks.enrichCatalog,
 }));
+vi.mock("../advice-modules", () => ({ loadAdviceModules: async () => [] }));
 vi.mock("../patients", () => ({ buildPatientContext: async () => ({ patientId: null, ageYears: null, sex: "UNSPECIFIED", isPregnant: null, isBreastfeeding: null, renalImpairment: null, hepaticImpairment: null, allergies: [], chronicConditions: [], currentTreatments: [], hasAdviceConsent: false }) }));
 vi.mock("../drug-identification", () => ({
   identifyPrescriptionLines: async () => [],

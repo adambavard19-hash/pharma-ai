@@ -139,6 +139,7 @@ export const ADMIN_NAV: AdminNavSpace[] = [
           },
           { href: "/admin/conseils/routines", label: "Routines", description: "Plusieurs produits proposés ensemble au comptoir (nettoyer, hydrater, traiter…), par médicament et par thème, une gamme par étape." },
           { href: "/admin/conseils/priorites", label: "Priorités", description: "Pour chaque famille de médicaments, l'ordre des conseils au comptoir — règle 1, règle 2, règle 3 — choisi par vous, pour toutes les pharmacies." },
+          { href: "/admin/conseils/modules", label: "Modules", description: "Phytothérapie, aromathérapie, médicaments conseil : ce que chaque pharmacie choisit de mettre en avant au comptoir." },
           { href: "/admin/conseils/questions", label: "Questions du comptoir", description: "Les questions, les réponses du patient et le conseil à dire, sous chaque produit conseil de la bannière : modifier pour toutes les pharmacies." },
           { href: "/admin/connaissances", label: "Base de connaissances", description: "Déposer des documents et des notes : le modèle les lit et propose des conseils, vous acceptez ou refusez." },
           { href: "/admin/a-connaitre", label: "Produits à connaître", description: "Ce que PharmaBoost n'a pas su ranger dans le stock des pharmacies : vous répondez une fois, c'est appris pour toutes." },

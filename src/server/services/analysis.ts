@@ -33,6 +33,7 @@ import {
   enrichCatalog,
   loadValidationHistory,
 } from "./catalog";
+import { loadAdviceModules } from "./advice-modules";
 import { buildPatientContext } from "./patients";
 import {
   identifyPrescriptionLines,
@@ -262,7 +263,7 @@ export async function analysePrescription(params: {
   const knowledgeProvider = getDrugKnowledgeProvider();
 
   params.onStage?.("IDENTIFICATION");
-  const [patient, pharmacyCatalog, nationalCandidates, rules, history, stockState, preferredRanges] = await Promise.all([
+  const [patient, pharmacyCatalog, nationalCandidates, rules, history, stockState, preferredRanges, adviceModules] = await Promise.all([
     buildPatientContext(prescription.patientId),
     loadCatalogSnapshot(params.scope, { includeSiblingAvailability: true }),
     // Les médicaments de l'officine susceptibles de répondre à une règle de
@@ -275,6 +276,8 @@ export async function analysePrescription(params: {
     loadStockState(params.scope),
     // Gammes privilégiées : départage d'équivalents seulement (jamais le score).
     loadPreferredRanges(params.scope),
+    // Modules de conseil choisis par l'officine : leurs références admises passent devant.
+    loadAdviceModules(params.scope.pharmacyId),
   ]);
 
   // Les deux origines se rejoignent ici, le temps d'un classement. Elles ne se
@@ -425,6 +428,7 @@ export async function analysePrescription(params: {
     explanations,
     extractionFindings,
     preferredRanges,
+    adviceModules,
     ...(overstock ? { overstock } : {}),
     interactions: {
       substancesByLine,
