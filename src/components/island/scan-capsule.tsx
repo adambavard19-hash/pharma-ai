@@ -85,6 +85,14 @@ export function ScanCapsule(props: ScanCapsuleProps) {
 }
 
 export const SCAN_CSS = `
+section.crd-glass.crd-glass{background:linear-gradient(180deg,#072A25 0%,#03171A 100%)!important;border-radius:22px!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 18px 40px -16px rgba(0,0,0,.6)!important}
+section.crd-glass.crd-glass::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;z-index:2;background:linear-gradient(110deg,rgba(95,165,148,.5),rgba(232,255,156,.75) 50%,rgba(95,165,148,.5));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+.crd-cap-in{animation:crd-cap-in .45s cubic-bezier(.2,.9,.3,1.2) both}
+@keyframes crd-cap-in{from{opacity:0;transform:translateY(-14px) scale(.92)}to{opacity:1;transform:none}}
+.crd-enter-croix{animation:crd-unfold .55s cubic-bezier(.2,.9,.3,1) both;transform-origin:top center}
+@keyframes crd-unfold{from{opacity:.2;clip-path:inset(0 12% 70% 12% round 22px);transform:scaleY(.85)}to{opacity:1;clip-path:inset(0 0 0 0 round 22px);transform:none}}
+.crd-enter-gelule{animation:crd-pillopen .55s cubic-bezier(.2,.9,.3,1) both}
+@keyframes crd-pillopen{from{opacity:.3;clip-path:inset(0 44% 0 44% round 22px)}to{opacity:1;clip-path:inset(0 0 0 0 round 22px)}}
 .scn-pop{animation:scn-pop .4s cubic-bezier(.2,.9,.3,1.4) both}
 @keyframes scn-pop{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:scale(1)}}
 .scn-heart{animation:scn-heart 1s ease-in-out infinite}
@@ -98,5 +106,5 @@ export const SCAN_CSS = `
 .scn-pill-open .scn-pill-left{transform:translateX(-7px) rotate(-12deg)}
 .scn-pill-open .scn-pill-right{transform:translateX(7px) rotate(12deg)}
 .scn-pill-count{position:absolute;left:50%;top:50%;margin:-11px 0 0 -11px;width:22px;height:22px;border-radius:999px;background:#E8FF9C;color:#04261A;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center}
-@media (prefers-reduced-motion:reduce){.scn-pop,.scn-heart,.scn-cross-glow{animation:none}}
+@media (prefers-reduced-motion:reduce){.scn-pop,.scn-heart,.scn-cross-glow,.crd-cap-in,.crd-enter-croix,.crd-enter-gelule{animation:none}}
 `;

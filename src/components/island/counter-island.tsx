@@ -387,6 +387,8 @@ export function CounterIsland(props: CounterIslandProps) {
   const sleeping = compact && !hover && asleep === adviceKey;
   const width = grumpy ? 340 : peek ? 400 : props.collapsible && collapsedAt === state.stage && state.stage !== "idle" ? 280 : sleeping ? COMPACT_SLEEP_WIDTH : compact ? (columns > 1 ? MULTI_CAPSULE_WIDTH : COMPACT_WIDTH) : STAGE_WIDTH[state.stage];
   const title = stageTitle(state, count);
+  // Le scan en animation (fondateur, 29 oct. 2026) : la capsule des essais, d'un seul tenant du scan à « N conseils ».
+  const scanCapsule = Boolean(props.scanLook) && (state.stage === "scan" || state.stage === "analyzing" || state.stage === "ready");
 
   const onTap = () => {
     const result = registerTap(taps, Date.now());
@@ -485,7 +487,8 @@ export function CounterIsland(props: CounterIslandProps) {
         body = (
           <div data-ile-repos="" className="flex h-10 items-center gap-2 pr-3.5 pl-1.5">
             {robot(28)}
-            <span className="min-w-0 flex-1 truncate text-[13px] text-white/80">{title}</span>
+            {/* « En attente de scan… » dans la police des cartes de conseil qui suivent (fondateur, 29 oct. 2026). */}
+            <span className="flex-1 whitespace-nowrap text-[14px] leading-[18px] font-bold text-white">{title}</span>
             <span className="size-2 shrink-0 rounded-full" style={{ background: C.accent, boxShadow: `0 0 8px ${C.accent}` }} aria-label="Poste connecté" />
             {props.movable && <GripVertical className="-mr-1.5 size-3.5 shrink-0 text-white/30" aria-hidden="true" />}
           </div>
@@ -873,9 +876,10 @@ export function CounterIsland(props: CounterIslandProps) {
       }}
     >
       <IslandShell
-        width={width}
+        width={scanCapsule ? 340 : width}
         tone={tone}
-        contentKey={grumpy ? "grumpy" : peek ? "peek" : collapsed ? `${state.stage}-replie` : sleeping ? "advice-capsule" : compact ? "advice-compact" : state.stage}
+        className={scanCapsule ? "crd-glass crd-cap-in" : undefined}
+        contentKey={scanCapsule ? "scan-capsule" : grumpy ? "grumpy" : peek ? "peek" : collapsed ? `${state.stage}-replie` : sleeping ? "advice-capsule" : compact ? "advice-compact" : state.stage}
         label="Bannière PharmaBoost du comptoir"
         onPointerEnter={() => {
           if (leaveTimer.current) clearTimeout(leaveTimer.current);

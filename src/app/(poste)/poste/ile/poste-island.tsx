@@ -109,6 +109,9 @@ export function frenchDay(iso: string): string {
 }
 
 /** « Bonjour Léa, comment vas-tu ? … » → le titre doré « Bonjour Léa ! » et le reste en dessous (« Comment vas-tu ? … »). */
+/** Le message « Bonjour » du robot au démarrage du poste : retiré (fondateur, 29 oct. 2026), gardé ici pour le remettre. */
+const SHOW_GREETING = false as boolean;
+
 export function greetingParts(text: string): { title: string; body: string } {
   const match = /^(Bonjour[^,!?]*)[,!]\s*(.*)$/s.exec(text.trim());
   if (!match) return { title: text.trim(), body: "" };
@@ -556,7 +559,8 @@ export function PosteIsland() {
   const expiryBox = entry && island.stage !== "idle" && island.stage !== "done" ? ((entry.boxes ?? []).filter((box) => box.expiry && !seenExpiry.includes(`${box.id}:${box.expiry.on}`)).sort((a, b) => Number(b.expiry?.state === "expired") - Number(a.expiry?.state === "expired"))[0] ?? null) : null;
 
   // Le bonjour ne se montre qu'au repos (le reducer l'efface déjà à chaque scan ou vente).
-  const greeting = island.stage === "idle" && !entry ? view.greeting : null;
+  // Plus de message « Bonjour… » au démarrage (fondateur, 29 oct. 2026) : le poste reste sur sa capsule au repos.
+  const greeting = SHOW_GREETING && island.stage === "idle" && !entry ? view.greeting : null;
   const items = entry ? toAdvice(entry) : [];
   // Les conseils déjà vendus (bipés, ou marqués « Vendu ») : la bannière repliée le montre d'elle-même.
   const soldCount = entry ? entry.items.filter((item) => item.outcome === "SOLD").length : 0;
@@ -730,6 +734,7 @@ export function PosteIsland() {
             boxes={entry.boxes ?? []}
             everyAdvice={everyAdvice}
             cards={cards}
+            enterFrom={scanLook ?? undefined}
             help={{
               log: helpLog.sale === entry.id ? helpLog.log : [],
               onAsk: (question, advice) => {

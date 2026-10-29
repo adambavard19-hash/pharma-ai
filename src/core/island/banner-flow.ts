@@ -41,7 +41,7 @@ export const STAGE_MOOD: Record<IslandStage, RobotMood> = {
 /** La largeur de l'île à chaque étape (px) : la capsule au repos, plus large quand il y a à lire. La hauteur suit le contenu. */
 export const STAGE_WIDTH: Record<IslandStage, number> = {
   // Une île fine : elle ne doit jamais masquer le logiciel de gestion derrière (les conseils défilent DANS l'île).
-  idle: 220,
+  idle: 252,
   scan: 300,
   analyzing: 340,
   ready: 320,
