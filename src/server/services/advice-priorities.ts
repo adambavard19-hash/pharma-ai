@@ -15,20 +15,27 @@ export async function loadPriorityRankings(): Promise<PriorityRankings> {
   return readRankings(row?.value);
 }
 
-/** Les règles en ligne, telles que le moteur les applique : celles du code (modifiées ou non) et les conseils ajoutés. */
-async function liveRules(): Promise<AdviceRule[]> {
+/** Toutes les règles, telles que le moteur les connaît : celles du code (modifiées ou non) et les conseils ajoutés. */
+async function allRules(): Promise<{ rules: AdviceRule[]; removed: Set<string> }> {
   const central = await loadCentralAdvice();
-  const removed = new Set(central.removed);
   const edited = new Map(central.custom.map((rule) => [rule.key, rule]));
   const codeKeys = new Set(ADVICE_RULES.map((rule) => rule.key));
-  return [...ADVICE_RULES.map((rule) => edited.get(rule.key) ?? rule), ...central.custom.filter((rule) => !codeKeys.has(rule.key))].filter((rule) => !removed.has(rule.key));
+  return { rules: [...ADVICE_RULES.map((rule) => edited.get(rule.key) ?? rule), ...central.custom.filter((rule) => !codeKeys.has(rule.key))], removed: new Set(central.removed) };
+}
+
+/** Les règles en ligne, telles que le moteur les applique. */
+async function liveRules(): Promise<AdviceRule[]> {
+  const { rules, removed } = await allRules();
+  return rules.filter((rule) => !removed.has(rule.key));
 }
 
 export type PriorityRuleView = { key: string; title: string; kind: AdviceRule["kind"]; ranked: boolean };
-export type PriorityFamilyView = { code: string; label: string; rules: PriorityRuleView[]; customized: boolean; defaultOrder: string[] };
+export type PriorityFamilyView = { code: string; label: string; rules: PriorityRuleView[]; customized: boolean; defaultOrder: string[]; removed: { key: string; title: string }[] };
 
 export async function listPriorityFamilies(): Promise<PriorityFamilyView[]> {
-  const [rules, rankings] = await Promise.all([liveRules(), loadPriorityRankings()]);
+  const [{ rules: every, removed }, rankings] = await Promise.all([allRules(), loadPriorityRankings()]);
+  const rules = every.filter((rule) => !removed.has(rule.key));
+  const gone = every.filter((rule) => removed.has(rule.key));
   return PRIORITY_FAMILIES.map((family) => {
     const order = rankings[family.code] ?? [];
     const ranked = rankedRulesForFamily(rules, family.code, order);
@@ -38,8 +45,10 @@ export async function listPriorityFamilies(): Promise<PriorityFamilyView[]> {
       customized: order.length > 0,
       defaultOrder: rankedRulesForFamily(rules, family.code).map((rule) => rule.key),
       rules: ranked.map((rule) => ({ key: rule.key, title: rule.title, kind: rule.kind, ranked: order.includes(rule.key) })),
+      // Les conseils retirés de cette famille, pour pouvoir les remettre.
+      removed: rankedRulesForFamily(gone, family.code).map((rule) => ({ key: rule.key, title: rule.title })),
     };
-  }).filter((family) => family.rules.length > 0);
+  }).filter((family) => family.rules.length > 0 || family.removed.length > 0);
 }
 
 type Failure = { ok: false; error: string };

@@ -38,6 +38,7 @@ import { declaredContraindicationFor, suggestionVigilances } from "./engines/pop
 import { buildAssociationAdvice, type AssociationInput } from "./engines/associations";
 import { applyOverstockCampaigns, type OverstockInput } from "./engines/overstock";
 import { rangeRankFor, type PreferredRangeInput } from "../catalog/preferred-ranges";
+import { productModule, type AdviceModuleCode } from "./advice-modules";
 import { productMatchesBrand } from "../catalog/brand";
 import type {
   AnalysisResult,
@@ -132,6 +133,11 @@ export type PipelineInput = {
    * une entrée dans le jeu. Les challenges laboratoires, eux, n'entrent pas ici.
    */
   preferredRanges?: PreferredRangeInput[];
+  /**
+   * Les modules de conseil choisis par l'officine (phytothérapie, aromathérapie, médicaments conseil) : pour chaque
+   * conseil, une référence admise de ces modules passe devant les autres (core/ai/advice-modules).
+   */
+  adviceModules?: AdviceModuleCode[];
   /** La compréhension IA a manqué (fournisseur absent ou appel en échec). */
   aiUnavailable?: boolean;
   /**
@@ -759,7 +765,15 @@ export function runAnalysisPipeline(input: PipelineInput): AnalysisResult {
         // La clinique seule désigne la meilleure référence ; les critères de
         // l'officine ne départagent que des références cliniquement
         // équivalentes (même sécurité, même adéquation, mêmes vigilances).
-        const decision = chooseAmongEquivalents(list, tiebreakContextFor(key));
+        // Les modules de l'officine (fondateur, 29 oct. 2026) : parmi les références déjà admises pour ce conseil, celles de
+        // ses modules d'abord ; aucune : le choix habituel. Le module ne fait entrer aucune référence écartée.
+        const modules = input.adviceModules ?? [];
+        const inModule = modules.length > 0 ? list.filter((item) => { const product = catalogById.get(item.productId); const code = product ? productModule(product) : null; return code !== null && modules.includes(code); }) : [];
+        const usesModule = inModule.length > 0 && inModule.length < list.length;
+        const ruling = chooseAmongEquivalents(usesModule ? inModule : list, tiebreakContextFor(key));
+        const clinicalBest = usesModule ? chooseAmongEquivalents(list, tiebreakContextFor(key)).chosen : ruling.chosen;
+        const decision = usesModule && clinicalBest !== ruling.chosen ? { ...ruling, criterion: "MODULE" as const } : ruling;
+        if (decision.criterion === "MODULE") notes.push(`« ${key} » : référence du module de conseil de l'officine retenue (${productModule(catalogById.get(decision.chosen.productId)!)}).`);
         const best = decision.best;
         list.sort((a, b) => (a === best ? -1 : b === best ? 1 : 0));
         // Le départage commercial se lit dans la justification du pharmacien (marge HT, référence remboursée), jamais

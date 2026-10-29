@@ -4,6 +4,7 @@ import { recordAudit } from "@/server/audit/log";
 import { recordIsDemo } from "@/server/db/demo-scope";
 import type { TenantScope } from "@/server/db/tenant";
 import { loadCatalogSnapshot, enrichCatalog, loadPreferredRanges, loadNationalDrugCandidates, loadPharmacyRules, loadStockState, loadValidationHistory } from "@/server/services/catalog";
+import { loadAdviceModules } from "@/server/services/advice-modules";
 import { fallbackRequestUnderstanding, runRequestPipeline, type RequestProposal, type RequestUnderstanding } from "@/core/counter/request";
 import { needLabel } from "@/core/understanding";
 import type { PatientContext } from "@/core/ai/types";
@@ -64,16 +65,17 @@ export async function adviseCounterRequest(params: { scope: TenantScope; pharmac
   }
   if (!understanding) understanding = fallbackRequestUnderstanding(request);
 
-  const [pharmacyCatalog, nationalCandidates, rules, history, stock, preferredRanges] = await Promise.all([
+  const [pharmacyCatalog, nationalCandidates, rules, history, stock, preferredRanges, adviceModules] = await Promise.all([
     loadCatalogSnapshot(scope, { includeSiblingAvailability: true }),
     loadNationalDrugCandidates(scope),
     loadPharmacyRules(scope),
     loadValidationHistory(scope),
     loadStockState(scope),
     loadPreferredRanges(scope),
+    loadAdviceModules(scope.pharmacyId),
   ]);
   const catalog = await enrichCatalog(scope, [...pharmacyCatalog, ...nationalCandidates]);
-  const result = runRequestPipeline({ understanding, patient, catalog, rules, history, stockConfigured: stock.configured, preferredRanges });
+  const result = runRequestPipeline({ understanding, patient, catalog, rules, history, stockConfigured: stock.configured, preferredRanges, adviceModules });
 
   const questions = [...new Set([...understanding.questions, ...result.ruleQuestions])].slice(0, 5);
   const row = await prisma.counterRequest.create({
