@@ -740,7 +740,7 @@ const POSOLOGY_MISSING = "Non renseignée dans PharmaBoost : voir la notice.";
  * 3. Aide : le pharmacien qui ne sait pas répondre au patient pose sa question sur CE conseil ; la réponse arrive dessous
  * (agent du poste → serveur → modèle). Rien du patient ne part : la question et la fiche du conseil.
  */
-function Help({ item, help }: { item: IslandAdvice; help: NonNullable<MixIslandProps["help"]> }) {
+function Help({ item, help, light = false }: { item: IslandAdvice; help: NonNullable<MixIslandProps["help"]>; /** Dans la fiche menthe (fondateur, 29 oct. 2026) : les couleurs de la bannière, sans la phrase d'introduction. */ light?: boolean }) {
   const [draft, setDraft] = useState("");
   const name = item.sheet?.name || item.name;
   const log = help.log.filter((entry) => entry.advice === name).slice(-3);
@@ -757,11 +757,11 @@ function Help({ item, help }: { item: IslandAdvice; help: NonNullable<MixIslandP
   };
   return (
     <div className="space-y-2" data-ile-aide="">
-      {log.length === 0 && <p style={{ color: C.inkSoft }}>Le patient pose une question à laquelle vous ne savez pas répondre ? Demandez à l&apos;aide, sur ce conseil.</p>}
+      {log.length === 0 && !light && <p style={{ color: C.inkSoft }}>Le patient pose une question à laquelle vous ne savez pas répondre ? Demandez à l&apos;aide, sur ce conseil.</p>}
       {log.map((entry, index) => (
         <div key={index} className="space-y-1">
-          <p className="ml-6 rounded-xl rounded-br-sm px-2.5 py-1.5 text-white" style={{ background: C.pick }}>{entry.question}</p>
-          <p className="mr-6 rounded-xl rounded-bl-sm px-2.5 py-1.5" style={{ background: C.raised, color: C.raisedInk }}>
+          <p className="ml-6 rounded-xl rounded-br-sm px-2.5 py-1.5 text-white" style={{ background: light ? L.green : C.pick }}>{entry.question}</p>
+          <p className="mr-6 rounded-xl rounded-bl-sm px-2.5 py-1.5" style={light ? { background: "#FFFFFF", color: L.ink, boxShadow: "0 0 0 1px #CFE3DA" } : { background: C.raised, color: C.raisedInk }}>
             {entry.answer || entry.error || "L'aide réfléchit…"}
           </p>
         </div>
@@ -775,13 +775,13 @@ function Help({ item, help }: { item: IslandAdvice; help: NonNullable<MixIslandP
           }}
           maxLength={400}
           placeholder="Ex. : peut-on le prendre enceinte ?"
-          className="h-8 min-w-0 flex-1 rounded-lg bg-white px-2.5 text-[12px] text-[#0F2F2A] outline-none"
+          className={light ? "h-9 min-w-0 flex-1 rounded-full border border-[#CFE3DA] bg-white px-3 text-[12.5px] text-[#0F2F2A] outline-none focus:border-[#0E8A7B]" : "h-8 min-w-0 flex-1 rounded-lg bg-white px-2.5 text-[12px] text-[#0F2F2A] outline-none"}
         />
-        <button type="button" onClick={ask} className="h-8 shrink-0 rounded-lg px-2.5 text-[11.5px] font-bold" style={{ background: C.accent, color: "#04261A" }}>
+        <button type="button" onClick={ask} className={light ? "h-9 shrink-0 rounded-full px-3.5 text-[12px] font-bold text-white" : "h-8 shrink-0 rounded-lg px-2.5 text-[11.5px] font-bold"} style={light ? { background: L.green } : { background: C.accent, color: "#04261A" }}>
           Demander
         </button>
       </div>
-      <p className="text-[10px]" style={{ color: C.inkSoft }}>Aide du modèle : vérifiez sur la notice ou le RCP avant de conseiller.</p>
+      <p className="text-[10px]" style={{ color: light ? L.muted : C.inkSoft }}>Aide du modèle : vérifiez sur la notice ou le RCP avant de conseiller.</p>
     </div>
   );
 }
@@ -940,8 +940,8 @@ function AdviceIsland({ item, width, sold, onClose, onCancelSold, alternatives, 
                   <LifeBuoy className="size-3.5" aria-hidden="true" /> Une question du patient ? Aide
                 </button>
                 {helping && (
-                  <div className="mt-1.5 rounded-xl bg-[#0F2F2A] p-2.5 text-white">
-                    <Help item={item} help={help} />
+                  <div className="mt-1.5 rounded-xl bg-[#E4F6EE] p-2.5 ring-1 ring-[#BFE6D4]">
+                    <Help item={item} help={help} light />
                   </div>
                 )}
               </div>
