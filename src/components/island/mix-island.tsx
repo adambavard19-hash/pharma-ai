@@ -2,7 +2,7 @@
 
 import { OVERSTOCK_LABEL } from "@/core/overstock/campaign";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Check, ChevronLeft, ChevronRight, Hourglass, LifeBuoy, MessageCircle, Pill, Star } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight, Hourglass, LifeBuoy, MessageCircle, Pill, Star } from "lucide-react";
 import type { HelpAdvice } from "@/core/poste/island-bridge";
 import { BANNER } from "../../../agent/src/banner-design";
 import type { CounterSheetLine } from "../../../agent/src/counter-sheet";
@@ -243,28 +243,51 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
             {belowHead}
 
             {/* Plus de bouton « Terminer » (fondateur, 29 oct. 2026 : « tout se passe depuis le LGO ») : la vente se termine quand le
-                logiciel de gestion la valide. Restent la routine et ce que la vente peut rapporter. */}
-            {(routine || total > 0) && (
-              <>
-                <div className="mx-1.5 my-1.5 h-px bg-white/10" />
-                <div className="flex min-h-8 items-center gap-2 px-1.5">
-                  {routine && (
-                    <span className="flex min-w-0 flex-1 items-center gap-2">
-                      <RoutineThumbs routine={routine.view} open={routineOpen} blink onToggle={() => setRoutineOpen((value) => !value)} onHover={() => setRoutineOpen(true)} />
-                      <span className="truncate text-[12px] font-semibold text-white/80">Routine · {routine.view.steps.length} produits</span>
-                    </span>
-                  )}
-                  {total > 0 && (
-                    <span className={`text-[12px] text-white/60 ${routine ? "shrink-0" : "min-w-0 flex-1"}`}>
-                      Jusqu&apos;à <b className="text-[#E8FF9C] tabular-nums">{eurosOf(total)}</b>{routine ? "" : " sur cette vente"}
-                    </span>
-                  )}
-                </div>
-              </>
+                logiciel de gestion la valide. Comme l'essai 1 : la routine, qui s'ouvre sur place, puis ce que la vente peut rapporter. */}
+            {(routine || total > 0) && <div className="mx-1.5 my-1.5 h-px bg-white/10" />}
+            {routine && (
+              <div data-ile-cartes-routine="">
+                <button type="button" onClick={() => setRoutineOpen((value) => !value)} className="flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left hover:bg-white/[0.05]">
+                  <span className="flex -space-x-2">
+                    {routine.view.steps.map((step, i) => (
+                      <span key={`${step.label}-${i}`} className={routineOpen ? "inline-flex" : "crd-blink inline-flex"} style={{ animationDelay: `${i * 0.25}s` }}>
+                        <span className="inline-flex size-[26px] items-center justify-center overflow-hidden rounded-lg border-2 border-[#062621] bg-white">
+                          {/* eslint-disable-next-line @next/next/no-img-element -- photo studio locale */}
+                          {step.image ? <img src={step.image} alt="" className="size-full object-contain p-0.5" /> : <Pill className="size-3 text-[#9FB8B0]" aria-hidden="true" />}
+                        </span>
+                      </span>
+                    ))}
+                  </span>
+                  <span className="min-w-0 flex-1 text-[12.5px] font-semibold text-white">Routine · {routine.view.steps.length} produits</span>
+                  <ChevronDown className={`size-4 text-white/60 transition-transform ${routineOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+                </button>
+                {routineOpen && (
+                  <div className="crd-in mt-1 flex items-stretch gap-1.5 px-1">
+                    {routine.view.steps.map((step, i) => (
+                      <div key={`${step.label}-${i}`} className="flex flex-1 items-center gap-1.5">
+                        <div className="flex flex-1 flex-col items-center gap-1 rounded-xl bg-white/[0.06] p-1.5 text-center">
+                          <span className="inline-flex size-[34px] items-center justify-center overflow-hidden rounded-xl bg-white">
+                            {/* eslint-disable-next-line @next/next/no-img-element -- photo studio locale */}
+                            {step.image ? <img src={step.image} alt="" className="size-full object-contain p-0.5" /> : <Pill className="size-4 text-[#9FB8B0]" aria-hidden="true" />}
+                          </span>
+                          <span className="text-[10.5px] font-bold text-[#E8FF9C] uppercase">{step.label}</span>
+                          <span className="line-clamp-1 text-[10.5px] text-white/65">{step.name}</span>
+                          {step.price && <span className="text-[10.5px] font-semibold text-white tabular-nums">{step.price}</span>}
+                        </div>
+                        {i < routine.view.steps.length - 1 && <ArrowRight className="size-3 shrink-0 text-white/30" aria-hidden="true" />}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {total > 0 && (
+              <p className="mt-1.5 px-1.5 text-[12px] text-white/60">
+                Jusqu&apos;à <b className="text-[#E8FF9C] tabular-nums">{eurosOf(total)}</b> sur cette vente
+              </p>
             )}
           </div>
         </IslandShell>
-        {routine && routineOpen && <RoutineIsland routine={routine.view} width={width} cards onClose={() => setRoutineOpen(false)} onPointerLeave={() => setRoutineOpen(false)} />}
       </>
     );
   }
@@ -919,7 +942,9 @@ function CardQuestions({ item }: { item: IslandAdvice }) {
 }
 
 const CARDS_CSS = `
+.crd-blink{animation:crd-blink 1.6s ease-in-out infinite}
+@keyframes crd-blink{0%,100%{opacity:1;transform:none}50%{opacity:.55;transform:translateY(-1px)}}
 .crd-in{animation:crd-in .4s cubic-bezier(.2,.9,.3,1) both}
 @keyframes crd-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-@media (prefers-reduced-motion:reduce){.crd-in{animation:none}}
+@media (prefers-reduced-motion:reduce){.crd-in,.crd-blink{animation:none}}
 `;
