@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { Check, Sparkles, Trophy } from "lucide-react";
+import { Check, Hourglass, Sparkles, Star, Trophy } from "lucide-react";
 import { MixIsland } from "@/components/island/mix-island";
 import { CounterIsland } from "@/components/island/counter-island";
 import { INITIAL_ISLAND } from "@/core/island/banner-flow";
@@ -665,7 +665,7 @@ function NeonScan({ lit, found = false }: { lit: number; found?: boolean }) {
 const PLAY_STEPS = [
   { title: "En attente", text: "PharmaBoost attend le bip, sur l'ADN.", ms: 4000 },
   { title: "Scan", text: "La boîte est bipée : la croix s'allume bras par bras.", ms: 3200 },
-  { title: "C'est prêt", text: "Toute la croix s'allume : les 2 conseils.", ms: 2600 },
+  { title: "C'est prêt", text: "Toute la croix s'allume : les 2 conseils, avec leur repère (challenge, date courte).", ms: 3200 },
   { title: "Les cartes", text: "Les conseils de la vente, la routine dessous.", ms: 5000 },
   { title: "Carte ouverte", text: "« À dire au patient » et les questions.", ms: 6000 },
   { title: "Bipé", text: "Cicaplast Lèvres passé en caisse : « Vendu ».", ms: 4500 },
@@ -684,11 +684,11 @@ function LightingScan() {
 }
 
 /** La petite bannière en blanc sur l'ADN : la croix verte, PHARMABOOST, et au survol l'ouverture. */
-function WhitePill({ lead, label, found = false, hover = true }: { lead: ReactNode; label: ReactNode; found?: boolean; hover?: boolean }) {
+function WhitePill({ lead, label, found = false, hover = true, fit = false }: { lead: ReactNode; label: ReactNode; found?: boolean; hover?: boolean; fit?: boolean }) {
   const { over, bind } = useOver();
   const open = hover && over;
   return (
-    <span {...(hover ? bind : {})} className="white-pill white-adn relative inline-flex items-center justify-center gap-2.5 overflow-hidden rounded-full bg-white px-4 transition-all duration-300" style={{ height: open ? 44 : 40, ...(open ? {} : { width: PILL_WIDTH }) }}>
+    <span {...(hover ? bind : {})} className="white-pill white-adn relative inline-flex items-center justify-center gap-2.5 overflow-hidden rounded-full bg-white px-4 transition-all duration-300" style={{ height: open ? 44 : 40, ...(open || fit ? {} : { width: PILL_WIDTH }) }}>
       {lead}
       {open ? (
         <>
@@ -716,6 +716,29 @@ function GreenCross({ lit, size = 24 }: { lit: number; size?: number }) {
       ))}
       <rect x="14" y="14" width="12" height="12" rx="2.5" fill="#0E8A7B" className="scn-heart" />
     </svg>
+  );
+}
+
+/**
+ * Étape 3 (fondateur, 29 oct. 2026 : « à la place de 2 conseils, écris-les avec leur émoticône ») : le nom de chaque conseil,
+ * avec son repère — l'étoile du challenge, le sablier de la date courte.
+ */
+function FoundNames({ dark = false }: { dark?: boolean }) {
+  const heads = ITEMS.filter((item) => !item.sheet?.routine);
+  return (
+    <span className="pop flex items-center gap-3 tracking-normal whitespace-nowrap normal-case">
+      {heads.map((item, i) => (
+        <span key={item.name} className="inline-flex items-center gap-1.5">
+          {i > 0 && <span className={`mr-1.5 h-3.5 w-px ${dark ? "bg-[#E8FF9C]/30" : "bg-[#0E8A7B]/25"}`} />}
+          {item.challenge ? (
+            <Star className={`size-3.5 ${dark ? "fill-[#E8FF9C] text-[#E8FF9C]" : "fill-[#B8D400] text-[#8AA000]"}`} aria-label="Challenge" />
+          ) : item.shortDate ? (
+            <Hourglass className={`size-3.5 ${dark ? "text-[#FF9C8F]" : "text-[#C23A2B]"}`} aria-label="Date courte" />
+          ) : null}
+          <span className={`text-[12px] font-bold ${dark ? "text-white" : "text-[#0F2B26]"}`}>{item.sheet?.name?.replace(/ baume réparateur$/i, "") || item.name}</span>
+        </span>
+      ))}
+    </span>
   );
 }
 
@@ -764,7 +787,7 @@ function ScanPlayer({ white = false }: { white?: boolean }) {
           <div key={at} className="player-in flex flex-col items-center gap-2">
             {at === 0 && (white ? <WhitePill lead={<GreenCross lit={4} />} label={<>Pharma<span className="text-[#0E8A7B]">boost</span></>} /> : <NeonPill className="neon neon-adn" lead={<LimeCross lit={4} />} width={PILL_WIDTH} />)}
             {at === 1 && (white ? <WhiteLighting /> : <LightingScan />)}
-            {at === 2 && (white ? <WhitePill hover={false} found lead={<GreenCross lit={4} />} label="Les 2 conseils" /> : <NeonScan lit={4} found />)}
+            {at === 2 && (white ? <WhitePill hover={false} fit lead={<GreenCross lit={4} />} label={<FoundNames />} /> : <NeonScan lit={4} found />)}
             {at === 3 && <MixIsland cards enterFrom="croix" items={ITEMS} outcomes={[]} open={false} onOpen={noop} onFinish={noop} onAnswer={noop} />}
             {at === 4 && <MixIsland cards items={ITEMS} outcomes={[]} open startAt={0} onOpen={noop} onFinish={noop} onAnswer={noop} />}
             {at === 5 && <MixIsland cards items={ITEMS} outcomes={["SOLD"]} open startAt={0} onOpen={noop} onFinish={noop} onAnswer={noop} />}
