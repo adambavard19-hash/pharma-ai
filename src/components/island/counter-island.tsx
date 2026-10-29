@@ -7,7 +7,7 @@ import { BANNER } from "../../../agent/src/banner-design";
 import { SHEET_MISSING, SHEET_PATIENT_LABELS, type CounterSheet, type CounterSheetLine } from "../../../agent/src/counter-sheet";
 import { Robot } from "@/components/robot";
 import { HelixBackdrop } from "@/components/app/helix/helix-backdrop";
-import { ScanCapsule, SCAN_CSS, SCAN_STEPS, WHITE_PILL_WIDTH, WhitePill, whiteFoundWidth, type ScanLook, type WhiteFound } from "./scan-capsule";
+import { ScanCapsule, SCAN_CSS, SCAN_STEPS, WHITE_PILL_WIDTH, WhitePill, shortAdviceName, whiteFoundWidth, type ScanLook, type WhiteFound } from "./scan-capsule";
 import { eurosOf, possibleMargin } from "./mix-island";
 import { analysisSteps, allAnswered, followAdviceLink, isTap, registerTap, splitAlert, STAGE_MOOD, STAGE_WIDTH, stageTitle, stageTone, type IslandOutcome, type IslandState } from "@/core/island/banner-flow";
 import { cn } from "@/lib/utils";
@@ -417,7 +417,7 @@ export function CounterIsland(props: CounterIslandProps) {
   // La petite bannière blanche (fondateur, 29 oct. 2026) : l'attente et le scan dans la même capsule blanche sur l'ADN.
   const whiteLook = props.scanLook === "blanc";
   const whiteFound: WhiteFound[] = whiteLook
-    ? items.filter((item) => !item.sheet?.routine).slice(0, 3).map((item) => ({ name: (item.sheet?.name || item.name).replace(/\s+(baume|crème|gel|lait|spray)\b.*$/i, ""), challenge: Boolean(item.challenge), shortDate: Boolean(item.shortDate) }))
+    ? items.filter((item) => !item.sheet?.routine).slice(0, 3).map((item) => ({ name: shortAdviceName(item.sheet?.name || item.name), challenge: Boolean(item.challenge), shortDate: Boolean(item.shortDate) }))
     : [];
 
   const onTap = () => {

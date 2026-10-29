@@ -208,7 +208,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                           {advice.drug && <span className="block truncate text-[11.5px]" style={{ color: L.muted }}>pour {advice.drug}</span>}
                           <span data-ile-mix-repere="" className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] font-semibold">
                             {advice.overstock && <span className="rounded-full px-1.5" style={{ background: OVERSTOCK_BG, color: OVERSTOCK_FG }}>{OVERSTOCK_LABEL}</span>}
-                            <span className="inline-flex items-center gap-1" style={{ color: stockInk(advice) }}>
+                            <span className="inline-flex items-center gap-1 rounded-full px-1.5" style={{ color: stockInk(advice), background: stockTint(advice) }}>
                               <span className="size-1.5 rounded-full" style={{ background: stockInk(advice) }} />
                               {stockLabel(advice)}
                             </span>
@@ -216,10 +216,11 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                             {advice.shortDate && <span className="inline-flex items-center gap-1 text-[#C23A2B]"><Hourglass className="size-3" aria-hidden="true" />{advice.shortDate}</span>}
                           </span>
                         </span>
-                        <span className="shrink-0 text-right">
-                          {/* Le prix seulement avec un stock fiable (jamais un chiffre douteux). */}
-                          <span className="block text-[15px] font-bold tabular-nums" style={{ color: L.green }}>{advice.price && advice.stock !== "UNKNOWN" ? advice.price : "—"}</span>
-                          {advice.margin && <span className="mt-0.5 inline-block rounded-md bg-[#FFF5D6] px-1.5 text-[10.5px] font-bold text-[#9A6400] tabular-nums">+{advice.margin}</span>}
+                        <span className="flex shrink-0 flex-col items-end gap-1 text-right">
+                          {/* Le prix seulement avec un stock fiable (jamais un chiffre douteux) ; sinon rien, pas de tiret. */}
+                          {advice.price && advice.stock !== "UNKNOWN" && <span className="block text-[15px] font-bold tabular-nums" style={{ color: L.green }}>{advice.price}</span>}
+                          {/* « Marge » écrit en toutes lettres (poste du 29 oct. 2026 : « on voit ni le stock ni la marge »). */}
+                          {advice.margin && <span className="inline-block rounded-md bg-[#FFE58A] px-1.5 py-0.5 text-[11px] font-bold whitespace-nowrap text-[#4A3500] tabular-nums">Marge {advice.margin}</span>}
                         </span>
                       </button>
                     </div>
@@ -612,6 +613,11 @@ function ScrollBody({ children }: { children: ReactNode }) {
 function stockLabel(item: IslandAdvice): string {
   const count = item.quantity !== undefined ? ` · ${item.quantity}` : "";
   return item.stock === "IN_STOCK" ? `${T.inStock}${count}` : item.stock === "LOW_STOCK" ? `${T.lowStock}${count}` : item.stock === "OUT_OF_STOCK" ? "Rupture" : "Stock à vérifier";
+}
+
+/** Le fond de la pastille du stock sur fond blanc. */
+function stockTint(item: IslandAdvice): string {
+  return item.stock === "IN_STOCK" ? "#E3F6EC" : item.stock === "LOW_STOCK" ? "#FFF1DE" : item.stock === "OUT_OF_STOCK" ? "#FFE4E0" : "#EEF2F0";
 }
 
 /** La couleur du stock sur fond blanc : vert, orange s'il est faible, rouge en rupture, gris s'il est à vérifier. */
