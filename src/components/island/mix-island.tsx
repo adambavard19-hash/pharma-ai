@@ -2,7 +2,7 @@
 
 import { OVERSTOCK_LABEL } from "@/core/overstock/campaign";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight, Hourglass, LifeBuoy, MessageCircle, Pill, Star } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Hourglass, LifeBuoy, MessageCircle, Pill, Star } from "lucide-react";
 import type { HelpAdvice } from "@/core/poste/island-bridge";
 import { BANNER } from "../../../agent/src/banner-design";
 import type { CounterSheetLine } from "../../../agent/src/counter-sheet";
@@ -242,12 +242,12 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
             {belowHead}
 
             {/* Plus de bouton « Terminer » (fondateur, 29 oct. 2026 : « tout se passe depuis le LGO ») : la vente se termine quand le
-                logiciel de gestion la valide. Comme l'essai 1 : la routine, qui s'ouvre sur place. Plus de « Jusqu'à … sur cette vente »
+                logiciel de gestion la valide. La routine : ses photos ; au survol, sa deuxième bannière. Plus de « Jusqu'à … sur cette vente »
                 (fondateur, 29 oct. 2026). */}
             {routine && <div className="mx-1.5 my-1.5 h-px bg-white/10" />}
             {routine && (
               <div data-ile-cartes-routine="">
-                <button type="button" onClick={() => setRoutineOpen((value) => !value)} className="flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left hover:bg-white/[0.05]">
+                <button type="button" onClick={() => setRoutineOpen((value) => !value)} onMouseEnter={() => setRoutineOpen(true)} className="flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left hover:bg-white/[0.05]">
                   <span className="flex -space-x-2">
                     {routine.view.steps.map((step, i) => (
                       <span key={`${step.label}-${i}`} className={routineOpen ? "inline-flex" : "crd-blink inline-flex"} style={{ animationDelay: `${i * 0.25}s` }}>
@@ -261,28 +261,12 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                   <span className="min-w-0 flex-1 text-[12.5px] font-semibold text-white">Routine · {routine.view.steps.length} produits</span>
                   <ChevronDown className={`size-4 text-white/60 transition-transform ${routineOpen ? "rotate-180" : ""}`} aria-hidden="true" />
                 </button>
-                {routineOpen && (
-                  <div className="crd-in mt-1 flex items-stretch gap-1.5 px-1">
-                    {routine.view.steps.map((step, i) => (
-                      <div key={`${step.label}-${i}`} className="flex flex-1 items-center gap-1.5">
-                        <div className="flex flex-1 flex-col items-center gap-1 rounded-xl bg-white/[0.06] p-1.5 text-center">
-                          <span className="inline-flex size-[34px] items-center justify-center overflow-hidden rounded-xl bg-white">
-                            {/* eslint-disable-next-line @next/next/no-img-element -- photo studio locale */}
-                            {step.image ? <img src={step.image} alt="" className="size-full object-contain p-0.5" /> : <Pill className="size-4 text-[#9FB8B0]" aria-hidden="true" />}
-                          </span>
-                          <span className="text-[10.5px] font-bold text-[#E8FF9C] uppercase">{step.label}</span>
-                          <span className="line-clamp-1 text-[10.5px] text-white/65">{step.name}</span>
-                          {step.price && <span className="text-[10.5px] font-semibold text-white tabular-nums">{step.price}</span>}
-                        </div>
-                        {i < routine.view.steps.length - 1 && <ArrowRight className="size-3 shrink-0 text-white/30" aria-hidden="true" />}
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
             )}
           </div>
         </IslandShell>
+        {/* La routine s'ouvre dans sa deuxième bannière, comme la version en ligne (fondateur, 29 oct. 2026 : « j'aurais voulu garder ça »). */}
+        {routine && routineOpen && <RoutineIsland routine={routine.view} width={width} cards onClose={() => setRoutineOpen(false)} onPointerLeave={() => setRoutineOpen(false)} />}
       </>
     );
   }
