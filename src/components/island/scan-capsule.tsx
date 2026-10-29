@@ -168,7 +168,7 @@ export function WhitePill({ phase, done = 0, drug = "", found = [], open = false
               ) : item.shortDate ? (
                 <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="#C23A2B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-label="Date courte"><path d="M5 22h14M5 2h14M17 22v-4.2a2 2 0 0 0-.6-1.4L12 12l-4.4 4.4a2 2 0 0 0-.6 1.4V22M7 2v4.2a2 2 0 0 0 .6 1.4L12 12l4.4-4.4a2 2 0 0 0 .6-1.4V2" /></svg>
               ) : null}
-              <span className="text-[12px] font-bold text-[#0F2B26]">{item.name}</span>
+              <span className="max-w-[150px] truncate text-[12px] font-bold text-[#0F2B26]">{item.name}</span>
             </span>
           ))}
         </span>
@@ -182,6 +182,17 @@ export function WhitePill({ phase, done = 0, drug = "", found = [], open = false
 /** La largeur de la bannière blanche quand elle montre le nom des conseils (une estimation au caractère près). */
 export function whiteFoundWidth(found: readonly WhiteFound[]): number {
   if (found.length === 0) return WHITE_PILL_WIDTH;
-  const text = found.reduce((sum, item) => sum + item.name.length * 7 + (item.challenge || item.shortDate ? 20 : 0), 0);
-  return Math.min(460, Math.max(WHITE_PILL_WIDTH, 80 + text + (found.length - 1) * 26));
+  const text = found.reduce((sum, item) => sum + Math.min(150, item.name.length * 7.4) + (item.challenge || item.shortDate ? 20 : 0), 0);
+  return Math.min(420, Math.max(WHITE_PILL_WIDTH, 84 + text + (found.length - 1) * 26));
+}
+
+/**
+ * Le nom court d'un conseil pour la petite bannière (poste du 29 oct. 2026 : « Hydratis, pastilles d'électrolytes - goût au
+ * choix » débordait) : avant la virgule, le tiret ou la parenthèse, sans la forme (« baume », « gel »…), 22 caractères au plus.
+ */
+export function shortAdviceName(name: string): string {
+  const head = name.split(/,|\s[-–]\s|\(/)[0].replace(/\s+(baume|crème|creme|gel|lait|spray|cpr|gél|gel|pdr|sachets?)\b.*$/i, "").trim() || name.trim();
+  if (head.length <= 22) return head;
+  const cut = head.slice(0, 22);
+  return cut.slice(0, cut.lastIndexOf(" ") > 10 ? cut.lastIndexOf(" ") : 22).trim();
 }
