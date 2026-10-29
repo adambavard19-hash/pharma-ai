@@ -504,10 +504,10 @@ function NeonDots({ step = false }: { step?: boolean }) {
 }
 
 /** La capsule néon de base, qui s'ouvre au survol. */
-function NeonPill({ lead, extra, className = "neon", spacing }: { lead: ReactNode; extra?: ReactNode; className?: string; spacing?: string }) {
+function NeonPill({ lead, extra, className = "neon", spacing, width }: { lead: ReactNode; extra?: ReactNode; className?: string; spacing?: string; width?: number }) {
   const { over, bind } = useOver();
   return (
-    <span {...bind} className={`${className} relative inline-flex items-center gap-3 overflow-hidden rounded-full bg-[#030504] px-4 transition-all duration-300`} style={{ height: over ? 44 : 36 }}>
+    <span {...bind} className={`${className} relative inline-flex items-center gap-3 overflow-hidden rounded-full bg-[#030504] px-4 transition-all duration-300`} style={{ height: over ? 44 : 36, ...(width && !over ? { width, justifyContent: "center" } : {}) }}>
       {lead}
       {over ? <NeonOpened /> : <><NeonName spacing={spacing} />{extra}</>}
     </span>
@@ -592,15 +592,19 @@ const NEONS: { key: string; title: string; text: string; View: () => ReactNode }
 ];
 
 /** Les étapes 2 à 8 du parcours retenu (scan A, cartes, fin 3), la vraie bannière figée : partagées par les variantes de couleur. */
-function JourneyRest() {
+function JourneyRest({ from = 2 }: { from?: number }) {
   return (
     <>
-            <Frame n="Étape 2" title="Scan : la croix s'allume" text="Le nom de la boîte et l'étape en cours ; un bras de la croix s'allume à chaque étape.">
-              <Capsule look="croix" phase="analyse" done={2} />
-            </Frame>
-            <Frame n="Étape 3" title="C'est prêt" text="Toute la croix s'allume : le nombre de conseils.">
-              <Capsule look="croix" phase="found" done={4} />
-            </Frame>
+            {from <= 2 && (
+              <>
+                <Frame n="Étape 2" title="Scan : la croix s'allume" text="Le nom de la boîte et l'étape en cours ; un bras de la croix s'allume à chaque étape.">
+                  <Capsule look="croix" phase="analyse" done={2} />
+                </Frame>
+                <Frame n="Étape 3" title="C'est prêt" text="Toute la croix s'allume : le nombre de conseils.">
+                  <Capsule look="croix" phase="found" done={4} />
+                </Frame>
+              </>
+            )}
             <Frame n="Étape 4" title="La bannière en cartes" text="Une carte par boîte scannée, la routine dessous (cliquez dessus pour l'ouvrir)." tall>
               <MixIsland cards enterFrom="croix" items={ITEMS} outcomes={[]} open={false} onOpen={noop} onFinish={noop} onAnswer={noop} />
             </Frame>
@@ -617,6 +621,42 @@ function JourneyRest() {
               <RealEnd stage="done" />
             </Frame>
     </>
+  );
+}
+
+/* ================================================================== LE PARCOURS, VERSION RETENUE (néon) */
+
+/** La largeur commune de la petite bannière : l'attente et le scan font exactement la même taille. */
+const PILL_WIDTH = 214;
+
+/** La croix de pharmacie en citron, la couleur de la bannière : ses bras s'allument un à un pendant l'analyse. */
+function LimeCross({ lit, size = 16, glow = false }: { lit: number; size?: number; glow?: boolean }) {
+  return (
+    <svg viewBox="0 0 40 40" style={{ width: size, height: size }} className={`shrink-0 ${glow ? "drop-shadow-[0_0_6px_rgba(232,255,156,.9)]" : ""}`} aria-hidden="true">
+      {[
+        { x: 14, y: 2 },
+        { x: 26, y: 14 },
+        { x: 14, y: 26 },
+        { x: 2, y: 14 },
+      ].map((arm, i) => (
+        <rect key={i} x={arm.x} y={arm.y} width="12" height="12" rx="2.5" fill={i < lit ? "#E8FF9C" : "rgba(232,255,156,.16)"} style={{ transition: "fill .25s" }} />
+      ))}
+      <rect x="14" y="14" width="12" height="12" rx="2.5" fill="#E8FF9C" className="scn-heart" />
+    </svg>
+  );
+}
+
+/** Le scan dans la petite bannière néon, à la même taille que l'attente : la croix citron et la boîte (ou « 2 conseils »). */
+function NeonScan({ lit, found = false }: { lit: number; found?: boolean }) {
+  return (
+    <span className="neon relative inline-flex h-9 items-center justify-center gap-2.5 overflow-hidden rounded-full bg-[#030504] px-4" style={{ width: PILL_WIDTH }}>
+      <LimeCross lit={found ? 4 : lit} glow={found} />
+      {found ? (
+        <span className="pop text-[11px] font-bold tracking-[0.2em] whitespace-nowrap text-[#E8FF9C] uppercase">2 conseils</span>
+      ) : (
+        <span className="text-[11px] font-bold tracking-[0.14em] whitespace-nowrap text-white uppercase">Curacné 20 mg</span>
+      )}
+    </span>
   );
 }
 
@@ -802,6 +842,22 @@ export function SaleEndTrials() {
         <p className="mt-2 max-w-3xl text-[15px] leading-7 text-[#4D6B64]">
           Chaque étape de la vraie bannière, figée : prenez le temps de tout regarder. Les cartes et la routine se cliquent. Vente d&apos;exemple (vrais produits du stock, photos studio).
         </p>
+
+        {/* La version retenue (fondateur, 29 oct. 2026) : l'ADN seulement sur la petite bannière ; le scan à la même taille, la croix en citron. */}
+        <h2 className="mt-8 text-[20px] font-bold text-[#0F2F2A]">Le parcours, version retenue</h2>
+        <p className="mt-1 max-w-3xl text-[14.5px] leading-7 text-[#4D6B64]">L&apos;ADN seulement sur la petite bannière ; le scan garde exactement sa taille, la croix s&apos;allume en citron ; ensuite, le néon sans ADN.</p>
+        <div className="theme-neon mt-4 grid gap-5 lg:grid-cols-2">
+          <Frame n="Étape 1" title="PharmaBoost sur l'ADN" text="La petite bannière : le néon fin et l'ADN en citron dedans. Au survol, « Scannez une boîte » et « Une question ? ».">
+            <NeonPill className="neon neon-adn" lead={<NeonDots />} width={PILL_WIDTH} />
+          </Frame>
+          <Frame n="Étape 2" title="Scan : la croix s'allume en citron" text="Même taille que l'étape 1. Le nom de la boîte, et un bras de la croix s'allume à chaque étape de l'analyse.">
+            <NeonScan lit={2} />
+          </Frame>
+          <Frame n="Étape 3" title="C'est prêt" text="Toujours la même taille : toute la croix s'allume, « 2 conseils ».">
+            <NeonScan lit={4} found />
+          </Frame>
+          <JourneyRest from={4} />
+        </div>
 
         {/* Le parcours entier au coloris du néon fin (fondateur, 29 oct. 2026) : noir, contour citron qui respire. */}
         <h2 className="mt-8 text-[20px] font-bold text-[#0F2F2A]">Tout le parcours au néon fin, sans ADN</h2>
