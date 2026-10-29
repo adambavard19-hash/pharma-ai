@@ -591,6 +591,35 @@ const NEONS: { key: string; title: string; text: string; View: () => ReactNode }
   { key: "N7", title: "Néon sur verre fumé", text: "Le contour citron de F3 sur la capsule transparente et floue de F1 : le logiciel se devine derrière.", View: N7Glass },
 ];
 
+/** Les étapes 2 à 8 du parcours retenu (scan A, cartes, fin 3), la vraie bannière figée : partagées par les variantes de couleur. */
+function JourneyRest() {
+  return (
+    <>
+            <Frame n="Étape 2" title="Scan : la croix s'allume" text="Le nom de la boîte et l'étape en cours ; un bras de la croix s'allume à chaque étape.">
+              <Capsule look="croix" phase="analyse" done={2} />
+            </Frame>
+            <Frame n="Étape 3" title="C'est prêt" text="Toute la croix s'allume : le nombre de conseils.">
+              <Capsule look="croix" phase="found" done={4} />
+            </Frame>
+            <Frame n="Étape 4" title="La bannière en cartes" text="Une carte par boîte scannée, la routine dessous (cliquez dessus pour l'ouvrir)." tall>
+              <MixIsland cards enterFrom="croix" items={ITEMS} outcomes={[]} open={false} onOpen={noop} onFinish={noop} onAnswer={noop} />
+            </Frame>
+            <Frame n="Étape 5" title="Une carte ouverte" text="« À dire au patient », les questions : touchez « Oui, il ne suffit plus » pour voir l'autre produit proposé." tall>
+              <MixIsland cards items={ITEMS} outcomes={[]} open startAt={0} onOpen={noop} onFinish={noop} onAnswer={noop} />
+            </Frame>
+            <Frame n="Étape 6" title="Le produit est bipé" text="Cicaplast Lèvres passé en caisse dans LGPI : la carte est cochée « Vendu »." tall>
+              <MixIsland cards items={ITEMS} outcomes={["SOLD"]} open startAt={0} onOpen={noop} onFinish={noop} onAnswer={noop} />
+            </Frame>
+            <Frame n="Étape 7" title="Vente validée : l'e-mail du bilan" text="Après « FIN · Valider » dans LGPI : une ligne, Envoyer ou Passer. Sans réponse, la vente se termine seule à la fin du compte à rebours.">
+              <RealEnd stage="email" />
+            </Frame>
+            <Frame n="Étape 8" title="Bravo, et qui a servi ce patient ?" text="La marge gagnée, et l'équipe en pastilles : la personne du comptoir est déjà choisie, un clic pour un collègue.">
+              <RealEnd stage="done" />
+            </Frame>
+    </>
+  );
+}
+
 /* ================================================================== LA FIN DE LA VENTE */
 
 /* ---------------------------------------- La vraie fin de vente du poste (fin 3), figée */
@@ -733,6 +762,14 @@ const PAGE_CSS = `
 .neon-double{box-shadow:inset 0 0 0 1px rgba(232,255,156,.35),0 0 0 3px #030504,0 0 0 4px rgba(232,255,156,.6),0 0 18px rgba(232,255,156,.3)!important;animation:none}
 .neon-heart{box-shadow:0 0 0 1px rgba(232,255,156,.6),0 0 10px rgba(232,255,156,.2);animation:heartbeat 2.2s ease-in-out infinite}
 @keyframes heartbeat{0%,40%,100%{box-shadow:0 0 0 1px rgba(232,255,156,.45),0 0 6px rgba(232,255,156,.15)}10%,30%{box-shadow:0 0 0 1.5px #E8FF9C,0 0 20px rgba(232,255,156,.5)}20%{box-shadow:0 0 0 1px rgba(232,255,156,.5),0 0 8px rgba(232,255,156,.2)}}
+/* Le coloris « néon fin » appliqué à toutes les bannières d'un parcours : noir, contour citron qui respire. :not(#_) passe devant le verre vert. */
+.theme-neon .scan-screen section:not(#_){background:#030504!important;box-shadow:0 14px 34px -14px rgba(0,0,0,.6)!important;isolation:isolate}
+.theme-neon .scan-screen section:not(#_)::before{content:""!important;display:block!important;position:absolute;inset:0;border-radius:inherit;padding:0!important;background:none!important;-webkit-mask:none!important;mask:none!important;pointer-events:none;z-index:3;box-shadow:inset 0 0 0 1px rgba(232,255,156,.65),inset 0 0 12px rgba(232,255,156,.12);animation:neon-in 3s ease-in-out infinite}
+@keyframes neon-in{0%,100%{box-shadow:inset 0 0 0 1px rgba(232,255,156,.7),inset 0 0 14px rgba(232,255,156,.14)}50%{box-shadow:inset 0 0 0 1px rgba(232,255,156,.3),inset 0 0 4px rgba(232,255,156,.05)}}
+.theme-adn .scan-screen section:not(#_)::after,.neon-adn::after{content:"";position:absolute;inset:-20%;z-index:-1;pointer-events:none;background:url(/poste/adn-helice.jpg) 62% 40%/cover no-repeat;filter:invert(1) grayscale(1) brightness(1.1) contrast(1.4) sepia(1) hue-rotate(28deg) saturate(3.2);mix-blend-mode:screen;opacity:.42;animation:adn-vit 14s ease-in-out infinite alternate}
+.neon-adn{isolation:isolate}
+.neon-adn::after{opacity:.75;inset:-60% -10%}
+@keyframes adn-vit{from{transform:translate3d(-6%,-3%,0) scale(1.05) rotate(-2deg)}to{transform:translate3d(6%,3%,0) scale(1.15) rotate(2deg)}}
 .radar{background:conic-gradient(from 0deg,rgba(232,255,156,.7),transparent 30%);animation:spin 1.8s linear infinite}
 .breathe{animation:breathe 2.4s ease-in-out infinite}
 @keyframes breathe{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
@@ -753,7 +790,7 @@ const PAGE_CSS = `
 .confetti{position:absolute;left:50%;top:50%;pointer-events:none}
 .confetti i{position:absolute;width:6px;height:6px;margin:-3px;border-radius:2px;background:var(--c);opacity:0;animation:conf 1.1s cubic-bezier(.2,.8,.3,1) both}
 @keyframes conf{0%{opacity:1;transform:rotate(var(--a)) translateY(0)}100%{opacity:0;transform:rotate(var(--a)) translateY(calc(var(--d) * -1)) rotate(180deg)}}
-@media (prefers-reduced-motion:reduce){.dot-step,.neon-grad,.underline-sweep,.neon-heart,.text-in,.smoke-wrap,.aurora,.neon,.dot,.holo-border,.shine,.radar,.eq,.ring-spin,.glow-border,.breathe,.idle-arm,.idle-laser,.pop,.bravo-in,.countdown,.gauge,.confetti i{animation:none}}
+@media (prefers-reduced-motion:reduce){.theme-neon .scan-screen section::before,.theme-adn .scan-screen section::after,.neon-adn::after,.dot-step,.neon-grad,.underline-sweep,.neon-heart,.text-in,.smoke-wrap,.aurora,.neon,.dot,.holo-border,.shine,.radar,.eq,.ring-spin,.glow-border,.breathe,.idle-arm,.idle-laser,.pop,.bravo-in,.countdown,.gauge,.confetti i{animation:none}}
 `;
 
 export function SaleEndTrials() {
@@ -766,7 +803,26 @@ export function SaleEndTrials() {
           Chaque étape de la vraie bannière, figée : prenez le temps de tout regarder. Les cartes et la routine se cliquent. Vente d&apos;exemple (vrais produits du stock, photos studio).
         </p>
 
-        <h2 className="mt-8 text-[20px] font-bold text-[#0F2F2A]">Étape 1 : autour du néon fin (F3)</h2>
+        {/* Le parcours entier au coloris du néon fin (fondateur, 29 oct. 2026) : noir, contour citron qui respire. */}
+        <h2 className="mt-8 text-[20px] font-bold text-[#0F2F2A]">Tout le parcours au néon fin, sans ADN</h2>
+        <p className="mt-1 max-w-3xl text-[14.5px] leading-7 text-[#4D6B64]">Les huit étapes avec le même habit que la F3 : fond noir, contour citron qui respire. Passez la souris sur l&apos;étape 1.</p>
+        <div className="theme-neon mt-4 grid gap-5 lg:grid-cols-2">
+          <Frame n="Étape 1" title="Le néon fin" text="La F3 : PHARMABOOST en capitales espacées, trois points ; au survol, « Scannez une boîte » et « Une question ? ».">
+            <NeonPill lead={<NeonDots />} />
+          </Frame>
+          <JourneyRest />
+        </div>
+
+        <h2 className="mt-12 text-[20px] font-bold text-[#0F2F2A]">Tout le parcours au néon fin, avec l&apos;ADN</h2>
+        <p className="mt-1 max-w-3xl text-[14.5px] leading-7 text-[#4D6B64]">Le même coloris, avec l&apos;hélice d&apos;ADN en citron qui bouge doucement derrière chaque bannière.</p>
+        <div className="theme-neon theme-adn mt-4 grid gap-5 lg:grid-cols-2">
+          <Frame n="Étape 1" title="Le néon fin sur l'ADN" text="La F3 avec l'hélice d'ADN en citron dedans ; au survol, elle s'ouvre pareil.">
+            <NeonPill className="neon neon-adn" lead={<NeonDots />} />
+          </Frame>
+          <JourneyRest />
+        </div>
+
+        <h2 className="mt-12 text-[20px] font-bold text-[#0F2F2A]">Étape 1 : autour du néon fin (F3)</h2>
         <p className="mt-1 max-w-3xl text-[14.5px] leading-7 text-[#4D6B64]">Toutes s&apos;ouvrent au survol : passez la souris dessus. Le fond gris clair imite l&apos;écran de LGPI.</p>
         <div className="mt-4 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
           {NEONS.map((item) => (
@@ -857,27 +913,7 @@ export function SaleEndTrials() {
           <Frame n="Étape 1" title="En attente de scan" text="Inchangée : la capsule sur l'ADN, dans la police des cartes.">
             <Waiting />
           </Frame>
-          <Frame n="Étape 2" title="Scan : la croix s'allume" text="Le nom de la boîte et l'étape en cours ; un bras de la croix s'allume à chaque étape.">
-            <Capsule look="croix" phase="analyse" done={2} />
-          </Frame>
-          <Frame n="Étape 3" title="C'est prêt" text="Toute la croix s'allume : le nombre de conseils.">
-            <Capsule look="croix" phase="found" done={4} />
-          </Frame>
-          <Frame n="Étape 4" title="La bannière en cartes" text="Une carte par boîte scannée, la routine dessous (cliquez dessus pour l'ouvrir)." tall>
-            <MixIsland cards enterFrom="croix" items={ITEMS} outcomes={[]} open={false} onOpen={noop} onFinish={noop} onAnswer={noop} />
-          </Frame>
-          <Frame n="Étape 5" title="Une carte ouverte" text="« À dire au patient », les questions : touchez « Oui, il ne suffit plus » pour voir l'autre produit proposé." tall>
-            <MixIsland cards items={ITEMS} outcomes={[]} open startAt={0} onOpen={noop} onFinish={noop} onAnswer={noop} />
-          </Frame>
-          <Frame n="Étape 6" title="Le produit est bipé" text="Cicaplast Lèvres passé en caisse dans LGPI : la carte est cochée « Vendu »." tall>
-            <MixIsland cards items={ITEMS} outcomes={["SOLD"]} open startAt={0} onOpen={noop} onFinish={noop} onAnswer={noop} />
-          </Frame>
-          <Frame n="Étape 7" title="Vente validée : l'e-mail du bilan" text="Après « FIN · Valider » dans LGPI : une ligne, Envoyer ou Passer. Sans réponse, la vente se termine seule à la fin du compte à rebours.">
-            <RealEnd stage="email" />
-          </Frame>
-          <Frame n="Étape 8" title="Bravo, et qui a servi ce patient ?" text="La marge gagnée, et l'équipe en pastilles : la personne du comptoir est déjà choisie, un clic pour un collègue.">
-            <RealEnd stage="done" />
-          </Frame>
+          <JourneyRest />
         </div>
 
         <h2 className="mt-12 text-[20px] font-bold text-[#0F2F2A]">2 · « Qui a servi ce patient ? » : propositions</h2>
