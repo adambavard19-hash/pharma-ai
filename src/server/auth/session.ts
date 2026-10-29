@@ -13,6 +13,7 @@ import {
 } from "@/server/rbac/permissions";
 import { SESSION_COOKIE_NAME, SESSION_DURATION_MS } from "@/config/constants";
 import type { TenantScope } from "@/server/db/tenant";
+import { isCommercialDemoPharmacy } from "@/core/demo/identity";
 
 export { getRequestMeta } from "@/server/http/request-meta";
 
@@ -44,7 +45,16 @@ export type SessionContext = {
   availablePharmacies: { id: string; name: string; city: string | null }[];
   scope: TenantScope;
   sessionId: string;
+  /**
+   * L'officine de démonstration (fondateur, 29 oct. 2026 : « un petit onglet pour montrer l'espace du pharmacien pendant la
+   * vidéo ») : le titulaire de la démo peut regarder l'application avec les droits d'un pharmacien adjoint. Absent hors de la
+   * démonstration commerciale ; la bascule ne fait que RETIRER des droits, jamais en donner.
+   */
+  demoView?: "titulaire" | "pharmacien";
 };
+
+/** Le cookie de la bascule « Espace titulaire / Espace pharmacien » de la démonstration. */
+export const DEMO_VIEW_COOKIE = "pb-demo-espace";
 
 export class AuthorizationError extends Error {
   constructor(public readonly permission: Permission) {
@@ -158,7 +168,11 @@ export const getSession = cache(async (): Promise<SessionContext | null> => {
     memberships.find((m) => m.pharmacyId === session.pharmacyId) ?? memberships[0];
   if (!active) return null;
 
-  const role = active.role as Role;
+  const realRole = active.role as Role;
+  // La démonstration commerciale : son titulaire peut regarder l'espace d'un pharmacien adjoint (moins de droits, jamais plus).
+  const demoSwitch = realRole === "OWNER" && isCommercialDemoPharmacy(active.pharmacy);
+  const demoView = demoSwitch ? (cookieStore.get(DEMO_VIEW_COOKIE)?.value === "pharmacien" ? "pharmacien" : "titulaire") : undefined;
+  const role: Role = demoView === "pharmacien" ? "PHARMACIST" : realRole;
   const { user } = session;
   const fullName = `${user.firstName} ${user.lastName}`.trim();
 
@@ -185,11 +199,12 @@ export const getSession = cache(async (): Promise<SessionContext | null> => {
     organization: user.organization,
     role,
     roleLabel: ROLE_LABELS[role],
-    permissions: resolvePermissions(
+    permissions: demoView === "pharmacien" ? resolvePermissions(role, [], []) : resolvePermissions(
       role,
       active.grantedPermissions,
       active.revokedPermissions,
     ),
+    ...(demoView ? { demoView } : {}),
     availablePharmacies: memberships.map((m) => ({
       id: m.pharmacy.id,
       name: m.pharmacy.name,

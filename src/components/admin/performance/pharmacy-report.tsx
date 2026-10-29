@@ -218,7 +218,12 @@ export function PharmacyReport({
                   <summary className="flex cursor-pointer list-none items-center gap-3 px-5 py-3 hover:bg-surface-sunken/60 [&::-webkit-details-marker]:hidden">
                     <span className="w-14 shrink-0 text-[12.5px] text-text-tertiary tabular-nums">{sameDay ? time.format(row.at) : dayTime.format(row.at)}</span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[14px] font-semibold text-text-primary">{row.product}</span>
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="truncate text-[14px] font-semibold text-text-primary">{row.product}</span>
+                        {row.kind && row.kind !== "CONSEIL" && (
+                          <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-bold", row.kind === "ROUTINE" ? "bg-[#EDE9FF] text-[#5B45C6]" : "bg-[#FFF1DE] text-[#9A5B00]")}>{row.kind === "ROUTINE" ? "Routine" : "Association"}</span>
+                        )}
+                      </span>
                       <span className="block truncate text-[12.5px] text-text-tertiary">
                         {row.forDrug ? `pour ${row.forDrug}` : "conseil de la vente"} · {row.who}
                       </span>

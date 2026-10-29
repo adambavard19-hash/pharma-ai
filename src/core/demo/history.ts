@@ -188,10 +188,11 @@ const DAY_MS = 86_400_000;
 /** Combien de passages un jour donné : l'officine ferme le dimanche, ralentit le samedi. */
 function visitsForDay(date: Date, isToday: boolean, random: () => number): number {
   const weekday = date.getUTCDay();
-  if (isToday) return 7 + Math.floor(random() * 4);
+  // Une officine de centre-ville bien fréquentée (fondateur, 29 oct. 2026 : « des chiffres plus hauts, qui impressionnent »).
+  if (isToday) return 16 + Math.floor(random() * 6);
   if (weekday === 0) return 0;
-  if (weekday === 6) return 8 + Math.floor(random() * 5);
-  return 13 + Math.floor(random() * 6);
+  if (weekday === 6) return 18 + Math.floor(random() * 6);
+  return 26 + Math.floor(random() * 9);
 }
 
 export function planHistory(input: HistoryInput): PlannedVisit[] {
@@ -203,8 +204,9 @@ export function planHistory(input: HistoryInput): PlannedVisit[] {
   for (let back = input.days - 1; back >= 0; back -= 1) {
     const dayStart = new Date(todayStart.getTime() - back * DAY_MS);
     const isToday = back === 0;
-    // Une progression douce : la dernière semaine accepte un peu plus que la première.
-    const trend = 0.86 + 0.2 * ((input.days - 1 - back) / (input.days - 1));
+    // Une progression nette : de semaine en semaine l'équipe vend mieux (la dernière semaine, environ 10 % de plus que la
+    // précédente — ce qu'on montre en démonstration).
+    const trend = 0.8 + 0.42 * ((input.days - 1 - back) / (input.days - 1));
     const count = visitsForDay(dayStart, isToday, random);
     for (let n = 0; n < count; n += 1) {
       // Les horaires d'ouverture (9 h – 19 h 30, heure de Paris ≈ UTC+1/+2) ; aujourd'hui : les dernières heures écoulées.
