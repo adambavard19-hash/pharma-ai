@@ -117,7 +117,9 @@ async function main() {
   const done = new Set(readdirSync(OUT_DIR).flatMap((file) => /^(\d{8,14})\.jpg$/.exec(file)?.[1] ?? []));
   const sources: Source[] = existsSync(SOURCES_FILE) ? JSON.parse(readFileSync(SOURCES_FILE, "utf8")) : [];
   const tried = new Set(sources.map((source) => source.ean));
-  const eans = [...new Set(readFileSync(listFile, "utf8").split(/\s+/).filter((line) => /^\d{8,14}$/.test(line)))].filter((ean) => !done.has(ean)).slice(0, limit);
+  // Les photos refusées à la relecture (main, dos de boîte, code-barres…) ne sont pas refaites.
+  const refused = new Set(existsSync("scripts/photos-auto/refusees.txt") ? readFileSync("scripts/photos-auto/refusees.txt", "utf8").split(/\s+/) : []);
+  const eans = [...new Set(readFileSync(listFile, "utf8").split(/\s+/).filter((line) => /^\d{8,14}$/.test(line)))].filter((ean) => !done.has(ean) && !refused.has(ean)).slice(0, limit);
   const report: Record<string, number> = {};
   let made = 0;
   for (const [index, ean] of eans.entries()) {
