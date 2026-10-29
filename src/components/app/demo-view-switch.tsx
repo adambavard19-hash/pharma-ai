@@ -1,9 +1,11 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Crown, Stethoscope } from "lucide-react";
+import { Crown, RotateCcw, Stethoscope } from "lucide-react";
 import { setDemoViewAction } from "@/server/actions/demo-view";
+import { resetDemoAction } from "@/server/actions/demo";
+import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 
 /**
@@ -12,7 +14,17 @@ import { cn } from "@/lib/utils";
  */
 export function DemoViewSwitch({ view }: { view: "titulaire" | "pharmacien" }) {
   const router = useRouter();
+  const { push } = useToast();
   const [pending, start] = useTransition();
+  const [confirming, setConfirming] = useState(false);
+  // Avant une vidéo : l'officine de démonstration repart de zéro, son historique recalé sur la date du jour.
+  const reset = () =>
+    start(async () => {
+      setConfirming(false);
+      const result = await resetDemoAction();
+      push({ tone: result.ok ? "success" : "error", title: result.ok ? (result.message ?? "Démonstration remise à zéro.") : result.error });
+      router.refresh();
+    });
   const choose = (next: "titulaire" | "pharmacien") =>
     start(async () => {
       if (next === view) return;
@@ -41,6 +53,19 @@ export function DemoViewSwitch({ view }: { view: "titulaire" | "pharmacien" }) {
             {label}
           </button>
         ))}
+        <span className="mx-1 h-5 w-px bg-[#0E7C5A]/20" />
+        {view === "titulaire" &&
+          (confirming ? (
+            <span className="flex items-center gap-1 pr-1 text-[12px] text-[#0F2F2A]">
+              Tout remettre à zéro ?
+              <button type="button" disabled={pending} onClick={reset} className="h-7 rounded-full bg-[#0E7C5A] px-3 text-[12px] font-semibold text-white">Oui</button>
+              <button type="button" onClick={() => setConfirming(false)} className="h-7 rounded-full px-2 text-[12px] font-semibold text-[#4D6B64]">Non</button>
+            </span>
+          ) : (
+            <button type="button" disabled={pending} onClick={() => setConfirming(true)} title="Remettre la démonstration à zéro, avant une vidéo" className="inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[12.5px] font-semibold text-[#4D6B64] hover:bg-[#0E7C5A]/10 hover:text-[#0F2F2A]">
+              <RotateCcw className="size-3.5" aria-hidden="true" /> {pending ? "Un instant…" : "Remettre à zéro"}
+            </button>
+          ))}
       </div>
     </div>
   );
