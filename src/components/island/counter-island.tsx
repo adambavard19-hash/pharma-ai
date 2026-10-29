@@ -904,7 +904,8 @@ export function CounterIsland(props: CounterIslandProps) {
         break;
       case "done": {
         const sold = items.filter((_, i) => state.outcomes[i] === "SOLD");
-        if (props.compactEnd && (sold.length || props.served)) {
+        // Bravo, la récompense et « Qui a servi ? » seulement si un conseil a été vendu (règle fixée par le fondateur).
+        if (props.compactEnd && sold.length) {
           // Fin 3 (fondateur, 29 oct. 2026) : le Bravo et la marge gagnée, puis « Qui a servi ce patient ? » dans la même capsule.
           const gained = possibleMargin(sold);
           const served = props.served;
@@ -913,16 +914,16 @@ export function CounterIsland(props: CounterIslandProps) {
             <div className="px-3 py-2.5" data-ile-fete="" data-ile-fin="compacte">
               <div className="flex items-center gap-2.5">
                 <span className="relative inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#0E8A7B]">
-                  {sold.length ? <Trophy className="size-5 text-white" aria-hidden="true" /> : <Check className="size-5 text-white" strokeWidth={3} aria-hidden="true" />}
-                  {sold.length > 0 && <span className="isl-burst" aria-hidden="true">
+                  <Trophy className="size-5 text-white" aria-hidden="true" />
+                  <span className="isl-burst" aria-hidden="true">
                     {BURST_PIECES.map((piece, index) => (
                       <i key={`${cheer}-${index}`} style={{ "--a": `${piece.angle}deg`, "--d": `${piece.distance}px`, "--c": piece.color, animationDelay: `${piece.delay}ms` } as CSSProperties} />
                     ))}
-                  </span>}
+                  </span>
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="isl-pop text-[16px] leading-5 font-bold text-[#0F2B26]" aria-live="polite">
-                    {sold.length ? "Bravo !" : "Vente terminée"}{gained > 0 && <span className="text-[#0E8A7B]"> +{eurosOf(gained)}</span>}
+                    Bravo !{gained > 0 && <span className="text-[#0E8A7B]"> +{eurosOf(gained)}</span>}
                   </p>
                   <p className="text-[11.5px] text-[#5B6B66]">
                     {served?.done ? `Vente comptée pour ${served.team.find((member) => member.id === served.chosen)?.name ?? "le comptoir"}` : served?.team.length ? "Qui a servi ce patient ?" : T.doneTitle}
@@ -1023,7 +1024,7 @@ export function CounterIsland(props: CounterIslandProps) {
       <IslandShell
         width={whiteLook && resting && !peek && !grumpy ? (hover ? 330 : WHITE_PILL_WIDTH) : whiteLook && scanCapsule ? (state.stage === "ready" ? whiteFoundWidth(whiteFound) : WHITE_PILL_WIDTH) : scanCapsule ? 340 : width}
         tone={tone}
-        className={whiteLook && ((resting && !peek && !grumpy) || scanCapsule) ? "crd-white" : scanCapsule ? "crd-glass crd-cap-in" : props.compactEnd && (state.stage === "email" || (state.stage === "done" && (state.outcomes.some((outcome) => outcome === "SOLD") || props.served))) ? "crd-light" : undefined}
+        className={whiteLook && ((resting && !peek && !grumpy) || scanCapsule) ? "crd-white" : scanCapsule ? "crd-glass crd-cap-in" : props.compactEnd && (state.stage === "email" || (state.stage === "done" && state.outcomes.some((outcome) => outcome === "SOLD"))) ? "crd-light" : undefined}
         contentKey={whiteLook && resting && !peek && !grumpy ? "attente-blanche" : scanCapsule ? "scan-capsule" : grumpy ? "grumpy" : peek ? "peek" : collapsed ? `${state.stage}-replie` : sleeping ? "advice-capsule" : compact ? "advice-compact" : state.stage}
         label="Bannière PharmaBoost du comptoir"
         onPointerEnter={() => {

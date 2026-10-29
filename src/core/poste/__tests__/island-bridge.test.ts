@@ -256,17 +256,17 @@ describe("qui a servi ce patient", () => {
     ({ id: "rx_1", items: [{ id: "rec_1", outcome }], team, alerts: [], questions: [], notes: [] }) as unknown as HostEntry;
   const done = (entry: HostEntry, outcomes: ("SOLD" | null)[] = []) => ({ entry, island: { ...INITIAL_POSTE.island, stage: "done" as const, outcomes } });
 
-  it("demande à chaque fin de vente, vendu ou non, s'il y a un collègue à choisir (fondateur, 29 oct. 2026)", () => {
+  it("ne demande qu'à la fin d'une vente où un conseil a été vendu, et s'il y a un collègue à choisir", () => {
     expect(shouldAskServed(done(sale("SOLD")))).toBe(true);
     expect(shouldAskServed(done(sale("NONE"), ["SOLD"]))).toBe(true);
-    expect(shouldAskServed(done(sale("NONE")))).toBe(true);
+    expect(shouldAskServed(done(sale("NONE")))).toBe(false);
     expect(shouldAskServed(done(sale("SOLD", [{ id: "u1", name: "Donna B." }])))).toBe(false);
     expect(shouldAskServed({ ...done(sale("SOLD")), island: { ...INITIAL_POSTE.island, stage: "advice" } })).toBe(false);
   });
 
-  it("une boîte en challenge sans conseil vendu : la question est posée aussi (fondateur, 29 oct. 2026)", () => {
+  it("une boîte en challenge sans conseil vendu : pas de question (fondateur, 21 oct. 2026)", () => {
     const zinc = { ...sale("NONE"), boxes: [{ id: "l1", name: "ZINC NHCO", challenge: "NHCO", reward: "1 € par boîte" }] } as unknown as HostEntry;
-    expect(shouldAskServed(done(zinc))).toBe(true);
+    expect(shouldAskServed(done(zinc))).toBe(false);
   });
 
   it("le mot SERVI, seulement avec des identifiants sûrs", () => {
