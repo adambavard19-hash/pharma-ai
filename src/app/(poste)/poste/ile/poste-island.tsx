@@ -543,9 +543,10 @@ export function PosteIsland() {
   const cards = useSyncExternalStore(noSubscribe, () => !["mix", "ancienne"].includes(new URLSearchParams(window.location.search).get("banniere") ?? ""), () => true);
   const scanLook = useSyncExternalStore(noSubscribe, () => {
     const value = new URLSearchParams(window.location.search).get("scan");
-    // Le scan A, la croix, retenu (fondateur, 29 oct. 2026) ; `?scan=gelule` pour la gélule.
-    return value === "gelule" ? "gelule" : value === "lignes" ? null : "croix";
-  }, () => "croix" as const);
+    // La petite bannière blanche, retenue et mise en ligne (fondateur, 29 oct. 2026) ; `?scan=croix` pour la croix sur le verre
+    // vert, `?scan=gelule` pour la gélule, `?scan=lignes` pour les lignes cochées d'avant.
+    return value === "croix" ? "croix" : value === "gelule" ? "gelule" : value === "lignes" ? null : "blanc";
+  }, () => "blanc" as const);
   const everyAdvice = useSyncExternalStore(noSubscribe, () => new URLSearchParams(window.location.search).has("tous-les-conseils"), () => false);
 
   // « C'est un autre client ? » : la dernière boîte est arrivée plus de 30 secondes après la précédente (le serveur la marque).

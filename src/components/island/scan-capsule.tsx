@@ -6,7 +6,7 @@
  * la croix de pharmacie (A) qui s'allume bras par bras. Le contenu seul : le verre vert est celui de la bannière autour.
  */
 
-export type ScanLook = "gelule" | "croix";
+export type ScanLook = "gelule" | "croix" | "blanc";
 export type ScanPhase = "scan" | "analyse" | "found";
 
 /** Les quatre temps de l'analyse, tels qu'ils s'affichent sous le nom de la boîte. */
@@ -85,6 +85,10 @@ export function ScanCapsule(props: ScanCapsuleProps) {
 }
 
 export const SCAN_CSS = `
+section.crd-white.crd-white{background:#FFFFFF!important;border-radius:999px!important;box-shadow:0 14px 32px -14px rgba(15,43,38,.45),0 0 0 1px rgba(14,138,123,.25)!important;isolation:isolate}
+section.crd-white.crd-white::before{display:none!important}
+section.crd-white.crd-white::after{content:"";position:absolute;inset:-60% -10%;z-index:-1;pointer-events:none;background:url(/poste/adn-helice.jpg) 62% 40%/cover no-repeat;mix-blend-mode:multiply;opacity:.42;animation:crd-adn 14s ease-in-out infinite alternate}
+@keyframes crd-adn{from{transform:translate3d(-6%,-3%,0) scale(1.05) rotate(-2deg)}to{transform:translate3d(6%,3%,0) scale(1.15) rotate(2deg)}}
 section.crd-light.crd-light{background:#EFF3F1!important;border-radius:22px!important;box-shadow:0 18px 40px -16px rgba(15,43,38,.45),0 0 0 1px rgba(15,47,42,.08)!important}
 section.crd-light.crd-light::before{display:none!important}
 section.crd-glass.crd-glass{background:linear-gradient(180deg,#072A25 0%,#03171A 100%)!important;border-radius:22px!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 18px 40px -16px rgba(0,0,0,.6)!important}
@@ -108,5 +112,76 @@ section.crd-glass.crd-glass::before{content:"";position:absolute;inset:0;border-
 .scn-pill-open .scn-pill-left{transform:translateX(-7px) rotate(-12deg)}
 .scn-pill-open .scn-pill-right{transform:translateX(7px) rotate(12deg)}
 .scn-pill-count{position:absolute;left:50%;top:50%;margin:-11px 0 0 -11px;width:22px;height:22px;border-radius:999px;background:#E8FF9C;color:#04261A;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center}
-@media (prefers-reduced-motion:reduce){.scn-pop,.scn-heart,.scn-cross-glow,.crd-cap-in,.crd-enter-croix,.crd-enter-gelule{animation:none}}
+@media (prefers-reduced-motion:reduce){section.crd-white.crd-white::after,.scn-pop,.scn-heart,.scn-cross-glow,.crd-cap-in,.crd-enter-croix,.crd-enter-gelule{animation:none}}
 `;
+
+/** La largeur de la petite bannière blanche : l'attente et le scan font exactement la même taille. */
+export const WHITE_PILL_WIDTH = 214;
+
+/** La croix de pharmacie verte de la petite bannière blanche : ses bras s'allument un à un pendant l'analyse. */
+export function GreenCross({ lit, size = 24 }: { lit: number; size?: number }) {
+  return (
+    <svg viewBox="0 0 40 40" style={{ width: size, height: size }} className="shrink-0" aria-hidden="true">
+      {[
+        { x: 14, y: 2 },
+        { x: 26, y: 14 },
+        { x: 14, y: 26 },
+        { x: 2, y: 14 },
+      ].map((arm, i) => (
+        <rect key={i} x={arm.x} y={arm.y} width="12" height="12" rx="2.5" fill={i < lit ? "#0E8A7B" : "rgba(14,138,123,.16)"} style={{ transition: "fill .25s" }} />
+      ))}
+      <rect x="14" y="14" width="12" height="12" rx="2.5" fill="#0E8A7B" className="scn-heart" />
+    </svg>
+  );
+}
+
+export type WhiteFound = { name: string; challenge?: boolean; shortDate?: boolean };
+
+/**
+ * La petite bannière blanche sur l'ADN (fondateur, 29 oct. 2026) : au repos, la croix et PHARMABOOST (au survol, « Scannez une
+ * boîte » et « Une question ? ») ; au scan, la croix qui s'allume sur le nom de la boîte ; trouvé, le nom des conseils avec
+ * l'étoile du challenge ou le sablier de la date courte. Le contenu seul : la capsule blanche est la bannière autour.
+ */
+export function WhitePill({ phase, done = 0, drug = "", found = [], open = false }: { phase: ScanPhase | "idle"; done?: number; drug?: string; found?: WhiteFound[]; open?: boolean }) {
+  const lit = phase === "idle" || phase === "found" ? 4 : phase === "analyse" ? Math.min(done, 4) : 0;
+  return (
+    <div className="flex h-10 items-center justify-center gap-2.5 px-4" data-ile-attente={phase === "idle" ? "" : undefined} data-ile-scan={phase === "idle" ? undefined : "blanc"} data-ile-scan-phase={phase === "idle" ? undefined : phase}>
+      <GreenCross lit={lit} />
+      {phase === "idle" ? (
+        open ? (
+          <>
+            <span className="text-[10.5px] font-bold tracking-[0.2em] whitespace-nowrap text-[#0F2B26] uppercase">Scannez une boîte</span>
+            <span className="ml-1 rounded-full bg-[#0E8A7B] px-2.5 py-[3px] text-[10.5px] font-bold tracking-[0.08em] whitespace-nowrap text-white uppercase">Une question ?</span>
+          </>
+        ) : (
+          <span className="text-[11px] font-bold tracking-[0.22em] whitespace-nowrap text-[#0F2B26] uppercase">
+            Pharma<span className="text-[#0E8A7B]">boost</span>
+          </span>
+        )
+      ) : phase === "found" && found.length > 0 ? (
+        <span className="scn-pop flex items-center gap-3 whitespace-nowrap">
+          {found.map((item, i) => (
+            <span key={`${item.name}-${i}`} className="inline-flex items-center gap-1.5">
+              {i > 0 && <span className="mr-1.5 h-3.5 w-px bg-[#0E8A7B]/25" />}
+              {item.challenge ? (
+                <svg viewBox="0 0 24 24" className="size-3.5" aria-label="Challenge"><path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4 6.1 20.5l1.2-6.5L2.5 9.4l6.6-.9z" fill="#B8D400" stroke="#8AA000" strokeWidth="1.2" strokeLinejoin="round" /></svg>
+              ) : item.shortDate ? (
+                <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="#C23A2B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-label="Date courte"><path d="M5 22h14M5 2h14M17 22v-4.2a2 2 0 0 0-.6-1.4L12 12l-4.4 4.4a2 2 0 0 0-.6 1.4V22M7 2v4.2a2 2 0 0 0 .6 1.4L12 12l4.4-4.4a2 2 0 0 0 .6-1.4V2" /></svg>
+              ) : null}
+              <span className="text-[12px] font-bold text-[#0F2B26]">{item.name}</span>
+            </span>
+          ))}
+        </span>
+      ) : (
+        <span className="truncate text-[11px] font-bold tracking-[0.14em] whitespace-nowrap text-[#0F2B26] uppercase">{phase === "found" ? "Rien à ajouter" : drug || "Lecture de la boîte"}</span>
+      )}
+    </div>
+  );
+}
+
+/** La largeur de la bannière blanche quand elle montre le nom des conseils (une estimation au caractère près). */
+export function whiteFoundWidth(found: readonly WhiteFound[]): number {
+  if (found.length === 0) return WHITE_PILL_WIDTH;
+  const text = found.reduce((sum, item) => sum + item.name.length * 7 + (item.challenge || item.shortDate ? 20 : 0), 0);
+  return Math.min(460, Math.max(WHITE_PILL_WIDTH, 80 + text + (found.length - 1) * 26));
+}

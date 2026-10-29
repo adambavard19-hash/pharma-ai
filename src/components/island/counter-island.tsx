@@ -7,7 +7,7 @@ import { BANNER } from "../../../agent/src/banner-design";
 import { SHEET_MISSING, SHEET_PATIENT_LABELS, type CounterSheet, type CounterSheetLine } from "../../../agent/src/counter-sheet";
 import { Robot } from "@/components/robot";
 import { HelixBackdrop } from "@/components/app/helix/helix-backdrop";
-import { ScanCapsule, SCAN_CSS, SCAN_STEPS, type ScanLook } from "./scan-capsule";
+import { ScanCapsule, SCAN_CSS, SCAN_STEPS, WHITE_PILL_WIDTH, WhitePill, whiteFoundWidth, type ScanLook, type WhiteFound } from "./scan-capsule";
 import { eurosOf, possibleMargin } from "./mix-island";
 import { analysisSteps, allAnswered, followAdviceLink, isTap, registerTap, splitAlert, STAGE_MOOD, STAGE_WIDTH, stageTitle, stageTone, type IslandOutcome, type IslandState } from "@/core/island/banner-flow";
 import { cn } from "@/lib/utils";
@@ -414,6 +414,11 @@ export function CounterIsland(props: CounterIslandProps) {
   const title = stageTitle(state, count);
   // Le scan en animation (fondateur, 29 oct. 2026) : la capsule des essais, d'un seul tenant du scan à « N conseils ».
   const scanCapsule = Boolean(props.scanLook) && (state.stage === "scan" || state.stage === "analyzing" || state.stage === "ready");
+  // La petite bannière blanche (fondateur, 29 oct. 2026) : l'attente et le scan dans la même capsule blanche sur l'ADN.
+  const whiteLook = props.scanLook === "blanc";
+  const whiteFound: WhiteFound[] = whiteLook
+    ? items.filter((item) => !item.sheet?.routine).slice(0, 3).map((item) => ({ name: (item.sheet?.name || item.name).replace(/\s+(baume|crème|gel|lait|spray)\b.*$/i, ""), challenge: Boolean(item.challenge), shortDate: Boolean(item.shortDate) }))
+    : [];
 
   const onTap = () => {
     const result = registerTap(taps, Date.now());
@@ -493,7 +498,17 @@ export function CounterIsland(props: CounterIslandProps) {
     if (props.scanLook && scanPhase) {
       // Les étapes de l'analyse ramenées aux quatre temps de l'animation ; trouvé, le nombre de conseils (sans la marge : fondateur, 29 oct. 2026).
       const total = analysisSteps(props.drug, count).length;
-      body = (
+      body = whiteLook ? (
+        <>
+          <style>{SCAN_CSS}</style>
+          <WhitePill
+            phase={scanPhase}
+            done={Math.round((Math.min(state.stepsDone, total) / Math.max(1, total)) * SCAN_STEPS.length)}
+            drug={/lecture en cours/i.test(props.drug) ? "" : props.drug}
+            found={whiteFound}
+          />
+        </>
+      ) : (
         <>
           <style>{SCAN_CSS}</style>
           <ScanCapsule
@@ -508,6 +523,15 @@ export function CounterIsland(props: CounterIslandProps) {
       );
     } else switch (state.stage) {
       case "idle":
+        if (whiteLook) {
+          body = (
+            <>
+              <style>{SCAN_CSS}</style>
+              <WhitePill phase="idle" open={hover} />
+            </>
+          );
+          break;
+        }
         body = (
           <div data-ile-repos="" className="flex h-10 items-center gap-2 pr-3.5 pl-1.5">
             {robot(28)}
@@ -997,10 +1021,10 @@ export function CounterIsland(props: CounterIslandProps) {
       }}
     >
       <IslandShell
-        width={scanCapsule ? 340 : width}
+        width={whiteLook && resting && !peek && !grumpy ? (hover ? 330 : WHITE_PILL_WIDTH) : whiteLook && scanCapsule ? (state.stage === "ready" ? whiteFoundWidth(whiteFound) : WHITE_PILL_WIDTH) : scanCapsule ? 340 : width}
         tone={tone}
-        className={scanCapsule ? "crd-glass crd-cap-in" : props.compactEnd && (state.stage === "email" || (state.stage === "done" && state.outcomes.some((outcome) => outcome === "SOLD"))) ? "crd-light" : undefined}
-        contentKey={scanCapsule ? "scan-capsule" : grumpy ? "grumpy" : peek ? "peek" : collapsed ? `${state.stage}-replie` : sleeping ? "advice-capsule" : compact ? "advice-compact" : state.stage}
+        className={whiteLook && ((resting && !peek && !grumpy) || scanCapsule) ? "crd-white" : scanCapsule ? "crd-glass crd-cap-in" : props.compactEnd && (state.stage === "email" || (state.stage === "done" && state.outcomes.some((outcome) => outcome === "SOLD"))) ? "crd-light" : undefined}
+        contentKey={whiteLook && resting && !peek && !grumpy ? "attente-blanche" : scanCapsule ? "scan-capsule" : grumpy ? "grumpy" : peek ? "peek" : collapsed ? `${state.stage}-replie` : sleeping ? "advice-capsule" : compact ? "advice-compact" : state.stage}
         label="Bannière PharmaBoost du comptoir"
         onPointerEnter={() => {
           if (leaveTimer.current) clearTimeout(leaveTimer.current);
