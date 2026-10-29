@@ -21,7 +21,10 @@ type KnownProduct = { ean: string; name: string; brand: string | null; category:
 type Step = { label: string; product: KnownProduct | null; brand: string; tags: string[] };
 
 const THEME_SUGGESTIONS = ["Acné", "Allergie", "Peau sèche", "Peau atopique", "Solaire", "Cheveux", "Bouche et dents", "Yeux", "Digestion", "Douleur", "Sommeil", "Immunité"];
-const STEP_SUGGESTIONS = ["Nettoyer", "Hydrater", "Traiter les boutons", "Protéger", "Apaiser", "Yeux", "Nez", "Complément"];
+/** Les bornes de ROUTINE_LIMITS (core/ai/central-advice), recopiées pour ne pas charger les règles dans la page. */
+const MAX_STEPS = 8;
+const STEP_LABEL_MAX = 40;
+const STEP_SUGGESTIONS = ["Nettoyer", "Hydrater", "Apaiser", "Réparer", "Traiter les boutons", "Protéger", "Yeux", "Nez", "Complément"];
 
 /** La gamme d'un produit : sa marque, ou à défaut le premier mot de son nom (« CERAVE GEL MOUSSANT » → « CERAVE »). */
 const brandOf = (product: KnownProduct) => product.brand?.trim() || product.name.split(/\s+/)[0] || "";
@@ -128,7 +131,7 @@ function NewRoutineForm({ themes, types, onDone }: { themes: string[]; types: st
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [atcInput, setAtcInput] = useState("");
   const [atcCodes, setAtcCodes] = useState<string[]>([]);
-  const [steps, setSteps] = useState<Step[]>(() => ["Nettoyer", "Hydrater", "Traiter les boutons"].map((label) => ({ label, product: null, brand: "", tags: [] })));
+  const [steps, setSteps] = useState<Step[]>(() => Array.from({ length: 3 }, () => ({ label: "", product: null, brand: "", tags: [] })));
   const [reason, setReason] = useState("Pendant le traitement ({drug}), la peau a besoin d'une routine adaptée.");
   const [script, setScript] = useState("« Pendant votre traitement ({drug}), je vous conseille une routine complète : {product} pour cette étape. »");
 
@@ -230,13 +233,24 @@ function NewRoutineForm({ themes, types, onDone }: { themes: string[]; types: st
           <div key={index} className="rounded-xl border border-border-subtle bg-surface-page p-3">
             <div className="flex items-center gap-2">
               <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-[#6B55D6] text-[12px] font-bold text-white">{index + 1}</span>
-              <Input aria-label={`Nom de l'étape ${index + 1}`} list="routine-steps" value={step.label} maxLength={30} onChange={(event) => setStep(index, { label: event.target.value })} placeholder="Nettoyer" className="max-w-[220px]" />
+              <Input aria-label={`Nom de l'étape ${index + 1}`} value={step.label} maxLength={STEP_LABEL_MAX} onChange={(event) => setStep(index, { label: event.target.value })} placeholder="Écrivez l'étape : Laver, Apaiser…" className="max-w-[320px]" />
               {steps.length > 2 && (
                 <button type="button" onClick={() => setSteps((list) => list.filter((_, at) => at !== index))} className="ml-auto rounded-md p-1.5 text-text-tertiary hover:bg-surface-sunken hover:text-text-primary" aria-label={`Retirer l'étape ${index + 1}`}>
                   <X className="size-4" />
                 </button>
               )}
             </div>
+            {/* Le nom de l'étape s'écrit librement (fondateur, 29 oct. 2026 : « laisse-moi la main ») ; quelques idées en un clic tant qu'il est vide. */}
+            {!step.label && (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5 pl-8 text-[12px]">
+                <span className="text-text-tertiary">Idées :</span>
+                {STEP_SUGGESTIONS.map((item) => (
+                  <button key={item} type="button" onClick={() => setStep(index, { label: item })} className="rounded-full border border-border-subtle bg-surface-card px-2 py-0.5 font-medium text-text-secondary hover:border-brand-300 hover:text-brand-700">
+                    {item}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="mt-2 grid gap-2 md:grid-cols-[1fr_200px]">
               <SearchField<KnownProduct>
                 label="Produit de référence"
@@ -278,12 +292,7 @@ function NewRoutineForm({ themes, types, onDone }: { themes: string[]; types: st
             )}
           </div>
         ))}
-        <datalist id="routine-steps">
-          {STEP_SUGGESTIONS.map((item) => (
-            <option key={item} value={item} />
-          ))}
-        </datalist>
-        {steps.length < 5 && (
+        {steps.length < MAX_STEPS && (
           <Button variant="outline" size="sm" onClick={() => setSteps((list) => [...list, { label: "", product: null, brand: "", tags: [] }])} leadingIcon={<Plus className="size-3.5" />}>
             Ajouter une étape
           </Button>

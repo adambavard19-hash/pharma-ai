@@ -108,7 +108,7 @@ export type CustomRuleDefinition = {
  */
 export type CustomRoutineStep = { label: string; category: ProductCategoryCode; tags: string[]; brand: string | null; ean: string | null; productName: string | null };
 
-export const ROUTINE_LIMITS = { steps: { min: 2, max: 5 }, label: 30, theme: 40 } as const;
+export const ROUTINE_LIMITS = { steps: { min: 2, max: 8 }, label: 40, theme: 40 } as const;
 
 function parseRoutine(raw: unknown): { ok: true; value: { steps: CustomRoutineStep[] } } | { ok: false; error: string } {
   const list = Array.isArray((raw as { steps?: unknown } | null)?.steps) ? ((raw as { steps: unknown[] }).steps) : [];
