@@ -2,7 +2,7 @@
 
 import { OVERSTOCK_LABEL } from "@/core/overstock/campaign";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Check, ChevronLeft, ChevronRight, LifeBuoy, MessageCircle, Pill } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Hourglass, LifeBuoy, MessageCircle, Pill, Star } from "lucide-react";
 import type { HelpAdvice } from "@/core/poste/island-bridge";
 import { BANNER } from "../../../agent/src/banner-design";
 import type { CounterSheetLine } from "../../../agent/src/counter-sheet";
@@ -118,12 +118,18 @@ export type MixIslandProps = {
   routineBeside?: ReactNode;
   headAside?: ReactNode;
   belowHead?: ReactNode;
+  /**
+   * La bannière « cartes photo » (fondateur, 29 oct. 2026, essai 1 de /robot-apercu/banniere-suite) : une carte par conseil —
+   * grande photo, prix et marge à droite, repères en couleur —, qui s'ouvre sur place sur « À dire au patient » et les questions,
+   * dont les réponses mènent aux alternatives. Absente : la bannière « mix » d'avant.
+   */
+  cards?: boolean;
 };
 
 /** Une question à l'aide et sa réponse (vide tant qu'elle n'est pas arrivée). */
 export type HelpExchange = { advice: string; question: string; answer: string; error?: string };
 
-export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, onOpen, onClose, onFinish, onAnswer, boxes = [], help, startAt, everyAdvice = false, routineChip, routineBeside, headAside, belowHead }: MixIslandProps) {
+export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, onOpen, onClose, onFinish, onAnswer, boxes = [], help, startAt, everyAdvice = false, routineChip, routineBeside, headAside, belowHead, cards = false }: MixIslandProps) {
   const challengedBoxes = boxes.filter((box) => box.challenge);
   // La routine (fondateur, 28 oct. 2026, essai « C » qui clignote) : ses étapes quittent la liste des conseils ; leurs photos
   // clignotent à droite de la petite bannière et, au survol, la routine s'ouvre dans une deuxième bannière.
@@ -152,6 +158,119 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
     if (!open) onOpen();
   };
   const width = narrow ? (open ? 330 : 300) : open ? 400 : 400;
+
+  if (cards) {
+    const unsold = order.filter((i) => !sold(i));
+    const total = possibleMargin(unsold.map((i) => items[i]));
+    return (
+      <>
+        <style>{`${ROUTINE_CSS}\n${CARDS_CSS}`}</style>
+        <IslandShell
+          width={width}
+          tone="accent"
+          contentKey={open ? "cartes-ouvert" : "cartes-replie"}
+          label="Conseils de la vente (cliquez sur un conseil pour l'ouvrir)"
+          backdrop={aurore ? <div data-ile-helice="" className="absolute inset-0 isolate opacity-60"><HelixBackdrop position="contained" framing="app" lazy className="[&_canvas]:scale-[1.6]" /></div> : undefined}
+        >
+          <div data-ile-mix="cartes" className="p-2">
+            {heads.map((head, row) => {
+              const advice = items[head];
+              const active = open && head === index;
+              return (
+                <div key={head} className="crd-in" style={{ animationDelay: `${row * 90}ms` }}>
+                  <button
+                    type="button"
+                    data-ile-replie={row === 0 ? "" : undefined}
+                    data-ile-mix-ligne={row + 1}
+                    aria-expanded={active}
+                    onClick={() => (active && onClose ? onClose() : show(head))}
+                    className={`flex w-full items-center gap-3 rounded-2xl px-1.5 py-1.5 text-left transition-colors ${active ? "bg-white/[0.07]" : "hover:bg-white/[0.05]"}`}
+                  >
+                    <CardPhoto src={advice.image} />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-1.5 text-[14px] leading-[18px] font-bold text-white">
+                        <span className="truncate">{advice.name}</span>
+                        {sold(head) && <Check className="size-3.5 shrink-0 text-[#E8FF9C]" strokeWidth={3} aria-label="Vendu" />}
+                      </span>
+                      {advice.drug && <span className="block truncate text-[11.5px] text-white/55">pour {advice.drug}</span>}
+                      <span data-ile-mix-repere="" className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] font-semibold">
+                        {advice.overstock && <span className="rounded-full px-1.5" style={{ background: OVERSTOCK_BG, color: OVERSTOCK_FG }}>{OVERSTOCK_LABEL}</span>}
+                        <span className="inline-flex items-center gap-1" style={{ color: stockColors(advice).bg }}>
+                          <span className="size-1.5 rounded-full" style={{ background: stockColors(advice).bg }} />
+                          {stockLabel(advice)}
+                        </span>
+                        {advice.challenge && <span className="inline-flex items-center gap-1 text-[#E8FF9C]"><Star className="size-3 fill-current" aria-hidden="true" />{T.challenge}</span>}
+                        {advice.shortDate && <span className="inline-flex items-center gap-1 text-[#FF9C8F]"><Hourglass className="size-3" aria-hidden="true" />{advice.shortDate}</span>}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-right">
+                      {/* Le prix seulement avec un stock fiable (jamais un chiffre douteux). */}
+                      <span className="block text-[15px] font-bold text-white tabular-nums">{advice.price && advice.stock !== "UNKNOWN" ? advice.price : "—"}</span>
+                      {advice.margin && <span className="block text-[11px] font-semibold text-[#E8FF9C] tabular-nums">+{advice.margin}</span>}
+                    </span>
+                  </button>
+                  {active && (
+                    <CardDetail
+                      item={item}
+                      sold={sold(index)}
+                      onCancelSold={() => onAnswer(index, null)}
+                      alternatives={alternatives.slice(0, 2).map(({ i, pos }) => ({ item: items[i], go: () => go(pos) }))}
+                      help={help}
+                    />
+                  )}
+                </div>
+              );
+            })}
+
+            {challengedBoxes.length > 0 && (
+              <div data-ile-challenge="" className="mx-1.5 mt-1 flex items-start gap-1.5 rounded-lg px-2.5 py-1.5 text-[11.5px] leading-[15px] font-semibold" style={{ background: "rgba(232,255,156,0.1)", color: "#E8FF9C" }}>
+                <Star className="mt-px size-3 shrink-0 fill-current" aria-hidden="true" />
+                <span className="min-w-0 flex-1">
+                  {challengedBoxes.map((box) => (
+                    <span key={box.id} className="block">
+                      {/^challenge\b/i.test(box.challenge ?? "") ? box.challenge : `Challenge ${box.challenge}`} : {box.name}
+                      {box.reward ? <span data-ile-challenge-gain=""> · {box.reward}</span> : null}
+                    </span>
+                  ))}
+                </span>
+              </div>
+            )}
+
+            {belowHead}
+
+            <div className="mx-1.5 my-1.5 h-px bg-white/10" />
+            <div className="flex items-center gap-2 px-1.5">
+              {routine ? (
+                <span className="flex min-w-0 flex-1 items-center gap-2">
+                  <RoutineThumbs routine={routine.view} open={routineOpen} blink onToggle={() => setRoutineOpen((value) => !value)} onHover={() => setRoutineOpen(true)} />
+                  <span className="truncate text-[12px] font-semibold text-white/80">Routine · {routine.view.steps.length} produits</span>
+                </span>
+              ) : (
+                <span className="min-w-0 flex-1 text-[12px] text-white/60">
+                  {total > 0 ? <>Jusqu&apos;à <b className="text-[#E8FF9C] tabular-nums">{eurosOf(total)}</b> sur cette vente</> : soldIndexes.length > 0 ? "Conseils vendus" : ""}
+                </span>
+              )}
+              <button
+                type="button"
+                data-ile-client-suivant=""
+                data-ile-sans-deploiement=""
+                onClick={onFinish}
+                className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-[#E8FF9C] px-3.5 text-[12.5px] font-bold text-[#04261A] transition-[filter] hover:brightness-105"
+              >
+                <Check className="size-3.5" strokeWidth={3} aria-hidden="true" /> Terminer
+              </button>
+            </div>
+            {routine && total > 0 && (
+              <p className="px-1.5 pt-1 text-[11.5px] text-white/55">
+                Jusqu&apos;à <b className="text-[#E8FF9C] tabular-nums">{eurosOf(total)}</b> sur cette vente
+              </p>
+            )}
+          </div>
+        </IslandShell>
+        {routine && routineOpen && <RoutineIsland routine={routine.view} width={width} cards onClose={() => setRoutineOpen(false)} onPointerLeave={() => setRoutineOpen(false)} />}
+      </>
+    );
+  }
 
   return (
     <>
@@ -664,3 +783,146 @@ const L = { ink: "#0F2B26", green: "#0E8A7B", muted: "#5B6B66", soft: "#F3F7F5" 
 
 /** « À dire au patient » : deux phrases au plus (fondateur, 22 oct. 2026 : « trop d'info, limite à 2 phrases »). */
 const TELL_MAX = 2;
+
+/** La photo studio du conseil, sur sa tuile blanche ; sans photo studio, une tuile vide (jamais une photo inventée). */
+function CardPhoto({ src }: { src?: string }) {
+  return (
+    <span className="inline-flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white">
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element -- image locale de l'agent ou du site, déjà dimensionnée
+        <img data-ile-mix-photo="" src={src} alt="" width={44} height={44} draggable={false} className="size-full object-contain p-0.5" />
+      ) : (
+        <Pill className="size-5 text-[#9FB8B0]" aria-hidden="true" />
+      )}
+    </span>
+  );
+}
+
+/**
+ * Ce qui s'ouvre sous une carte (fondateur, 29 oct. 2026) : « À dire au patient », puis les questions — une réponse touchée dit
+ * quoi faire et, parfois, mène à un produit plus précis du stock —, puis les autres possibilités en stock, à un clic.
+ */
+function CardDetail({ item, sold, onCancelSold, alternatives, help }: { item: IslandAdvice; sold: boolean; onCancelSold: () => void; alternatives: { item: IslandAdvice; go: () => void }[]; help?: MixIslandProps["help"] }) {
+  const [helping, setHelping] = useState(false);
+  const tell = (item.sheet?.usage ?? []).slice(0, TELL_MAX).map((line) => line.text);
+  const reason = item.sheet?.reasons[0] || item.reason;
+  const said = tell.length > 0 ? tell : reason ? [reason] : [];
+  const others = item.sheet?.alternatives ?? [];
+  return (
+    <div data-ile-carte-detail="" className="crd-in mx-1 mt-1 mb-1.5 space-y-2 rounded-xl bg-white/[0.06] px-3 py-2.5 text-[12.5px] leading-5 text-white/85">
+      {sold && (
+        <p data-ile-mix-vendu="" className="flex items-center gap-2 font-bold text-[#E8FF9C]">
+          <Check className="size-4" strokeWidth={3} aria-hidden="true" />
+          <span className="flex-1">Vendu</span>
+          <button type="button" onClick={onCancelSold} className="text-[11px] font-semibold text-white/60 underline-offset-2 hover:underline">
+            Annuler
+          </button>
+        </p>
+      )}
+      <div>
+        <p className="mb-0.5 flex items-center gap-1.5 text-[10.5px] font-bold tracking-[0.1em] text-[#E8FF9C] uppercase">
+          <MessageCircle className="size-3" aria-hidden="true" /> À dire au patient
+        </p>
+        {said.length > 0 ? said.map((line) => <p key={line}>{line}</p>) : <p className="text-white/55">Voir la notice du produit.</p>}
+        {item.sheet?.description && <p className="mt-1 text-[11.5px] text-white/60">Posologie : {item.sheet.description}</p>}
+      </div>
+      <CardQuestions item={item} />
+      {(others.length > 0 || alternatives.length > 0) && (
+        <div data-ile-mix-alternative="">
+          <p className="mb-1 text-[10.5px] font-bold tracking-[0.1em] text-white/50 uppercase">Autre alternative en stock</p>
+          <div className="space-y-1">
+            {others.map((other) => (
+              <div key={other.name} className="flex items-center gap-2 rounded-lg border border-white/10 px-2.5 py-1.5">
+                <span className="min-w-0 flex-1 truncate font-semibold text-white">{other.name}</span>
+                {other.price && <span className="shrink-0 font-bold text-white tabular-nums">{other.price}</span>}
+                {other.margin && <span className="shrink-0 text-[11px] font-semibold text-[#E8FF9C] tabular-nums">+{other.margin}</span>}
+              </div>
+            ))}
+            {alternatives.map(({ item: other, go }) => (
+              <button key={other.name} type="button" onClick={go} className="flex w-full items-center gap-2 rounded-lg border border-white/10 px-2.5 py-1.5 text-left hover:bg-white/[0.06]">
+                <span className="min-w-0 flex-1 truncate font-semibold text-white">{other.name}</span>
+                {other.price && other.stock !== "UNKNOWN" && <span className="shrink-0 font-bold text-white tabular-nums">{other.price}</span>}
+                <ChevronRight className="size-3.5 shrink-0 text-white/50" aria-hidden="true" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {help && (
+        <div>
+          <button type="button" onClick={() => setHelping((value) => !value)} className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-white/60 hover:text-white">
+            <LifeBuoy className="size-3.5" aria-hidden="true" /> Une question du patient ? Aide
+          </button>
+          {helping && (
+            <div className="mt-1.5">
+              <Help item={item} help={help} />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Les questions en pastilles : la réponse touchée dit quoi proposer et, quand il y en a un, le produit plus précis du stock. */
+function CardQuestions({ item }: { item: IslandAdvice }) {
+  const ask = item.sheet?.ask ?? [];
+  const answers = (item.sheet?.answers ?? []).filter((answer) => !sendsToDoctor(answer));
+  const [picked, setPicked] = useState<Record<number, number>>({});
+  if (ask.length === 0) return null;
+  return (
+    <ol className="space-y-2">
+      {ask.map((question, q) => {
+        const choices = answers.filter((answer) => answer.ask === q);
+        const chosen = picked[q] !== undefined ? choices[picked[q]] : undefined;
+        return (
+          <li key={question} data-pitch-question="">
+            <p className="flex gap-2 font-semibold text-white">
+              <span className="mt-0.5 inline-flex size-4 shrink-0 items-center justify-center rounded-full bg-[#E8FF9C] text-[9.5px] font-bold text-[#04261A]">{q + 1}</span>
+              {question}
+            </p>
+            {choices.length > 0 && (
+              <div className="mt-1 ml-6 flex flex-wrap gap-1">
+                {choices.map((choice, n) => (
+                  <button
+                    key={choice.label}
+                    type="button"
+                    data-pitch-answer=""
+                    aria-pressed={picked[q] === n}
+                    onClick={() => setPicked((current) => {
+                      const next = { ...current };
+                      if (next[q] === n) delete next[q];
+                      else next[q] = n;
+                      return next;
+                    })}
+                    className={`h-6 rounded-full border px-2.5 text-[11.5px] font-semibold transition-colors ${picked[q] === n ? "border-[#E8FF9C] bg-[#E8FF9C] text-[#04261A]" : "border-white/20 text-white hover:border-white/40"}`}
+                  >
+                    {choice.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            {chosen && (
+              <div data-pitch-then="" className="crd-in mt-1 ml-6 rounded-lg bg-white/[0.07] px-2.5 py-1.5 text-[12px] leading-[16px]">
+                <p>→ {chosen.say}</p>
+                {chosen.product && (
+                  <p data-pitch-product="" className="mt-1 flex flex-wrap items-center gap-x-2 font-semibold text-white">
+                    <span className="min-w-0 flex-1 truncate">{chosen.product.name}</span>
+                    {chosen.product.price && <span className="tabular-nums">{chosen.product.price}</span>}
+                    {chosen.product.margin && <span className="text-[11px] text-[#E8FF9C] tabular-nums">+{chosen.product.margin}</span>}
+                  </p>
+                )}
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+const CARDS_CSS = `
+.crd-in{animation:crd-in .4s cubic-bezier(.2,.9,.3,1) both}
+@keyframes crd-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.crd-in{animation:none}}
+`;
