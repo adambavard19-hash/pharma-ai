@@ -198,7 +198,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                         }}
                         className={`flex w-full items-center gap-3 rounded-2xl px-1.5 py-1.5 text-left transition-colors ${active ? "bg-[#EAF6F0]" : "hover:bg-[#F3F7F5]"}`}
                       >
-                        <CardPhoto src={advice.image} />
+                        <CardPhoto src={advice.image} name={advice.name} />
                         <span className="min-w-0 flex-1">
                           {/* Le nom entier sur deux lignes au plus, jamais coupé à côté de la coche « Vendu » (fondateur, 29 oct. 2026). */}
                           <span className="flex items-start gap-1.5 text-[14px] leading-[18px] font-bold">
@@ -266,7 +266,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                           <span key={`${step.label}-${i}`} className={routineOpen ? "inline-flex" : "crd-blink inline-flex"} style={{ animationDelay: `${i * 0.25}s` }}>
                             <span className="inline-flex size-[26px] items-center justify-center overflow-hidden rounded-lg border-2 border-white bg-white ring-1 ring-[#E3EBE8]">
                               {/* eslint-disable-next-line @next/next/no-img-element -- photo studio locale */}
-                              {step.image ? <img src={step.image} alt="" className="size-full object-contain p-0.5" /> : <Pill className="size-3 text-[#9FB8B0]" aria-hidden="true" />}
+                              {step.image ? <img src={step.image} alt="" className="size-full object-contain p-0.5" /> : <span className="flex size-full items-center justify-center bg-[linear-gradient(135deg,#14A374,#0A5C46)] text-[9px] font-extrabold text-white">{monogramOf(step.name)}</span>}
                             </span>
                           </span>
                         ))}
@@ -821,15 +821,31 @@ const L = { ink: "#0F2B26", green: "#0E8A7B", muted: "#5B6B66", soft: "#F3F7F5" 
 const TELL_MAX = 2;
 
 /** La photo studio du conseil, sur sa tuile blanche ; sans photo studio, une tuile vide (jamais une photo inventée). */
-function CardPhoto({ src }: { src?: string }) {
+function CardPhoto({ src, name }: { src?: string; name: string }) {
+  if (!src) return <Monogram name={name} />;
   return (
     <span className="inline-flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white">
-      {src ? (
-        // eslint-disable-next-line @next/next/no-img-element -- image locale de l'agent ou du site, déjà dimensionnée
-        <img data-ile-mix-photo="" src={src} alt="" width={44} height={44} draggable={false} className="size-full object-contain p-0.5" />
-      ) : (
-        <Pill className="size-5 text-[#9FB8B0]" aria-hidden="true" />
-      )}
+      {/* eslint-disable-next-line @next/next/no-img-element -- image locale de l'agent ou du site, déjà dimensionnée */}
+      <img data-ile-mix-photo="" src={src} alt="" width={44} height={44} draggable={false} className="size-full object-contain p-0.5" />
+    </span>
+  );
+}
+
+/** Les initiales d'un produit : « FORMAG MAGNESIUM… » → « FM », « Hydratis » → « HY ». */
+export function monogramOf(name: string): string {
+  const words = name.replace(/[^\p{L}\s]/gu, " ").split(/\s+/).filter((word) => word.length > 1);
+  if (words.length === 0) return "+";
+  return (words.length > 1 ? `${words[0][0]}${words[1][0]}` : words[0].slice(0, 2)).toUpperCase();
+}
+
+/**
+ * Sans photo studio, une pastille aux initiales du produit, aux couleurs de PharmaBoost (fondateur, 29 oct. 2026 : « le
+ * trombone vide, ça fait pas beau ») — jamais une fausse boîte : la photo arrive quand le produit a sa photo studio.
+ */
+function Monogram({ name, size = 48 }: { name: string; size?: number }) {
+  return (
+    <span data-ile-mix-initiales="" className="inline-flex shrink-0 items-center justify-center rounded-xl bg-[linear-gradient(135deg,#14A374,#0A5C46)] font-extrabold tracking-[0.04em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,.25)]" style={{ width: size, height: size, fontSize: Math.round(size * 0.34) }} aria-hidden="true">
+      {monogramOf(name)}
     </span>
   );
 }
@@ -858,11 +874,13 @@ function AdviceIsland({ item, width, sold, onClose, onCancelSold, alternatives, 
             {/* La même présentation que la carte du conseil en ligne (fondateur, 29 oct. 2026 : « garde bien la même présentation ») :
                 la photo, « pour … », le nom et le prix en grand, puis la marge, le challenge et le stock en pastilles. */}
             <div className="flex items-center gap-3">
-              {item.image && (
+              {item.image ? (
                 <span className="inline-flex size-[60px] shrink-0 items-center justify-center rounded-xl bg-white p-1 ring-1 ring-[#E3EBE8]">
                   {/* eslint-disable-next-line @next/next/no-img-element -- photo studio locale */}
                   <img src={item.image} alt="" width={52} height={52} className="size-full object-contain" />
                 </span>
+              ) : (
+                <Monogram name={item.sheet?.name || item.name} size={60} />
               )}
               <div className="min-w-0 flex-1 pb-0.5">
                 {item.drug && <p className="text-[10px] font-bold tracking-[0.14em] uppercase" style={{ color: L.green }}>pour {item.drug}</p>}
