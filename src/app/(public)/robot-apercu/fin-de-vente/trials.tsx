@@ -159,6 +159,92 @@ const WAITS: { key: string; title: string; text: string; View: () => ReactNode }
   { key: "E", title: "L'ADN plus doux", text: "Avec l'ADN, mais sur le verre vert et en transparence : plus calme que le fond noir.", View: WaitSoftDna },
 ];
 
+/* ================================================================== ÉTAPE 1, AUTOUR DE LA D (plus moderne) */
+
+/** La capsule de base des propositions : verre vert, centrée au pixel, taille fixe. */
+const pod = "crd-glass relative inline-flex items-center justify-center overflow-hidden";
+
+/** D1 · Une pastille ronde, la croix seule qui respire ; au survol, « Scannez une boîte ». */
+function PodCross() {
+  const [over, setOver] = useState(false);
+  return (
+    <section onMouseEnter={() => setOver(true)} onMouseLeave={() => setOver(false)} className={`${pod} h-11 gap-2 transition-[width] duration-300 ease-out`} style={{ width: over ? 200 : 44 }}>
+      <IdleCross size={20} />
+      {over && <span className="pop text-[13.5px] font-bold whitespace-nowrap text-white">Scannez une boîte</span>}
+    </section>
+  );
+}
+
+/** D2 · La tête du robot et la croix, séparées d'un trait : la marque, et la pharmacie. Aucun texte. */
+function PodRobotCross() {
+  return (
+    <section className={`${pod} h-11 gap-2.5 px-3`}>
+      <Robot size={26} mood="idle" label="" />
+      <span className="h-5 w-px bg-white/15" />
+      <IdleCross size={18} />
+    </section>
+  );
+}
+
+/** D3 · Façon « Dynamic Island » : une capsule noire très fine, la croix, et un petit signal qui écoute la douchette. */
+function PodIsland() {
+  return (
+    <section className="relative inline-flex h-9 w-[150px] items-center justify-between rounded-full bg-[#050807] px-3 shadow-[0_10px_30px_-10px_rgba(0,0,0,.6),0_0_0_1px_rgba(232,255,156,.12)]">
+      <IdleCross size={16} />
+      <span className="flex h-3.5 items-end gap-[3px]" aria-hidden="true">
+        {[0, 1, 2, 3, 4].map((i) => <i key={i} className="eq block w-[3px] rounded-full bg-[#3DDC84]" style={{ animationDelay: `${i * 0.15}s` }} />)}
+      </span>
+    </section>
+  );
+}
+
+/** D4 · La tête du robot seule, dans un rond de verre ; un anneau citron tourne doucement autour. */
+function PodRobotRing() {
+  return (
+    <span className="relative inline-flex size-12 items-center justify-center">
+      <span className="ring-spin absolute inset-0 rounded-full" aria-hidden="true" />
+      <section className="crd-glass relative inline-flex size-[42px] items-center justify-center overflow-hidden">
+        <Robot size={28} mood="idle" label="" />
+      </section>
+    </span>
+  );
+}
+
+/** D5 · Un liseré de lumière qui fait le tour de la capsule ; la croix et « PharmaBoost » au centre. */
+function PodGlow() {
+  return (
+    <span className="glow-border relative inline-flex h-10 items-center justify-center rounded-full p-[1.5px]">
+      <span className="relative inline-flex h-full items-center gap-2 rounded-full bg-[linear-gradient(180deg,#072A25,#03171A)] px-3.5">
+        <IdleCross size={16} />
+        <span className="text-[13px] font-bold tracking-[-0.01em] text-white">Pharma<span className="text-[#E8FF9C]">Boost</span></span>
+      </span>
+    </span>
+  );
+}
+
+/** D6 · Le robot dans une pastille, et au survol la capsule s'ouvre sur « Comptoir 1 » et « Demander un conseil ». */
+function PodExpand() {
+  const [over, setOver] = useState(false);
+  return (
+    <section onMouseEnter={() => setOver(true)} onMouseLeave={() => setOver(false)} className="crd-glass relative inline-flex h-11 items-center gap-2 overflow-hidden pl-[7px] transition-[width] duration-300 ease-out" style={{ width: over ? 260 : 44 }}>
+      <span className="shrink-0"><Robot size={30} mood="idle" label="" /></span>
+      <span className={`${over ? "pop flex" : "hidden"} min-w-0 flex-1 items-center justify-between gap-2`}>
+        <span className="text-[12.5px] leading-4 font-bold whitespace-nowrap text-white">Comptoir 1<br /><span className="font-medium text-[#9FCBBB]">scannez une boîte</span></span>
+        <span className="mr-1.5 rounded-full bg-[#E8FF9C] px-2.5 py-1 text-[11px] font-bold whitespace-nowrap text-[#04261A]">Une question ?</span>
+      </span>
+    </section>
+  );
+}
+
+const PODS: { key: string; title: string; text: string; View: () => ReactNode }[] = [
+  { key: "D1", title: "La pastille croix", text: "Un rond de 44 px, la croix seule qui respire. Au survol : « Scannez une boîte ». Le plus discret.", View: PodCross },
+  { key: "D2", title: "Robot et croix", text: "La tête du robot (la marque) et la croix (la pharmacie), séparées d'un trait. Aucun texte.", View: PodRobotCross },
+  { key: "D3", title: "Façon Dynamic Island", text: "Une capsule noire très fine, comme sur l'iPhone : la croix, et un petit signal qui bouge, prêt à recevoir le bip.", View: PodIsland },
+  { key: "D4", title: "Le robot et son anneau", text: "La tête du robot seule dans un rond de verre, un anneau citron tourne doucement autour : il veille.", View: PodRobotRing },
+  { key: "D5", title: "Le liseré de lumière", text: "Une lumière fait le tour de la capsule ; au centre, la croix et « PharmaBoost ». La marque, en moderne.", View: PodGlow },
+  { key: "D6", title: "Le robot qui s'ouvre", text: "Une pastille avec le robot ; au survol, elle s'ouvre sur « Comptoir 1 · scannez une boîte » et « Une question ? ».", View: PodExpand },
+];
+
 /* ================================================================== LA FIN DE LA VENTE */
 
 /* ---------------------------------------- La vraie fin de vente du poste (fin 3), figée */
@@ -272,6 +358,13 @@ const SERVED: { key: string; title: string; text: string; View: () => ReactNode 
 ];
 
 const PAGE_CSS = `
+.eq{height:4px;animation:eq 1.1s ease-in-out infinite}
+@keyframes eq{0%,100%{height:4px;opacity:.5}50%{height:14px;opacity:1}}
+.ring-spin{background:conic-gradient(from 0deg,transparent 0 55%,#E8FF9C 75%,transparent 95%);animation:spin 3.2s linear infinite;-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2px));mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2px))}
+@keyframes spin{to{transform:rotate(360deg)}}
+.glow-border{background:conic-gradient(from var(--ang,0deg),rgba(95,165,148,.35),#E8FF9C 20%,rgba(95,165,148,.35) 40%,rgba(95,165,148,.35));animation:glow-rot 4s linear infinite;box-shadow:0 14px 34px -14px rgba(0,0,0,.6)}
+@property --ang{syntax:"<angle>";inherits:false;initial-value:0deg}
+@keyframes glow-rot{to{--ang:360deg}}
 .breathe{animation:breathe 2.4s ease-in-out infinite}
 @keyframes breathe{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
 .idle-arm{animation:idle-arm 2.8s ease-in-out infinite}
@@ -291,7 +384,7 @@ const PAGE_CSS = `
 .confetti{position:absolute;left:50%;top:50%;pointer-events:none}
 .confetti i{position:absolute;width:6px;height:6px;margin:-3px;border-radius:2px;background:var(--c);opacity:0;animation:conf 1.1s cubic-bezier(.2,.8,.3,1) both}
 @keyframes conf{0%{opacity:1;transform:rotate(var(--a)) translateY(0)}100%{opacity:0;transform:rotate(var(--a)) translateY(calc(var(--d) * -1)) rotate(180deg)}}
-@media (prefers-reduced-motion:reduce){.breathe,.idle-arm,.idle-laser,.pop,.bravo-in,.countdown,.gauge,.confetti i{animation:none}}
+@media (prefers-reduced-motion:reduce){.eq,.ring-spin,.glow-border,.breathe,.idle-arm,.idle-laser,.pop,.bravo-in,.countdown,.gauge,.confetti i{animation:none}}
 `;
 
 export function SaleEndTrials() {
@@ -304,7 +397,24 @@ export function SaleEndTrials() {
           Chaque étape de la vraie bannière, figée : prenez le temps de tout regarder. Les cartes et la routine se cliquent. Vente d&apos;exemple (vrais produits du stock, photos studio).
         </p>
 
-        <h2 className="mt-8 text-[20px] font-bold text-[#0F2F2A]">Étape 1 « En attente de scan » : propositions</h2>
+        <h2 className="mt-8 text-[20px] font-bold text-[#0F2F2A]">Étape 1 : nouvelles propositions, autour de la D</h2>
+        <p className="mt-1 max-w-3xl text-[14.5px] leading-7 text-[#4D6B64]">Plus de « En attente de scan », plus de « Prêt » : petites, centrées, modernes. Passez la souris sur D1 et D6.</p>
+        <div className="mt-4 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          {PODS.map((item) => (
+            <article key={item.key} className="flex flex-col gap-3 rounded-2xl border border-[#DCE7E2] bg-white p-5">
+              <div>
+                <p className="text-[12px] font-bold tracking-[0.12em] text-[#4D6B64] uppercase">Proposition {item.key}</p>
+                <h3 className="text-[17px] font-bold text-[#0F2F2A]">{item.title}</h3>
+                <p className="mt-1 text-[13px] leading-6 text-[#4D6B64]">{item.text}</p>
+              </div>
+              <Screen>
+                <item.View />
+              </Screen>
+            </article>
+          ))}
+        </div>
+
+        <h2 className="mt-12 text-[20px] font-bold text-[#0F2F2A]">Étape 1 : les premières propositions</h2>
         <p className="mt-1 max-w-3xl text-[14.5px] leading-7 text-[#4D6B64]">Ce qui reste à l&apos;écran entre deux patients. D&apos;abord aujourd&apos;hui, puis cinq propositions, dont quatre sans ADN. Passez la souris sur la D.</p>
         <div className="mt-4 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
           {WAITS.map((wait) => (
