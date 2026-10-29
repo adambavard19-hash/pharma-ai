@@ -166,98 +166,121 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
     return (
       <>
         <style>{`${ROUTINE_CSS}\n${SCAN_CSS}\n${CARDS_CSS}`}</style>
-        {/* Exactement l'essai 1 (fondateur, 29 oct. 2026) : le verre vert, sans l'hélice d'ADN derrière. */}
+        {/* Fond blanc sur l'ADN, comme la routine et le conseil ouverts (fondateur, 29 oct. 2026 : « le fond blanc sur toutes les bannières »). */}
         <IslandShell
           width={width}
           tone="accent"
-          className={`crd-glass${enterFrom ? ` crd-enter-${enterFrom}` : ""}`}
+          className={`crd-light${enterFrom ? ` crd-enter-${enterFrom}` : ""}`}
           contentKey="cartes"
           label="Conseils de la vente (cliquez sur un conseil pour l'ouvrir)"
         >
-          <div data-ile-cartes="" className="p-2">
-            {heads.map((head, row) => {
-              const advice = items[head];
-              const active = open && head === index;
-              return (
-                <div key={head} className="crd-in" style={{ animationDelay: `${row * 90}ms` }}>
-                  <button
-                    type="button"
-                    data-ile-replie={row === 0 ? "" : undefined}
-                    data-ile-mix-ligne={row + 1}
-                    aria-expanded={active}
-                    onClick={() => (active && onClose ? onClose() : show(head))}
-                    className={`flex w-full items-center gap-3 rounded-2xl px-1.5 py-1.5 text-left transition-colors ${active ? "bg-white/[0.07]" : "hover:bg-white/[0.05]"}`}
-                  >
-                    <CardPhoto src={advice.image} />
+          <div className="relative overflow-hidden rounded-[22px] bg-[#EFF3F1]">
+            <div className="pointer-events-none absolute inset-0 isolate" aria-hidden="true">
+              <HelixBackdrop position="contained" framing="app" lazy className="[&_canvas]:scale-[1.6]" />
+            </div>
+            <div className="relative p-2">
+              <div data-ile-cartes="" className="rounded-[18px] bg-white p-1.5 shadow-[0_12px_32px_-18px_rgba(15,43,38,0.55)]" style={{ color: L.ink }}>
+                {heads.map((head, row) => {
+                  const advice = items[head];
+                  const active = open && head === index;
+                  return (
+                    <div key={head} className="crd-in" style={{ animationDelay: `${row * 90}ms` }}>
+                      <button
+                        type="button"
+                        data-ile-replie={row === 0 ? "" : undefined}
+                        data-ile-mix-ligne={row + 1}
+                        aria-expanded={active}
+                        onClick={() => {
+                          // Un seul panneau ouvert à la fois : le conseil prend la place de la routine.
+                          setRoutineOpen(false);
+                          if (active && onClose) onClose();
+                          else show(head);
+                        }}
+                        className={`flex w-full items-center gap-3 rounded-2xl px-1.5 py-1.5 text-left transition-colors ${active ? "bg-[#EAF6F0]" : "hover:bg-[#F3F7F5]"}`}
+                      >
+                        <CardPhoto src={advice.image} />
+                        <span className="min-w-0 flex-1">
+                          {/* Le nom entier sur deux lignes au plus, jamais coupé à côté de la coche « Vendu » (fondateur, 29 oct. 2026). */}
+                          <span className="flex items-start gap-1.5 text-[14px] leading-[18px] font-bold">
+                            <span className="line-clamp-2">{advice.name}</span>
+                            {sold(head) && <Check className="mt-0.5 size-3.5 shrink-0" strokeWidth={3} style={{ color: L.green }} aria-label="Vendu" />}
+                          </span>
+                          {advice.drug && <span className="block truncate text-[11.5px]" style={{ color: L.muted }}>pour {advice.drug}</span>}
+                          <span data-ile-mix-repere="" className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] font-semibold">
+                            {advice.overstock && <span className="rounded-full px-1.5" style={{ background: OVERSTOCK_BG, color: OVERSTOCK_FG }}>{OVERSTOCK_LABEL}</span>}
+                            <span className="inline-flex items-center gap-1" style={{ color: stockInk(advice) }}>
+                              <span className="size-1.5 rounded-full" style={{ background: stockInk(advice) }} />
+                              {stockLabel(advice)}
+                            </span>
+                            {advice.challenge && <span className="inline-flex items-center gap-1 rounded-full bg-[#EEFFC2] px-1.5 text-[#3F5A00]"><Star className="size-3 fill-current" aria-hidden="true" />{T.challenge}</span>}
+                            {advice.shortDate && <span className="inline-flex items-center gap-1 text-[#C23A2B]"><Hourglass className="size-3" aria-hidden="true" />{advice.shortDate}</span>}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-right">
+                          {/* Le prix seulement avec un stock fiable (jamais un chiffre douteux). */}
+                          <span className="block text-[15px] font-bold tabular-nums" style={{ color: L.green }}>{advice.price && advice.stock !== "UNKNOWN" ? advice.price : "—"}</span>
+                          {advice.margin && <span className="mt-0.5 inline-block rounded-md bg-[#FFF5D6] px-1.5 text-[10.5px] font-bold text-[#9A6400] tabular-nums">+{advice.margin}</span>}
+                        </span>
+                      </button>
+                    </div>
+                  );
+                })}
+
+                {challengedBoxes.length > 0 && (
+                  <div data-ile-challenge="" className="mx-1.5 mt-1 flex items-start gap-1.5 rounded-lg bg-[#FFF6DD] px-2.5 py-1.5 text-[11.5px] leading-[15px] font-semibold text-[#8A5A00]">
+                    <Star className="mt-px size-3 shrink-0 fill-current" aria-hidden="true" />
                     <span className="min-w-0 flex-1">
-                      {/* Le nom entier sur deux lignes au plus, jamais coupé à côté de la coche « Vendu » (fondateur, 29 oct. 2026). */}
-                      <span className="flex items-start gap-1.5 text-[14px] leading-[18px] font-bold text-white">
-                        <span className="line-clamp-2">{advice.name}</span>
-                        {sold(head) && <Check className="mt-0.5 size-3.5 shrink-0 text-[#E8FF9C]" strokeWidth={3} aria-label="Vendu" />}
-                      </span>
-                      {advice.drug && <span className="block truncate text-[11.5px] text-white/55">pour {advice.drug}</span>}
-                      <span data-ile-mix-repere="" className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] font-semibold">
-                        {advice.overstock && <span className="rounded-full px-1.5" style={{ background: OVERSTOCK_BG, color: OVERSTOCK_FG }}>{OVERSTOCK_LABEL}</span>}
-                        <span className="inline-flex items-center gap-1" style={{ color: stockColors(advice).bg }}>
-                          <span className="size-1.5 rounded-full" style={{ background: stockColors(advice).bg }} />
-                          {stockLabel(advice)}
+                      {challengedBoxes.map((box) => (
+                        <span key={box.id} className="block">
+                          {/^challenge\b/i.test(box.challenge ?? "") ? box.challenge : `Challenge ${box.challenge}`} : {box.name}
+                          {box.reward ? <span data-ile-challenge-gain=""> · {box.reward}</span> : null}
                         </span>
-                        {advice.challenge && <span className="inline-flex items-center gap-1 text-[#E8FF9C]"><Star className="size-3 fill-current" aria-hidden="true" />{T.challenge}</span>}
-                        {advice.shortDate && <span className="inline-flex items-center gap-1 text-[#FF9C8F]"><Hourglass className="size-3" aria-hidden="true" />{advice.shortDate}</span>}
+                      ))}
+                    </span>
+                  </div>
+                )}
+
+                {belowHead}
+
+                {/* Plus de bouton « Terminer » (fondateur, 29 oct. 2026 : « tout se passe depuis le LGO ») : la vente se termine quand le
+                    logiciel de gestion la valide. La routine s'ouvre d'un clic, à la place du conseil, dans sa deuxième bannière. */}
+                {routine && <div className="mx-1.5 my-1 h-px bg-[#E3EBE8]" />}
+                {routine && (
+                  <div data-ile-cartes-routine="">
+                    <button
+                      type="button"
+                      aria-expanded={routineOpen}
+                      onClick={() => {
+                        if (routineOpen) {
+                          setRoutineOpen(false);
+                          return;
+                        }
+                        if (open && onClose) onClose();
+                        setRoutineOpen(true);
+                      }}
+                      className={`flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left ${routineOpen ? "bg-[#F1EEFF]" : "hover:bg-[#F3F7F5]"}`}
+                    >
+                      <span className="flex -space-x-2">
+                        {routine.view.steps.map((step, i) => (
+                          <span key={`${step.label}-${i}`} className={routineOpen ? "inline-flex" : "crd-blink inline-flex"} style={{ animationDelay: `${i * 0.25}s` }}>
+                            <span className="inline-flex size-[26px] items-center justify-center overflow-hidden rounded-lg border-2 border-white bg-white ring-1 ring-[#E3EBE8]">
+                              {/* eslint-disable-next-line @next/next/no-img-element -- photo studio locale */}
+                              {step.image ? <img src={step.image} alt="" className="size-full object-contain p-0.5" /> : <Pill className="size-3 text-[#9FB8B0]" aria-hidden="true" />}
+                            </span>
+                          </span>
+                        ))}
                       </span>
-                    </span>
-                    <span className="shrink-0 text-right">
-                      {/* Le prix seulement avec un stock fiable (jamais un chiffre douteux). */}
-                      <span className="block text-[15px] font-bold text-white tabular-nums">{advice.price && advice.stock !== "UNKNOWN" ? advice.price : "—"}</span>
-                      {advice.margin && <span className="block text-[11px] font-semibold text-[#E8FF9C] tabular-nums">+{advice.margin}</span>}
-                    </span>
-                  </button>
-                </div>
-              );
-            })}
-
-            {challengedBoxes.length > 0 && (
-              <div data-ile-challenge="" className="mx-1.5 mt-1 flex items-start gap-1.5 rounded-lg px-2.5 py-1.5 text-[11.5px] leading-[15px] font-semibold" style={{ background: "rgba(232,255,156,0.1)", color: "#E8FF9C" }}>
-                <Star className="mt-px size-3 shrink-0 fill-current" aria-hidden="true" />
-                <span className="min-w-0 flex-1">
-                  {challengedBoxes.map((box) => (
-                    <span key={box.id} className="block">
-                      {/^challenge\b/i.test(box.challenge ?? "") ? box.challenge : `Challenge ${box.challenge}`} : {box.name}
-                      {box.reward ? <span data-ile-challenge-gain=""> · {box.reward}</span> : null}
-                    </span>
-                  ))}
-                </span>
+                      <span className="min-w-0 flex-1 text-[12.5px] font-semibold">Routine · {routine.view.steps.length} produits</span>
+                      <ChevronDown className={`size-4 transition-transform ${routineOpen ? "rotate-180" : ""}`} style={{ color: L.muted }} aria-hidden="true" />
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
-
-            {belowHead}
-
-            {/* Plus de bouton « Terminer » (fondateur, 29 oct. 2026 : « tout se passe depuis le LGO ») : la vente se termine quand le
-                logiciel de gestion la valide. La routine : ses photos ; au survol, sa deuxième bannière. Plus de « Jusqu'à … sur cette vente »
-                (fondateur, 29 oct. 2026). */}
-            {routine && <div className="mx-1.5 my-1.5 h-px bg-white/10" />}
-            {routine && (
-              <div data-ile-cartes-routine="">
-                <button type="button" onClick={() => setRoutineOpen((value) => !value)} onMouseEnter={() => setRoutineOpen(true)} className="flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left hover:bg-white/[0.05]">
-                  <span className="flex -space-x-2">
-                    {routine.view.steps.map((step, i) => (
-                      <span key={`${step.label}-${i}`} className={routineOpen ? "inline-flex" : "crd-blink inline-flex"} style={{ animationDelay: `${i * 0.25}s` }}>
-                        <span className="inline-flex size-[26px] items-center justify-center overflow-hidden rounded-lg border-2 border-[#062621] bg-white">
-                          {/* eslint-disable-next-line @next/next/no-img-element -- photo studio locale */}
-                          {step.image ? <img src={step.image} alt="" className="size-full object-contain p-0.5" /> : <Pill className="size-3 text-[#9FB8B0]" aria-hidden="true" />}
-                        </span>
-                      </span>
-                    ))}
-                  </span>
-                  <span className="min-w-0 flex-1 text-[12.5px] font-semibold text-white">Routine · {routine.view.steps.length} produits</span>
-                  <ChevronDown className={`size-4 text-white/60 transition-transform ${routineOpen ? "rotate-180" : ""}`} aria-hidden="true" />
-                </button>
-              </div>
-            )}
+            </div>
           </div>
         </IslandShell>
         {/* Le conseil ouvert, dans sa deuxième bannière blanche sur l'ADN, comme la routine (fondateur, 29 oct. 2026). */}
-        {open && (
+        {open && !routineOpen && (
           <AdviceIsland
             item={item}
             width={width}
@@ -269,7 +292,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
           />
         )}
         {/* La routine s'ouvre dans sa deuxième bannière, comme la version en ligne (fondateur, 29 oct. 2026 : « j'aurais voulu garder ça »). */}
-        {routine && routineOpen && <RoutineIsland routine={routine.view} width={width} cards onClose={() => setRoutineOpen(false)} onPointerLeave={() => setRoutineOpen(false)} />}
+        {routine && routineOpen && <RoutineIsland routine={routine.view} width={width} cards onClose={() => setRoutineOpen(false)} />}
       </>
     );
   }
@@ -591,6 +614,11 @@ function stockLabel(item: IslandAdvice): string {
   return item.stock === "IN_STOCK" ? `${T.inStock}${count}` : item.stock === "LOW_STOCK" ? `${T.lowStock}${count}` : item.stock === "OUT_OF_STOCK" ? "Rupture" : "Stock à vérifier";
 }
 
+/** La couleur du stock sur fond blanc : vert, orange s'il est faible, rouge en rupture, gris s'il est à vérifier. */
+function stockInk(item: IslandAdvice): string {
+  return item.stock === "IN_STOCK" ? "#0E7A4E" : item.stock === "LOW_STOCK" ? "#B45309" : item.stock === "OUT_OF_STOCK" ? "#B42318" : "#5B6B66";
+}
+
 /** Les couleurs du stock dans la petite bannière : vert, orange s'il est faible, rouge en rupture, gris s'il est à vérifier. */
 function stockColors(item: IslandAdvice): { bg: string; fg: string } {
   return item.stock === "IN_STOCK" ? { bg: "#7BE0B0", fg: "#063B26" } : item.stock === "LOW_STOCK" ? { bg: "#FFB86B", fg: "#4A2600" } : item.stock === "OUT_OF_STOCK" ? { bg: "#FF8A80", fg: "#4A0B07" } : { bg: "rgba(255,255,255,0.14)", fg: "#F2FFF9" };
@@ -819,16 +847,18 @@ function AdviceIsland({ item, width, sold, onClose, onCancelSold, alternatives, 
         </div>
         <div className="relative p-2.5">
           <div data-ile-mix-carte="" className="space-y-2.5 rounded-[18px] bg-white p-3 text-left shadow-[0_12px_32px_-18px_rgba(15,43,38,0.55)]" style={{ color: L.ink }}>
+            {/* La même présentation que la carte du conseil en ligne (fondateur, 29 oct. 2026 : « garde bien la même présentation ») :
+                la photo, « pour … », le nom et le prix en grand, puis la marge, le challenge et le stock en pastilles. */}
             <div className="flex items-center gap-3">
               {item.image && (
-                <span className="inline-flex size-[52px] shrink-0 items-center justify-center rounded-xl bg-white p-1 ring-1 ring-[#E3EBE8]">
+                <span className="inline-flex size-[60px] shrink-0 items-center justify-center rounded-xl bg-white p-1 ring-1 ring-[#E3EBE8]">
                   {/* eslint-disable-next-line @next/next/no-img-element -- photo studio locale */}
-                  <img src={item.image} alt="" className="size-full object-contain" />
+                  <img src={item.image} alt="" width={52} height={52} className="size-full object-contain" />
                 </span>
               )}
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 pb-0.5">
                 {item.drug && <p className="text-[10px] font-bold tracking-[0.14em] uppercase" style={{ color: L.green }}>pour {item.drug}</p>}
-                <p className="text-[15px] leading-[19px] font-bold tracking-[-0.02em]">
+                <p className="mt-0.5 text-[17px] leading-[21px] font-bold tracking-[-0.025em] break-words">
                   {item.sheet?.name || item.name}
                   <span className="ml-2 whitespace-nowrap tabular-nums" style={{ color: L.green }}>{item.price && item.stock !== "UNKNOWN" ? item.price : "—"}</span>
                 </p>
@@ -838,6 +868,9 @@ function AdviceIsland({ item, width, sold, onClose, onCancelSold, alternatives, 
                   <X className="size-4" aria-hidden="true" />
                 </button>
               )}
+            </div>
+            <div className="-mt-1">
+              <Tags item={item} margin={item.margin} />
             </div>
             {sold && (
               <p data-ile-mix-vendu="" className="flex items-center gap-2 rounded-xl px-3 py-1.5 text-[12.5px] font-bold" style={{ background: L.soft }}>

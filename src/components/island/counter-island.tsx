@@ -6,6 +6,7 @@ import { islandTheme, PHARMABOOST_GREEN } from "./island-theme";
 import { BANNER } from "../../../agent/src/banner-design";
 import { SHEET_MISSING, SHEET_PATIENT_LABELS, type CounterSheet, type CounterSheetLine } from "../../../agent/src/counter-sheet";
 import { Robot } from "@/components/robot";
+import { HelixBackdrop } from "@/components/app/helix/helix-backdrop";
 import { ScanCapsule, SCAN_CSS, SCAN_STEPS, type ScanLook } from "./scan-capsule";
 import { eurosOf, possibleMargin } from "./mix-island";
 import { analysisSteps, allAnswered, followAdviceLink, isTap, registerTap, splitAlert, STAGE_MOOD, STAGE_WIDTH, stageTitle, stageTone, type IslandOutcome, type IslandState } from "@/core/island/banner-flow";
@@ -332,6 +333,21 @@ function Chip({ bg, fg, children }: { bg: string; fg: string; children: ReactNod
     <span className="inline-flex items-center gap-1 rounded-full px-1.5 py-px text-[10.5px] font-semibold whitespace-nowrap" style={{ background: bg, color: fg }}>
       {children}
     </span>
+  );
+}
+
+/** Le fond blanc sur l'ADN des bannières de fin (fondateur, 29 oct. 2026 : « le fond blanc sur toutes les bannières »). */
+function LightPanel({ children }: { children: ReactNode }) {
+  return (
+    <div className="relative overflow-hidden rounded-[22px] bg-[#EFF3F1]">
+      <style>{SCAN_CSS}</style>
+      <div className="pointer-events-none absolute inset-0 isolate" aria-hidden="true">
+        <HelixBackdrop position="contained" framing="app" lazy className="[&_canvas]:scale-[1.6]" />
+      </div>
+      <div className="relative p-2">
+        <div className="rounded-[18px] bg-white shadow-[0_12px_32px_-18px_rgba(15,43,38,0.55)]">{children}</div>
+      </div>
+    </div>
   );
 }
 
@@ -775,11 +791,12 @@ export function CounterIsland(props: CounterIslandProps) {
           // Fin 3 (fondateur, 29 oct. 2026) : une ligne — l'adresse, Envoyer, Passer —, le compte à rebours dessous.
           const skip = props.onFinishWithoutEmail ?? props.onCloseEmail;
           body = (
+            <LightPanel>
             <div className="px-3 py-2.5" data-ile-fin="compacte">
               <div className="flex items-center gap-2">
-                <Mail className="size-4 shrink-0 text-[#E8FF9C]" aria-hidden="true" />
-                <p className="flex-1 text-[12.5px] font-bold text-white">Bilan par e-mail</p>
-                {props.emailCountdown && <span className="text-[11px] text-white/50 tabular-nums">{props.emailCountdown.seconds} s</span>}
+                <Mail className="size-4 shrink-0 text-[#0E8A7B]" aria-hidden="true" />
+                <p className="flex-1 text-[12.5px] font-bold text-[#0F2B26]">Bilan par e-mail</p>
+                {props.emailCountdown && <span className="text-[11px] text-[#5B6B66] tabular-nums">{props.emailCountdown.seconds} s</span>}
               </div>
               <form
                 className="mt-1.5 flex items-center gap-1.5"
@@ -795,23 +812,24 @@ export function CounterIsland(props: CounterIslandProps) {
                   value={state.email}
                   onChange={(event) => props.onEmail(event.target.value)}
                   placeholder="e-mail du patient"
-                  className="h-8 min-w-0 flex-1 rounded-full border border-white/10 bg-white/[0.06] px-3 text-[12.5px] text-white placeholder:text-white/35 focus:border-[#E8FF9C] focus:outline-none"
+                  className="h-8 min-w-0 flex-1 rounded-full border border-[#D5E3DD] bg-[#F6F9F8] px-3 text-[12.5px] text-[#0F2B26] placeholder:text-[#8FA39C] focus:border-[#0E8A7B] focus:outline-none"
                 />
-                <button type="submit" aria-label="Envoyer" className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-[#E8FF9C] text-[#04261A]">
+                <button type="submit" aria-label="Envoyer" className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-[#0E8A7B] text-white">
                   <Send className="size-3.5" aria-hidden="true" />
                 </button>
                 {skip && (
-                  <button type="button" onClick={skip} data-ile-sans-email="" className="h-8 shrink-0 rounded-full px-2.5 text-[11.5px] font-semibold text-white/60 hover:text-white">
+                  <button type="button" onClick={skip} data-ile-sans-email="" className="h-8 shrink-0 rounded-full px-2.5 text-[11.5px] font-semibold text-[#5B6B66] hover:text-[#0F2B26]">
                     Passer
                   </button>
                 )}
               </form>
               {props.emailCountdown && (
-                <span className="mt-2 block h-1 overflow-hidden rounded-full bg-white/10">
-                  <span className="block h-full rounded-full bg-[#E8FF9C]" style={{ width: `${Math.round(props.emailCountdown.ratio * 100)}%`, transition: "width 250ms linear" }} />
+                <span className="mt-2 block h-1 overflow-hidden rounded-full bg-[#E3EBE8]">
+                  <span className="block h-full rounded-full bg-[#0E8A7B]" style={{ width: `${Math.round(props.emailCountdown.ratio * 100)}%`, transition: "width 250ms linear" }} />
                 </span>
               )}
             </div>
+            </LightPanel>
           );
           break;
         }
@@ -867,10 +885,11 @@ export function CounterIsland(props: CounterIslandProps) {
           const gained = possibleMargin(sold);
           const served = props.served;
           body = (
+            <LightPanel>
             <div className="px-3 py-2.5" data-ile-fete="" data-ile-fin="compacte">
               <div className="flex items-center gap-2.5">
-                <span className="relative inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#E8FF9C]">
-                  <Trophy className="size-5 text-[#04261A]" aria-hidden="true" />
+                <span className="relative inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#0E8A7B]">
+                  <Trophy className="size-5 text-white" aria-hidden="true" />
                   <span className="isl-burst" aria-hidden="true">
                     {BURST_PIECES.map((piece, index) => (
                       <i key={`${cheer}-${index}`} style={{ "--a": `${piece.angle}deg`, "--d": `${piece.distance}px`, "--c": piece.color, animationDelay: `${piece.delay}ms` } as CSSProperties} />
@@ -878,10 +897,10 @@ export function CounterIsland(props: CounterIslandProps) {
                   </span>
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="isl-pop text-[16px] leading-5 font-bold text-white" aria-live="polite">
-                    Bravo !{gained > 0 && <span className="text-[#E8FF9C]"> +{eurosOf(gained)}</span>}
+                  <p className="isl-pop text-[16px] leading-5 font-bold text-[#0F2B26]" aria-live="polite">
+                    Bravo !{gained > 0 && <span className="text-[#0E8A7B]"> +{eurosOf(gained)}</span>}
                   </p>
-                  <p className="text-[11.5px] text-white/60">
+                  <p className="text-[11.5px] text-[#5B6B66]">
                     {served?.done ? `Vente comptée pour ${served.team.find((member) => member.id === served.chosen)?.name ?? "le comptoir"}` : served?.team.length ? "Qui a servi ce patient ?" : T.doneTitle}
                   </p>
                 </div>
@@ -897,7 +916,7 @@ export function CounterIsland(props: CounterIslandProps) {
                         data-ile-servi-personne={member.id}
                         aria-pressed={chosen}
                         onClick={() => served.onPick(member.id)}
-                        className={`inline-flex h-7 items-center gap-1 rounded-full px-3 text-[12px] font-semibold ${chosen ? "bg-[#E8FF9C] text-[#04261A]" : "border border-white/20 text-white hover:border-white/40"}`}
+                        className={`inline-flex h-7 items-center gap-1 rounded-full px-3 text-[12px] font-semibold ${chosen ? "bg-[#0E8A7B] text-white" : "border border-[#D5E3DD] text-[#0F2B26] hover:border-[#0E8A7B]"}`}
                       >
                         {chosen && <Check className="size-3" strokeWidth={3} aria-hidden="true" />}
                         {member.name}
@@ -907,6 +926,7 @@ export function CounterIsland(props: CounterIslandProps) {
                 </div>
               )}
             </div>
+            </LightPanel>
           );
           break;
         }
@@ -979,7 +999,7 @@ export function CounterIsland(props: CounterIslandProps) {
       <IslandShell
         width={scanCapsule ? 340 : width}
         tone={tone}
-        className={scanCapsule ? "crd-glass crd-cap-in" : undefined}
+        className={scanCapsule ? "crd-glass crd-cap-in" : props.compactEnd && (state.stage === "email" || (state.stage === "done" && state.outcomes.some((outcome) => outcome === "SOLD"))) ? "crd-light" : undefined}
         contentKey={scanCapsule ? "scan-capsule" : grumpy ? "grumpy" : peek ? "peek" : collapsed ? `${state.stage}-replie` : sleeping ? "advice-capsule" : compact ? "advice-compact" : state.stage}
         label="Bannière PharmaBoost du comptoir"
         onPointerEnter={() => {
