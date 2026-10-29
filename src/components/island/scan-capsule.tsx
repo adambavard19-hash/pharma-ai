@@ -85,6 +85,8 @@ export function ScanCapsule(props: ScanCapsuleProps) {
 }
 
 export const SCAN_CSS = `
+section.crd-light.crd-light{background:#EFF3F1!important;border-radius:22px!important;box-shadow:0 18px 40px -16px rgba(15,43,38,.45),0 0 0 1px rgba(15,47,42,.08)!important}
+section.crd-light.crd-light::before{display:none!important}
 section.crd-glass.crd-glass{background:linear-gradient(180deg,#072A25 0%,#03171A 100%)!important;border-radius:22px!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 18px 40px -16px rgba(0,0,0,.6)!important}
 section.crd-glass.crd-glass::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;z-index:2;background:linear-gradient(110deg,rgba(95,165,148,.5),rgba(232,255,156,.75) 50%,rgba(95,165,148,.5));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
 .crd-cap-in{animation:crd-cap-in .45s cubic-bezier(.2,.9,.3,1.2) both}
