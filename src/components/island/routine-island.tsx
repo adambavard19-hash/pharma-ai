@@ -179,7 +179,7 @@ export function RoutineMiniIsland({ routine, open, onToggle, width }: { routine:
 export function RoutineIsland({ routine, width, cards = false, onClose, onPointerLeave }: { routine: IslandRoutine; width: number; cards?: boolean; onClose: () => void; onPointerLeave?: () => void }) {
   const total = routineTotal(routine);
   return (
-    <IslandShell width={width} tone="accent" contentKey={cards ? "routine-cartes" : "routine-liste"} label={`Routine : ${routine.title}`} onPointerLeave={onPointerLeave}>
+    <IslandShell width={width} tone="accent" className="crd-light" contentKey={cards ? "routine-cartes" : "routine-liste"} label={`Routine : ${routine.title}`} onPointerLeave={onPointerLeave}>
       <div data-ile-routine="" className="relative overflow-hidden rounded-[22px] bg-[#EFF3F1]">
         <div className="pointer-events-none absolute inset-0 isolate" aria-hidden="true">
           <HelixBackdrop position="contained" framing="app" lazy className="[&_canvas]:scale-[1.6]" />
