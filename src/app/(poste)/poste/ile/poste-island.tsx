@@ -539,12 +539,13 @@ export function PosteIsland() {
   const mix = useSyncExternalStore(noSubscribe, () => new URLSearchParams(window.location.search).get("banniere") !== "ancienne", () => true);
   // La démo au comptoir montre chaque conseil sur sa ligne de la petite bannière, même pour une seule boîte (fondateur, 28 oct. 2026).
   // La bannière « cartes photo » et le scan en animation (fondateur, 29 oct. 2026) : la gélule par défaut, `?scan=croix` pour la
-  // croix de pharmacie, `?scan=lignes` pour les lignes cochées d'avant ; `?banniere=mix` pour la bannière mix d'avant.
+  // croix de pharmacie (par défaut depuis le 29 oct.), `?scan=lignes` pour les lignes cochées d'avant ; `?banniere=mix` pour la bannière mix d'avant.
   const cards = useSyncExternalStore(noSubscribe, () => !["mix", "ancienne"].includes(new URLSearchParams(window.location.search).get("banniere") ?? ""), () => true);
   const scanLook = useSyncExternalStore(noSubscribe, () => {
     const value = new URLSearchParams(window.location.search).get("scan");
-    return value === "croix" ? "croix" : value === "lignes" ? null : "gelule";
-  }, () => "gelule" as const);
+    // Le scan A, la croix, retenu (fondateur, 29 oct. 2026) ; `?scan=gelule` pour la gélule.
+    return value === "gelule" ? "gelule" : value === "lignes" ? null : "croix";
+  }, () => "croix" as const);
   const everyAdvice = useSyncExternalStore(noSubscribe, () => new URLSearchParams(window.location.search).has("tous-les-conseils"), () => false);
 
   // « C'est un autre client ? » : la dernière boîte est arrivée plus de 30 secondes après la précédente (le serveur la marque).
@@ -576,6 +577,11 @@ export function PosteIsland() {
     items,
     drug,
     ...(scanLook ? { scanLook } : {}),
+    // La fin « compacte » (essai Fin 3, fondateur, 29 oct. 2026) avec la bannière en cartes : l'e-mail en une ligne, le compte
+    // à rebours dedans, et « Qui a servi ? » dans le Bravo.
+    compactEnd: cards,
+    emailCountdown: cards && autoClose && autoClose.id === entry?.id ? { seconds: Math.max(0, Math.ceil((autoClose.until - clock) / 1000)), ratio: Math.max(0, Math.min(1, (autoClose.until - clock) / VALIDATED_EMAIL_MS)) } : null,
+    served: cards && askServed && served && served.id === entry?.id && entry?.team ? { team: entry.team, chosen: served.chosen, done: served.done, onPick: (id: string) => answerServed(id) } : null,
     alert,
     alertItems: entry?.alerts ?? [],
     movable: true,
@@ -818,7 +824,7 @@ export function PosteIsland() {
           !questionsOnly && <CounterIsland {...islandProps} />
         )}
 
-        {autoClose && autoClose.id === entry?.id && (
+        {autoClose && autoClose.id === entry?.id && !cards && (
           <IslandShell width={STAGE_WIDTH.email} tone="success" contentKey={`valide-${autoClose.id}`} label="Vente validée dans LGPI">
             {/* LGPI a validé la vente : la bannière se termine seule à la fin du compte à rebours, sauf si le pharmacien clique. */}
             <div data-ile-validee="" className="px-3 py-1.5 text-left">
@@ -902,7 +908,7 @@ export function PosteIsland() {
           </IslandShell>
         )}
 
-        {askServed && served && served.id === entry?.id && entry.team && (
+        {askServed && served && served.id === entry?.id && entry.team && !cards && (
           <IslandShell width={view.side === "gauche" || view.side === "droite" ? 280 : 380} tone="success" contentKey={`servi-${entry.id}-${served.done ? "ok" : "q"}`} label="Qui a servi ce patient ?">
             {served.done ? (
               <p data-ile-servi-ok="" className="flex items-center gap-2 px-4 py-3 text-[13px] font-semibold text-white">

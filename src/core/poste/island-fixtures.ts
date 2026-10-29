@@ -114,8 +114,11 @@ export const ESSAI_SEQUENCE: TimedCommand[] = [
   { at: 600, command: { op: "greet", text: greetingText("Léa") } },
   { at: 12500, command: { op: "scan" } },
   { at: 14200, command: { op: "show", entry: ESSAI_ENTRY } },
-  // La bannière reste une minute : le temps d'ouvrir les cartes, les questions et la routine.
-  { at: 74000, command: { op: "done", info: { id: "essai", title: "Vente terminée — résultats enregistrés", lines: ["1 vendu · 0 non vendu · 1 sans réponse", "✓ Bilan envoyé au patient."], badge: "3e conseil vendu aujourd'hui", warning: false } } },
+  // La bannière reste une demi-minute : le temps d'ouvrir les cartes, les questions et la routine. Puis Cicaplast est bipé, la
+  // vente validée dans LGPI (l'e-mail du bilan et son compte à rebours), et le Bravo avec « Qui a servi ce patient ? ».
+  { at: 44000, command: { op: "show", entry: { ...ESSAI_ENTRY, signature: "essai-2", items: [{ ...ESSAI_ENTRY.items[0], outcome: "SOLD" }, ...ESSAI_ENTRY.items.slice(1)] } } },
+  { at: 50000, command: { op: "validated", id: ESSAI_ENTRY.id } },
+  { at: 63500, command: { op: "done", info: { id: "essai", title: "Vente terminée — résultats enregistrés", lines: ["1 vendu · 0 non vendu · 1 sans réponse", "✓ Bilan envoyé au patient."], badge: "3e conseil vendu aujourd'hui", warning: false } } },
   // « Qui a servi ce patient ? » tient l'écran de fin jusqu'à 8 s, puis la confirmation : la vente suivante vient après.
   { at: 86000, command: { op: "scan" } },
   { at: 87500, command: { op: "show", entry: ALERT_ENTRY } },

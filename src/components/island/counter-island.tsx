@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ExternalLink, FileText, GripVertical, Mail, Maximize2, Minimize2, PartyPopper, Pill, ScanLine, Send, TriangleAlert, X } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ExternalLink, FileText, GripVertical, Mail, Maximize2, Minimize2, PartyPopper, Pill, ScanLine, Send, TriangleAlert, Trophy, X } from "lucide-react";
 import { islandTheme, PHARMABOOST_GREEN } from "./island-theme";
 import { BANNER } from "../../../agent/src/banner-design";
 import { SHEET_MISSING, SHEET_PATIENT_LABELS, type CounterSheet, type CounterSheetLine } from "../../../agent/src/counter-sheet";
 import { Robot } from "@/components/robot";
 import { ScanCapsule, SCAN_CSS, SCAN_STEPS, type ScanLook } from "./scan-capsule";
+import { eurosOf, possibleMargin } from "./mix-island";
 import { analysisSteps, allAnswered, followAdviceLink, isTap, registerTap, splitAlert, STAGE_MOOD, STAGE_WIDTH, stageTitle, stageTone, type IslandOutcome, type IslandState } from "@/core/island/banner-flow";
 import { cn } from "@/lib/utils";
 import { IslandShell } from "./island-shell";
@@ -74,6 +75,15 @@ export type CounterIslandProps = {
    * absente, les lignes d'avant.
    */
   scanLook?: ScanLook;
+  /**
+   * La fin de vente « compacte » (fondateur, 29 oct. 2026, essai « Fin 3 ») : l'e-mail tient en une ligne (Envoyer, Passer) avec
+   * le compte à rebours dedans, et le Bravo pose tout de suite « Qui a servi ce patient ? ».
+   */
+  compactEnd?: boolean;
+  /** Le compte à rebours de la vente validée dans le logiciel de gestion : secondes restantes et part restante (0 à 1). */
+  emailCountdown?: { seconds: number; ratio: number } | null;
+  /** « Qui a servi ce patient ? » dans le Bravo (fin compacte) : l'équipe, la personne choisie, et le choix. */
+  served?: { team: { id: string; name: string }[]; chosen: string | null; done: boolean; onPick: (id: string) => void } | null;
   items: IslandAdvice[];
   drug: string;
   alert: { title: string; text: string } | null;
@@ -761,6 +771,50 @@ export function CounterIsland(props: CounterIslandProps) {
         );
         break;
       case "email":
+        if (props.compactEnd) {
+          // Fin 3 (fondateur, 29 oct. 2026) : une ligne — l'adresse, Envoyer, Passer —, le compte à rebours dessous.
+          const skip = props.onFinishWithoutEmail ?? props.onCloseEmail;
+          body = (
+            <div className="px-3 py-2.5" data-ile-fin="compacte">
+              <div className="flex items-center gap-2">
+                <Mail className="size-4 shrink-0 text-[#E8FF9C]" aria-hidden="true" />
+                <p className="flex-1 text-[12.5px] font-bold text-white">Bilan par e-mail</p>
+                {props.emailCountdown && <span className="text-[11px] text-white/50 tabular-nums">{props.emailCountdown.seconds} s</span>}
+              </div>
+              <form
+                className="mt-1.5 flex items-center gap-1.5"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  props.onSendEmail();
+                }}
+              >
+                <label className="sr-only" htmlFor="ile-email">E-mail du patient</label>
+                <input
+                  id="ile-email"
+                  type="email"
+                  value={state.email}
+                  onChange={(event) => props.onEmail(event.target.value)}
+                  placeholder="e-mail du patient"
+                  className="h-8 min-w-0 flex-1 rounded-full border border-white/10 bg-white/[0.06] px-3 text-[12.5px] text-white placeholder:text-white/35 focus:border-[#E8FF9C] focus:outline-none"
+                />
+                <button type="submit" aria-label="Envoyer" className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-[#E8FF9C] text-[#04261A]">
+                  <Send className="size-3.5" aria-hidden="true" />
+                </button>
+                {skip && (
+                  <button type="button" onClick={skip} data-ile-sans-email="" className="h-8 shrink-0 rounded-full px-2.5 text-[11.5px] font-semibold text-white/60 hover:text-white">
+                    Passer
+                  </button>
+                )}
+              </form>
+              {props.emailCountdown && (
+                <span className="mt-2 block h-1 overflow-hidden rounded-full bg-white/10">
+                  <span className="block h-full rounded-full bg-[#E8FF9C]" style={{ width: `${Math.round(props.emailCountdown.ratio * 100)}%`, transition: "width 250ms linear" }} />
+                </span>
+              )}
+            </div>
+          );
+          break;
+        }
         // Compacte (fondateur, 26 oct. 2026) : une ligne de titre, le champ, « Terminer sans e-mail » en petit — LGPI reste visible.
         body = (
           <div className="px-2.5 pt-2 pb-2">
@@ -808,6 +862,54 @@ export function CounterIsland(props: CounterIslandProps) {
         break;
       case "done": {
         const sold = items.filter((_, i) => state.outcomes[i] === "SOLD");
+        if (props.compactEnd && sold.length) {
+          // Fin 3 (fondateur, 29 oct. 2026) : le Bravo et la marge gagnée, puis « Qui a servi ce patient ? » dans la même capsule.
+          const gained = possibleMargin(sold);
+          const served = props.served;
+          body = (
+            <div className="px-3 py-2.5" data-ile-fete="" data-ile-fin="compacte">
+              <div className="flex items-center gap-2.5">
+                <span className="relative inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#E8FF9C]">
+                  <Trophy className="size-5 text-[#04261A]" aria-hidden="true" />
+                  <span className="isl-burst" aria-hidden="true">
+                    {BURST_PIECES.map((piece, index) => (
+                      <i key={`${cheer}-${index}`} style={{ "--a": `${piece.angle}deg`, "--d": `${piece.distance}px`, "--c": piece.color, animationDelay: `${piece.delay}ms` } as CSSProperties} />
+                    ))}
+                  </span>
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="isl-pop text-[16px] leading-5 font-bold text-white" aria-live="polite">
+                    Bravo !{gained > 0 && <span className="text-[#E8FF9C]"> +{eurosOf(gained)}</span>}
+                  </p>
+                  <p className="text-[11.5px] text-white/60">
+                    {served?.done ? `Vente comptée pour ${served.team.find((member) => member.id === served.chosen)?.name ?? "le comptoir"}` : served?.team.length ? "Qui a servi ce patient ?" : T.doneTitle}
+                  </p>
+                </div>
+              </div>
+              {served && served.team.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5" data-ile-servi="" data-ile-sans-deploiement="">
+                  {served.team.map((member) => {
+                    const chosen = served.chosen === member.id;
+                    return (
+                      <button
+                        key={member.id}
+                        type="button"
+                        data-ile-servi-personne={member.id}
+                        aria-pressed={chosen}
+                        onClick={() => served.onPick(member.id)}
+                        className={`inline-flex h-7 items-center gap-1 rounded-full px-3 text-[12px] font-semibold ${chosen ? "bg-[#E8FF9C] text-[#04261A]" : "border border-white/20 text-white hover:border-white/40"}`}
+                      >
+                        {chosen && <Check className="size-3" strokeWidth={3} aria-hidden="true" />}
+                        {member.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+          break;
+        }
         const soldLine = `${sold.length} conseil${sold.length > 1 ? "s" : ""} vendu${sold.length > 1 ? "s" : ""}${sold[0]?.price ? ` · ${sold.map((item) => item.price).filter(Boolean).join(" + ")}` : ""}`;
         body = sold.length ? (
           // Au moins un conseil vendu : le robot en blouse, plus grand, saute et lance ses confettis — « Bravo ! ».
