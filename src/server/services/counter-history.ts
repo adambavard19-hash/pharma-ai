@@ -100,6 +100,8 @@ export type AdviceRow = {
   /** Vendu par le scan du produit (sans clic), ou déclaré à la main. */
   soldByScan: boolean;
   boxes: string[];
+  /** Un conseil du moteur, une association de l'officine, ou une étape de routine (fondateur, 29 oct. 2026). */
+  kind?: "CONSEIL" | "ASSOCIATION" | "ROUTINE";
 };
 
 /**
@@ -124,7 +126,8 @@ export async function loadAdviceRows(input: { pharmacyId: string; from: Date; to
       outcomeSource: true,
       product: { select: { name: true, salePriceCents: true } },
       presentation: { select: { priceCents: true, specialty: { select: { name: true } } } },
-      opportunity: { select: { triggeredLineIds: true } },
+      routine: true,
+      opportunity: { select: { triggeredLineIds: true, ruleKey: true } },
       events: { where: { type: "PURCHASED" }, orderBy: { createdAt: "desc" }, take: 1, select: { metadata: true } },
       prescription: {
         select: {
@@ -159,6 +162,7 @@ export async function loadAdviceRows(input: { pharmacyId: string; from: Date; to
         reason: rec.shortReason ?? rec.patientReason ?? null,
         soldByScan: status === "SOLD" && via === "SCAN",
         boxes: rec.prescription.lines.map((line) => clean(line.drugName)).filter(Boolean),
+        kind: rec.routine ? "ROUTINE" : rec.opportunity?.ruleKey?.startsWith("association:") ? "ASSOCIATION" : "CONSEIL",
       };
     })
     .sort((a, b) => b.at.getTime() - a.at.getTime());

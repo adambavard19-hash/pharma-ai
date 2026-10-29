@@ -16,6 +16,7 @@ import { pharmacySuggestions } from "@/core/pharmacy-assistant/assistant";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { NOT_LINKED, thisPcComptoir } from "@/server/services/post-link";
 import { RobotPresenceProvider } from "@/components/robot/robot-presence";
+import { DemoViewSwitch } from "@/components/app/demo-view-switch";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const session = await requireSession();
@@ -67,6 +68,12 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             />
           </div>
 
+          {/* La démonstration : « Espace titulaire / Espace pharmacien » (fondateur, 29 oct. 2026). */}
+          {session.demoView && (
+            <div className="no-print">
+              <DemoViewSwitch view={session.demoView} />
+            </div>
+          )}
           {/* La feuille blanche, aux grands coins arrondis, posée sur le fond menthe ; les pages y vivent telles quelles. */}
           <div className="espace-feuille mx-2 mb-2 min-h-[calc(100dvh-4rem)] rounded-[24px] sm:mx-3 sm:mb-3 lg:rounded-[48px] print:m-0 print:min-h-0 print:rounded-none print:border-0">
             <main

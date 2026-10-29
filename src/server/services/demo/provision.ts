@@ -324,6 +324,8 @@ async function writeHistory(context: HistoryContext): Promise<{ sales: number; r
   const events: Prisma.RecommendationEventCreateManyInput[] = [];
   const sales: Prisma.SaleCreateManyInput[] = [];
   const saleLines: Prisma.SaleLineCreateManyInput[] = [];
+  // La fin de chaque vente au comptoir (Performances, « Par collaborateur ») : sans elle, les compteurs de la démo restaient vides.
+  const followUps: Prisma.CounterSaleFollowUpCreateManyInput[] = [];
   let saleNumber = 0;
 
   for (const visit of visits) {
@@ -338,6 +340,7 @@ async function writeHistory(context: HistoryContext): Promise<{ sales: number; r
       source: "COUNTER_SCAN",
       counterPost: DEMO_POST.hostname,
       createdByUserId: memberId,
+      handledByUserId: memberId,
       verifiedByUserId: memberId,
       verifiedAt: seconds(visit.at, 20),
       validatedAt: minutes(visit.at, 4),
@@ -355,9 +358,12 @@ async function writeHistory(context: HistoryContext): Promise<{ sales: number; r
     for (const [position, advice] of visit.advice.entries()) {
       const recommendationId = randomUUID();
       let opportunityId: string | null = null;
+      // Conseil, association ou routine : une part des conseils de la démo vient d'une association de l'officine ou d'une routine,
+      // pour que le détail par collaborateur montre les trois (déterministe, sans hasard).
+      const kind = advice.manual ? "CONSEIL" : (visit.index + position) % 7 === 0 ? "ASSOCIATION" : (visit.index + position) % 3 === 0 && ["DERMOCOSMETIQUE", "SOINS", "HYGIENE"].includes(advice.category) ? "ROUTINE" : "CONSEIL";
       if (!advice.manual) {
         opportunityId = randomUUID();
-        opportunities.push({ id: opportunityId, analysisRunId: runId, category: advice.category as never, title: advice.title, rationale: advice.reason, priority: 60, ruleKey: advice.ruleKey, ruleVersion: "1.0", coverage: "COVERED", createdAt: seconds(visit.at, 26) });
+        opportunities.push({ id: opportunityId, analysisRunId: runId, category: advice.category as never, title: advice.title, rationale: advice.reason, priority: 60, ruleKey: kind === "ASSOCIATION" ? `association:demo-${advice.ruleKey}` : advice.ruleKey, ruleVersion: "1.0", coverage: "COVERED", createdAt: seconds(visit.at, 26) });
       }
       const drug = advice.target.kind === "drug" ? drugsByKey.get(advice.target.key) : null;
       if (advice.target.kind === "drug" && !drug) continue;
@@ -371,8 +377,11 @@ async function writeHistory(context: HistoryContext): Promise<{ sales: number; r
         opportunityId,
         productId: advice.target.kind === "product" ? (productIds.get(advice.target.slug) ?? null) : null,
         presentationId: drug?.presentationId ?? null,
-        origin: advice.manual ? "MANUAL" : "AI",
+        origin: advice.manual ? "MANUAL" : kind === "ASSOCIATION" ? "RULE" : "AI",
         status: advice.status,
+        // Vendu ou non vendu, déclaré au comptoir comme au vrai poste ; une étape de routine porte sa routine.
+        ...(advice.status === "PURCHASED" || advice.status === "DECLINED" ? { outcomeSource: "COUNTER_DECLARED" } : {}),
+        ...(kind === "ROUTINE" ? { routine: { key: "routine-demo-peau", title: "Routine peau", step: "Hydrater", index: 1, count: 3, stepLabel: "Hydrater", benefit: "Une peau protégée pendant le traitement." } } : {}),
         totalScore: advice.manual ? 0 : 55 + ((visit.index * 7 + position * 11) % 38),
         justification: advice.reason,
         shortReason: advice.reason,
@@ -392,6 +401,25 @@ async function writeHistory(context: HistoryContext): Promise<{ sales: number; r
         events.push({ id: randomUUID(), recommendationId, type: "PURCHASED", userId: memberId, createdAt: minutes(visit.at, 4) });
         purchased.push({ recommendationId, advice });
       }
+    }
+    // La vente terminée au comptoir : proposés, vendus, non vendus, sans réponse ; un bilan envoyé une fois sur trois.
+    const offered = visit.advice.filter((advice) => !advice.manual);
+    if (offered.length > 0) {
+      followUps.push({
+        id: randomUUID(),
+        pharmacyId,
+        prescriptionId,
+        closedAt: minutes(visit.at, 5),
+        closedPost: DEMO_POST.hostname,
+        proposedCount: offered.length,
+        soldCount: offered.filter((advice) => advice.status === "PURCHASED").length,
+        notSoldCount: offered.filter((advice) => advice.status === "DECLINED").length,
+        unansweredCount: offered.filter((advice) => advice.status !== "PURCHASED" && advice.status !== "DECLINED").length,
+        reportStatus: visit.index % 3 === 0 && offered.some((advice) => advice.status === "PURCHASED") ? "SENT" : "NONE",
+        reportSentAt: visit.index % 3 === 0 && offered.some((advice) => advice.status === "PURCHASED") ? minutes(visit.at, 5) : null,
+        createdAt: visit.at,
+        updatedAt: minutes(visit.at, 5),
+      });
     }
     for (const gap of visit.gaps) {
       opportunities.push({ id: randomUUID(), analysisRunId: runId, category: gap.category as never, title: gap.title, rationale: "Un besoin réel que le rayon n'a pas couvert.", priority: 55, ruleKey: gap.ruleKey, ruleVersion: "1.0", coverage: gap.cause, createdAt: seconds(visit.at, 26) });
@@ -423,6 +451,7 @@ async function writeHistory(context: HistoryContext): Promise<{ sales: number; r
   await insertAll(events, (batch) => prisma.recommendationEvent.createMany({ data: batch }));
   await insertAll(sales, (batch) => prisma.sale.createMany({ data: batch }));
   await insertAll(saleLines, (batch) => prisma.saleLine.createMany({ data: batch }));
+  await insertAll(followUps, (batch) => prisma.counterSaleFollowUp.createMany({ data: batch }));
   return { sales: sales.length, recommendations: recommendations.length };
 }
 
