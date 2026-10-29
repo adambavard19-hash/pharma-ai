@@ -89,7 +89,10 @@ section.crd-white.crd-white{background:#FFFFFF!important;border-radius:999px!imp
 section.crd-white.crd-white::before{display:none!important}
 section.crd-white.crd-white::after{content:"";position:absolute;inset:-60% -10%;z-index:-1;pointer-events:none;background:url(/poste/adn-helice.jpg) 62% 40%/cover no-repeat;mix-blend-mode:multiply;opacity:.42;animation:crd-adn 14s ease-in-out infinite alternate}
 @keyframes crd-adn{from{transform:translate3d(-6%,-3%,0) scale(1.05) rotate(-2deg)}to{transform:translate3d(6%,3%,0) scale(1.15) rotate(2deg)}}
-section.crd-light.crd-light{background:#EFF3F1!important;border-radius:22px!important;box-shadow:0 18px 40px -16px rgba(15,43,38,.45),0 0 0 1px rgba(15,47,42,.08)!important}
+section.crd-light.crd-light{background:#BDEBD7!important;border-radius:22px!important;box-shadow:0 0 0 1.5px #3DBF8E,0 18px 40px -14px rgba(14,124,90,.5)!important}
+.crd-frame.crd-frame{background:linear-gradient(160deg,#BDEBD7,#8FDDBE)!important}
+.crd-frame.crd-frame > div:first-child{mix-blend-mode:multiply;opacity:.75}
+.crd-pad.crd-pad{padding:11px!important}
 section.crd-light.crd-light::before{display:none!important}
 section.crd-glass.crd-glass{background:linear-gradient(180deg,#072A25 0%,#03171A 100%)!important;border-radius:22px!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 18px 40px -16px rgba(0,0,0,.6)!important}
 section.crd-glass.crd-glass::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;z-index:2;background:linear-gradient(110deg,rgba(95,165,148,.5),rgba(232,255,156,.75) 50%,rgba(95,165,148,.5));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}

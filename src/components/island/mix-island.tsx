@@ -174,11 +174,11 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
           contentKey="cartes"
           label="Conseils de la vente (cliquez sur un conseil pour l'ouvrir)"
         >
-          <div className="relative overflow-hidden rounded-[22px] bg-[#EFF3F1]">
+          <div className="relative overflow-hidden rounded-[22px] crd-frame bg-[#EFF3F1]">
             <div className="pointer-events-none absolute inset-0 isolate" aria-hidden="true">
               <HelixBackdrop position="contained" framing="app" lazy className="[&_canvas]:scale-[1.6]" />
             </div>
-            <div className="relative p-2">
+            <div className="crd-pad relative p-2">
               <div data-ile-cartes="" className="rounded-[18px] bg-white p-1.5 shadow-[0_12px_32px_-18px_rgba(15,43,38,0.55)]" style={{ color: L.ink }}>
                 {heads.map((head, row) => {
                   const advice = items[head];
@@ -849,11 +849,11 @@ function AdviceIsland({ item, width, sold, onClose, onCancelSold, alternatives, 
     // « crd-light » : blanc et arrondi dès la première image — sur le poste, la fenêtre montrait un rond noir le temps
     // que la fiche s'affiche (vidéo du 29 oct. 2026).
     <IslandShell width={width} tone="accent" className="crd-light" contentKey={`conseil-${item.name}`} label={`Conseil : ${item.name}`}>
-      <div data-ile-conseil="" className="relative overflow-hidden rounded-[22px] bg-[#EFF3F1]">
+      <div data-ile-conseil="" className="relative overflow-hidden rounded-[22px] crd-frame bg-[#EFF3F1]">
         <div className="pointer-events-none absolute inset-0 isolate" aria-hidden="true">
           <HelixBackdrop position="contained" framing="app" lazy className="[&_canvas]:scale-[1.6]" />
         </div>
-        <div className="relative p-2.5">
+        <div className="crd-pad relative p-2.5">
           <div data-ile-mix-carte="" className="space-y-2.5 rounded-[18px] bg-white p-3 text-left shadow-[0_12px_32px_-18px_rgba(15,43,38,0.55)]" style={{ color: L.ink }}>
             {/* La même présentation que la carte du conseil en ligne (fondateur, 29 oct. 2026 : « garde bien la même présentation ») :
                 la photo, « pour … », le nom et le prix en grand, puis la marge, le challenge et le stock en pastilles. */}
