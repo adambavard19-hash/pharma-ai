@@ -7,7 +7,7 @@ import { BANNER } from "../../../agent/src/banner-design";
 import { SHEET_MISSING, SHEET_PATIENT_LABELS, type CounterSheet, type CounterSheetLine } from "../../../agent/src/counter-sheet";
 import { Robot } from "@/components/robot";
 import { HelixBackdrop } from "@/components/app/helix/helix-backdrop";
-import { ScanCapsule, SCAN_CSS, SCAN_STEPS, WHITE_PILL_WIDTH, WhitePill, shortAdviceName, whiteFoundWidth, type ScanLook, type WhiteFound } from "./scan-capsule";
+import { GreenCross, ScanCapsule, SCAN_CSS, SCAN_STEPS, WHITE_PILL_WIDTH, WhitePill, shortAdviceName, whiteFoundWidth, type ScanLook, type WhiteFound } from "./scan-capsule";
 import { eurosOf, possibleMargin } from "./mix-island";
 import { analysisSteps, allAnswered, followAdviceLink, isTap, registerTap, splitAlert, STAGE_MOOD, STAGE_WIDTH, stageTitle, stageTone, type IslandOutcome, type IslandState } from "@/core/island/banner-flow";
 import { cn } from "@/lib/utils";
@@ -462,6 +462,30 @@ export function CounterIsland(props: CounterIslandProps) {
   } else if (grumpy) {
     body = (
       <Row robot={robot(30)} title="Doucement !" sub="Trop de clics d'un coup — je reprends dans 3 secondes." />
+    );
+  } else if (peek && whiteLook) {
+    // La petite bannière blanche ouverte (fondateur, 29 oct. 2026 : « le même visuel que la bannière à jour »).
+    body = (
+      <LightPanel>
+        <div className="px-3 pt-2.5 pb-3" data-ile-attente-ouverte="">
+          <div className="flex items-center gap-2.5">
+            <GreenCross lit={4} size={26} />
+            <div className="min-w-0 flex-1">
+              <p className="text-[12px] font-bold tracking-[0.2em] text-[#0F2B26] uppercase">
+                Pharma<span className="text-[#0E8A7B]">boost</span>
+              </p>
+              <p className="truncate text-[11.5px] text-[#5B6B66]">Je surveille le comptoir : scannez une boîte.</p>
+            </div>
+            {pills[0] && (
+              <span data-ile-poste-connecte="" className="flex shrink-0 items-center gap-1 rounded-full bg-[#E4F6EE] px-2 py-0.5 text-[10.5px] font-semibold text-[#0E7A4E]" title={`${pills[0].label} : ${pills[0].value}`}>
+                <span className="size-1.5 rounded-full bg-[#14A374]" />
+                {pills[0].label}
+              </span>
+            )}
+          </div>
+          {props.ask && <div className="mt-2.5">{props.ask}</div>}
+        </div>
+      </LightPanel>
     );
   } else if (peek) {
     body = (
@@ -1024,7 +1048,7 @@ export function CounterIsland(props: CounterIslandProps) {
       <IslandShell
         width={whiteLook && resting && !peek && !grumpy ? (hover ? 330 : WHITE_PILL_WIDTH) : whiteLook && scanCapsule ? (state.stage === "ready" ? whiteFoundWidth(whiteFound) : WHITE_PILL_WIDTH) : scanCapsule ? 340 : width}
         tone={tone}
-        className={whiteLook && ((resting && !peek && !grumpy) || scanCapsule) ? "crd-white" : scanCapsule ? "crd-glass crd-cap-in" : props.compactEnd && (state.stage === "email" || (state.stage === "done" && state.outcomes.some((outcome) => outcome === "SOLD"))) ? "crd-light" : undefined}
+        className={whiteLook && peek && !grumpy ? "crd-light" : whiteLook && ((resting && !peek && !grumpy) || scanCapsule) ? "crd-white" : scanCapsule ? "crd-glass crd-cap-in" : props.compactEnd && (state.stage === "email" || (state.stage === "done" && state.outcomes.some((outcome) => outcome === "SOLD"))) ? "crd-light" : undefined}
         contentKey={whiteLook && resting && !peek && !grumpy ? "attente-blanche" : scanCapsule ? "scan-capsule" : grumpy ? "grumpy" : peek ? "peek" : collapsed ? `${state.stage}-replie` : sleeping ? "advice-capsule" : compact ? "advice-compact" : state.stage}
         label="Bannière PharmaBoost du comptoir"
         onPointerEnter={() => {
