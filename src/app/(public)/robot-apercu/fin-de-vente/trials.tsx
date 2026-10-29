@@ -652,7 +652,7 @@ function NeonScan({ lit, found = false }: { lit: number; found?: boolean }) {
     <span className="neon neon-adn relative inline-flex h-10 items-center justify-center gap-2.5 overflow-hidden rounded-full bg-[#030504] px-4" style={{ width: PILL_WIDTH }}>
       <LimeCross lit={found ? 4 : lit} glow={found} />
       {found ? (
-        <span className="pop text-[11px] font-bold tracking-[0.2em] whitespace-nowrap text-[#E8FF9C] uppercase">2 conseils</span>
+        <span className="pop text-[11px] font-bold tracking-[0.2em] whitespace-nowrap text-[#E8FF9C] uppercase">Les 2 conseils</span>
       ) : (
         <span className="text-[11px] font-bold tracking-[0.14em] whitespace-nowrap text-white uppercase">Curacné 20 mg</span>
       )}
@@ -665,7 +665,7 @@ function NeonScan({ lit, found = false }: { lit: number; found?: boolean }) {
 const PLAY_STEPS = [
   { title: "En attente", text: "PharmaBoost attend le bip, sur l'ADN.", ms: 4000 },
   { title: "Scan", text: "La boîte est bipée : la croix s'allume bras par bras.", ms: 3200 },
-  { title: "C'est prêt", text: "Toute la croix s'allume : 2 conseils.", ms: 2600 },
+  { title: "C'est prêt", text: "Toute la croix s'allume : les 2 conseils.", ms: 2600 },
   { title: "Les cartes", text: "Les conseils de la vente, la routine dessous.", ms: 5000 },
   { title: "Carte ouverte", text: "« À dire au patient » et les questions.", ms: 6000 },
   { title: "Bipé", text: "Cicaplast Lèvres passé en caisse : « Vendu ».", ms: 4500 },

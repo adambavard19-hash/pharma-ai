@@ -2,7 +2,7 @@
 
 import { OVERSTOCK_LABEL } from "@/core/overstock/campaign";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Check, ChevronDown, ChevronLeft, ChevronRight, Hourglass, LifeBuoy, MessageCircle, Pill, Star } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Hourglass, LifeBuoy, MessageCircle, Pill, Star, X } from "lucide-react";
 import type { HelpAdvice } from "@/core/poste/island-bridge";
 import { BANNER } from "../../../agent/src/banner-design";
 import type { CounterSheetLine } from "../../../agent/src/counter-sheet";
@@ -212,15 +212,6 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                       {advice.margin && <span className="block text-[11px] font-semibold text-[#E8FF9C] tabular-nums">+{advice.margin}</span>}
                     </span>
                   </button>
-                  {active && (
-                    <CardDetail
-                      item={item}
-                      sold={sold(index)}
-                      onCancelSold={() => onAnswer(index, null)}
-                      alternatives={alternatives.slice(0, 2).map(({ i, pos }) => ({ item: items[i], go: () => go(pos) }))}
-                      help={help}
-                    />
-                  )}
                 </div>
               );
             })}
@@ -265,6 +256,18 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
             )}
           </div>
         </IslandShell>
+        {/* Le conseil ouvert, dans sa deuxième bannière blanche sur l'ADN, comme la routine (fondateur, 29 oct. 2026). */}
+        {open && (
+          <AdviceIsland
+            item={item}
+            width={width}
+            sold={sold(index)}
+            onClose={onClose}
+            onCancelSold={() => onAnswer(index, null)}
+            alternatives={alternatives.slice(0, 2).map(({ i, pos }) => ({ item: items[i], go: () => go(pos) }))}
+            help={help}
+          />
+        )}
         {/* La routine s'ouvre dans sa deuxième bannière, comme la version en ligne (fondateur, 29 oct. 2026 : « j'aurais voulu garder ça »). */}
         {routine && routineOpen && <RoutineIsland routine={routine.view} width={width} cards onClose={() => setRoutineOpen(false)} onPointerLeave={() => setRoutineOpen(false)} />}
       </>
@@ -798,125 +801,96 @@ function CardPhoto({ src }: { src?: string }) {
 }
 
 /**
- * Ce qui s'ouvre sous une carte (fondateur, 29 oct. 2026) : « À dire au patient », puis les questions — une réponse touchée dit
- * quoi faire et, parfois, mène à un produit plus précis du stock —, puis les autres possibilités en stock, à un clic.
+ * Le conseil ouvert dans sa deuxième bannière (fondateur, 29 oct. 2026 : « la page qui s'ouvre de la routine, avec le fond
+ * blanc et l'ADN, fais la même chose pour les conseils ») : la photo, le nom et le prix, « À dire au patient », les questions —
+ * une réponse mène à un autre produit du stock —, les autres possibilités en stock et l'aide.
  */
-function CardDetail({ item, sold, onCancelSold, alternatives, help }: { item: IslandAdvice; sold: boolean; onCancelSold: () => void; alternatives: { item: IslandAdvice; go: () => void }[]; help?: MixIslandProps["help"] }) {
+function AdviceIsland({ item, width, sold, onClose, onCancelSold, alternatives, help }: { item: IslandAdvice; width: number; sold: boolean; onClose?: () => void; onCancelSold: () => void; alternatives: { item: IslandAdvice; go: () => void }[]; help?: MixIslandProps["help"] }) {
   const [helping, setHelping] = useState(false);
   const tell = (item.sheet?.usage ?? []).slice(0, TELL_MAX).map((line) => line.text);
   const reason = item.sheet?.reasons[0] || item.reason;
   const said = tell.length > 0 ? tell : reason ? [reason] : [];
   const others = item.sheet?.alternatives ?? [];
   return (
-    <div data-ile-carte-detail="" className="crd-in mx-1 mt-1 mb-1.5 space-y-2 rounded-xl bg-white/[0.06] px-3 py-2.5 text-[12.5px] leading-5 text-white/85">
-      {sold && (
-        <p data-ile-mix-vendu="" className="flex items-center gap-2 font-bold text-[#E8FF9C]">
-          <Check className="size-4" strokeWidth={3} aria-hidden="true" />
-          <span className="flex-1">Vendu</span>
-          <button type="button" onClick={onCancelSold} className="text-[11px] font-semibold text-white/60 underline-offset-2 hover:underline">
-            Annuler
-          </button>
-        </p>
-      )}
-      <div>
-        <p className="mb-0.5 flex items-center gap-1.5 text-[10.5px] font-bold tracking-[0.1em] text-[#E8FF9C] uppercase">
-          <MessageCircle className="size-3" aria-hidden="true" /> À dire au patient
-        </p>
-        {said.length > 0 ? said.map((line) => <p key={line}>{line}</p>) : <p className="text-white/55">Voir la notice du produit.</p>}
-        {item.sheet?.description && <p className="mt-1 text-[11.5px] text-white/60">Posologie : {item.sheet.description}</p>}
-      </div>
-      <CardQuestions item={item} />
-      {(others.length > 0 || alternatives.length > 0) && (
-        <div data-ile-mix-alternative="">
-          <p className="mb-1 text-[10.5px] font-bold tracking-[0.1em] text-white/50 uppercase">Autre alternative en stock</p>
-          <div className="space-y-1">
-            {others.map((other) => (
-              <div key={other.name} className="flex items-center gap-2 rounded-lg border border-white/10 px-2.5 py-1.5">
-                <span className="min-w-0 flex-1 truncate font-semibold text-white">{other.name}</span>
-                {other.price && <span className="shrink-0 font-bold text-white tabular-nums">{other.price}</span>}
-                {other.margin && <span className="shrink-0 text-[11px] font-semibold text-[#E8FF9C] tabular-nums">+{other.margin}</span>}
+    <IslandShell width={width} tone="accent" contentKey={`conseil-${item.name}`} label={`Conseil : ${item.name}`}>
+      <div data-ile-conseil="" className="relative overflow-hidden rounded-[22px] bg-[#EFF3F1]">
+        <div className="pointer-events-none absolute inset-0 isolate" aria-hidden="true">
+          <HelixBackdrop position="contained" framing="app" lazy className="[&_canvas]:scale-[1.6]" />
+        </div>
+        <div className="relative p-2.5">
+          <div data-ile-mix-carte="" className="space-y-2.5 rounded-[18px] bg-white p-3 text-left shadow-[0_12px_32px_-18px_rgba(15,43,38,0.55)]" style={{ color: L.ink }}>
+            <div className="flex items-center gap-3">
+              {item.image && (
+                <span className="inline-flex size-[52px] shrink-0 items-center justify-center rounded-xl bg-white p-1 ring-1 ring-[#E3EBE8]">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- photo studio locale */}
+                  <img src={item.image} alt="" className="size-full object-contain" />
+                </span>
+              )}
+              <div className="min-w-0 flex-1">
+                {item.drug && <p className="text-[10px] font-bold tracking-[0.14em] uppercase" style={{ color: L.green }}>pour {item.drug}</p>}
+                <p className="text-[15px] leading-[19px] font-bold tracking-[-0.02em]">
+                  {item.sheet?.name || item.name}
+                  <span className="ml-2 whitespace-nowrap tabular-nums" style={{ color: L.green }}>{item.price && item.stock !== "UNKNOWN" ? item.price : "—"}</span>
+                </p>
               </div>
-            ))}
-            {alternatives.map(({ item: other, go }) => (
-              <button key={other.name} type="button" onClick={go} className="flex w-full items-center gap-2 rounded-lg border border-white/10 px-2.5 py-1.5 text-left hover:bg-white/[0.06]">
-                <span className="min-w-0 flex-1 truncate font-semibold text-white">{other.name}</span>
-                {other.price && other.stock !== "UNKNOWN" && <span className="shrink-0 font-bold text-white tabular-nums">{other.price}</span>}
-                <ChevronRight className="size-3.5 shrink-0 text-white/50" aria-hidden="true" />
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-      {help && (
-        <div>
-          <button type="button" onClick={() => setHelping((value) => !value)} className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-white/60 hover:text-white">
-            <LifeBuoy className="size-3.5" aria-hidden="true" /> Une question du patient ? Aide
-          </button>
-          {helping && (
-            <div className="mt-1.5">
-              <Help item={item} help={help} />
+              {onClose && (
+                <button type="button" onClick={onClose} aria-label="Fermer le conseil" className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-[#0F2F2A]/8 text-[#0F2F2A] hover:bg-[#0F2F2A]/15">
+                  <X className="size-4" aria-hidden="true" />
+                </button>
+              )}
             </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** Les questions en pastilles : la réponse touchée dit quoi proposer et, quand il y en a un, le produit plus précis du stock. */
-function CardQuestions({ item }: { item: IslandAdvice }) {
-  const ask = item.sheet?.ask ?? [];
-  const answers = (item.sheet?.answers ?? []).filter((answer) => !sendsToDoctor(answer));
-  const [picked, setPicked] = useState<Record<number, number>>({});
-  if (ask.length === 0) return null;
-  return (
-    <ol className="space-y-2">
-      {ask.map((question, q) => {
-        const choices = answers.filter((answer) => answer.ask === q);
-        const chosen = picked[q] !== undefined ? choices[picked[q]] : undefined;
-        return (
-          <li key={question} data-pitch-question="">
-            <p className="flex gap-2 font-semibold text-white">
-              <span className="mt-0.5 inline-flex size-4 shrink-0 items-center justify-center rounded-full bg-[#E8FF9C] text-[9.5px] font-bold text-[#04261A]">{q + 1}</span>
-              {question}
-            </p>
-            {choices.length > 0 && (
-              <div className="mt-1 ml-6 flex flex-wrap gap-1">
-                {choices.map((choice, n) => (
-                  <button
-                    key={choice.label}
-                    type="button"
-                    data-pitch-answer=""
-                    aria-pressed={picked[q] === n}
-                    onClick={() => setPicked((current) => {
-                      const next = { ...current };
-                      if (next[q] === n) delete next[q];
-                      else next[q] = n;
-                      return next;
-                    })}
-                    className={`h-6 rounded-full border px-2.5 text-[11.5px] font-semibold transition-colors ${picked[q] === n ? "border-[#E8FF9C] bg-[#E8FF9C] text-[#04261A]" : "border-white/20 text-white hover:border-white/40"}`}
-                  >
-                    {choice.label}
-                  </button>
-                ))}
+            {sold && (
+              <p data-ile-mix-vendu="" className="flex items-center gap-2 rounded-xl px-3 py-1.5 text-[12.5px] font-bold" style={{ background: L.soft }}>
+                <Check className="size-4" strokeWidth={3} style={{ color: L.green }} aria-hidden="true" />
+                <span className="flex-1">Vendu</span>
+                <button type="button" onClick={onCancelSold} className="text-[11px] font-semibold underline-offset-2 hover:underline" style={{ color: L.muted }}>Annuler</button>
+              </p>
+            )}
+            <div>
+              <p className="mb-0.5 flex items-center gap-1.5 text-[10px] font-bold tracking-[0.14em] uppercase" style={{ color: L.green }}>
+                <MessageCircle className="size-3" aria-hidden="true" /> À dire au patient
+              </p>
+              <div className="text-[12.5px] leading-[18px]">{said.length > 0 ? said.map((line) => <p key={line}>{line}</p>) : <p style={{ color: L.muted }}>Voir la notice du produit.</p>}</div>
+              {item.sheet?.description && <p className="mt-1 text-[11.5px]" style={{ color: L.muted }}>Posologie : {item.sheet.description}</p>}
+            </div>
+            {(item.sheet?.ask?.length ?? 0) > 0 && <Ask key={item.name} item={item} />}
+            {(others.length > 0 || alternatives.length > 0) && (
+              <div data-ile-mix-alternative="">
+                <p className="text-[10px] font-bold tracking-[0.14em] uppercase" style={{ color: L.muted }}>Autre alternative en stock</p>
+                <div className="mt-1 space-y-1">
+                  {others.map((other) => (
+                    <div key={other.name} className="flex items-center gap-2 rounded-xl border px-2.5 py-1.5" style={{ borderColor: "#E3EBE8" }}>
+                      <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold">{other.name}</span>
+                      {other.price && <span className="shrink-0 text-[12.5px] font-bold tabular-nums" style={{ color: L.green }}>{other.price}</span>}
+                      {other.margin && <span className="shrink-0 rounded-md border px-1.5 py-0.5 text-[9.5px] font-bold tabular-nums" style={{ borderColor: "#BDE5CF", background: "#EAF8F0", color: "#0E7A4E" }}>MARGE {other.margin}</span>}
+                    </div>
+                  ))}
+                  {alternatives.map(({ item: other, go }) => (
+                    <button key={other.name} type="button" onClick={go} className="flex w-full items-center gap-2 rounded-xl border px-2.5 py-1.5 text-left hover:bg-[#F6F9F8]" style={{ borderColor: "#E3EBE8" }}>
+                      <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold">{other.name}</span>
+                      {other.price && other.stock !== "UNKNOWN" && <span className="shrink-0 text-[12.5px] font-bold tabular-nums" style={{ color: L.green }}>{other.price}</span>}
+                      <ChevronRight className="size-3.5 shrink-0" style={{ color: L.muted }} aria-hidden="true" />
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
-            {chosen && (
-              <div data-pitch-then="" className="crd-in mt-1 ml-6 rounded-lg bg-white/[0.07] px-2.5 py-1.5 text-[12px] leading-[16px]">
-                <p>→ {chosen.say}</p>
-                {chosen.product && (
-                  <p data-pitch-product="" className="mt-1 flex flex-wrap items-center gap-x-2 font-semibold text-white">
-                    <span className="min-w-0 flex-1 truncate">{chosen.product.name}</span>
-                    {chosen.product.price && <span className="tabular-nums">{chosen.product.price}</span>}
-                    {chosen.product.margin && <span className="text-[11px] text-[#E8FF9C] tabular-nums">+{chosen.product.margin}</span>}
-                  </p>
+            {help && (
+              <div>
+                <button type="button" onClick={() => setHelping((value) => !value)} className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold hover:underline" style={{ color: L.muted }}>
+                  <LifeBuoy className="size-3.5" aria-hidden="true" /> Une question du patient ? Aide
+                </button>
+                {helping && (
+                  <div className="mt-1.5 rounded-xl bg-[#0F2F2A] p-2.5 text-white">
+                    <Help item={item} help={help} />
+                  </div>
                 )}
               </div>
             )}
-          </li>
-        );
-      })}
-    </ol>
+          </div>
+        </div>
+      </div>
+    </IslandShell>
   );
 }
 
