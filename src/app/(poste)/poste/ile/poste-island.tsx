@@ -596,6 +596,7 @@ export function PosteIsland() {
     // question part vers l'agent (ou, dans l'aperçu `?essai=demande`, vers le serveur local) et les conseils arrivent comme après un bip.
     ask: !greeting ? (
       <AskBox
+        light={scanLook === "blanc"}
         typed={demoTyped}
         open={asking}
         onOpen={() => setAsking(true)}
@@ -991,7 +992,7 @@ const ASK_EXAMPLES = ["Mal de gorge, adulte", "Diarrhée depuis hier", "Peau sè
  * Dans la capsule au repos (fondateur, 23 oct. 2026, essai A) : « Votre patient vous pose une question ? », puis un champ pour
  * écrire ce que le patient demande. Le clavier n'est pris qu'au clic.
  */
-function AskBox({ open, onOpen, onClose, onAsk, typed }: { open: boolean; onOpen: () => void; onClose: () => void; onAsk: (text: string) => void; typed?: string }) {
+function AskBox({ open, onOpen, onClose, onAsk, typed, light = false }: { open: boolean; onOpen: () => void; onClose: () => void; onAsk: (text: string) => void; typed?: string; /** Le visuel de la bannière blanche (fondateur, 29 oct. 2026). */ light?: boolean }) {
   const [text, setText] = useState("");
   const submit = (value: string) => {
     const clean = value.replace(/\s+/g, " ").trim();
@@ -1001,7 +1002,7 @@ function AskBox({ open, onOpen, onClose, onAsk, typed }: { open: boolean; onOpen
   };
   if (!open)
     return (
-      <button type="button" data-ile-demander="" data-ile-sans-deploiement="" onClick={onOpen} className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left transition-[filter] hover:brightness-105" style={{ background: "#E8FF9C", color: "#04261A" }}>
+      <button type="button" data-ile-demander="" data-ile-sans-deploiement="" onClick={onOpen} className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left transition-[filter] hover:brightness-105" style={light ? { background: "#0E8A7B", color: "#FFFFFF" } : { background: "#E8FF9C", color: "#04261A" }}>
         <span className="text-[14px] font-bold">Votre patient vous pose une question ?</span>
         <ArrowRight className="size-4 shrink-0" aria-hidden="true" />
       </button>
@@ -1014,23 +1015,23 @@ function AskBox({ open, onOpen, onClose, onAsk, typed }: { open: boolean; onOpen
         event.preventDefault();
         submit(text);
       }}
-      className="w-full rounded-2xl bg-white/[0.07] p-2.5 text-left"
+      className={light ? "w-full rounded-2xl bg-[#E4F6EE] p-2.5 text-left ring-1 ring-[#BFE6D4]" : "w-full rounded-2xl bg-white/[0.07] p-2.5 text-left"}
     >
-      <p className="text-[13px] font-bold text-white">Que demande le patient ?</p>
+      <p className={light ? "text-[13px] font-bold text-[#0F2B26]" : "text-[13px] font-bold text-white"}>Que demande le patient ?</p>
       <div className="mt-2 flex gap-1.5">
         {/* Le champ prend le clavier seulement parce que le pharmacien vient de cliquer pour écrire. */}
-        <input autoFocus={typed === undefined} value={typed ?? text} onChange={(event) => setText(event.target.value)} maxLength={300} placeholder="Ex. : mal de gorge, adulte" className="h-9 min-w-0 flex-1 rounded-lg bg-white px-3 text-[13px] text-[#0F2F2A] outline-none" />
-        <button type="submit" className="h-9 shrink-0 rounded-lg px-3 text-[12.5px] font-bold" style={{ background: "#E8FF9C", color: "#04261A" }}>
+        <input autoFocus={typed === undefined} value={typed ?? text} onChange={(event) => setText(event.target.value)} maxLength={300} placeholder="Ex. : mal de gorge, adulte" className={light ? "h-9 min-w-0 flex-1 rounded-full border border-[#CFE3DA] bg-white px-3 text-[13px] text-[#0F2F2A] outline-none focus:border-[#0E8A7B]" : "h-9 min-w-0 flex-1 rounded-lg bg-white px-3 text-[13px] text-[#0F2F2A] outline-none"} />
+        <button type="submit" className={light ? "h-9 shrink-0 rounded-full px-3.5 text-[12.5px] font-bold" : "h-9 shrink-0 rounded-lg px-3 text-[12.5px] font-bold"} style={light ? { background: "#0E8A7B", color: "#FFFFFF" } : { background: "#E8FF9C", color: "#04261A" }}>
           Chercher
         </button>
       </div>
       <div className="mt-2 flex flex-wrap gap-1">
         {ASK_EXAMPLES.map((example) => (
-          <button key={example} type="button" onClick={() => submit(example)} className="rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white/85 hover:bg-white/20">
+          <button key={example} type="button" onClick={() => submit(example)} className={light ? "rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-[#0F2B26] ring-1 ring-[#CFE3DA] hover:ring-[#0E8A7B]" : "rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white/85 hover:bg-white/20"}>
             {example}
           </button>
         ))}
-        <button type="button" onClick={onClose} className="ml-auto px-1 text-[11px] font-semibold text-white/60 hover:text-white">
+        <button type="button" onClick={onClose} className={light ? "ml-auto px-1 text-[11px] font-semibold text-[#5B6B66] hover:text-[#0F2B26]" : "ml-auto px-1 text-[11px] font-semibold text-white/60 hover:text-white"}>
           Fermer
         </button>
       </div>
