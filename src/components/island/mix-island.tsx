@@ -766,7 +766,8 @@ function Help({ item, help, light = false }: { item: IslandAdvice; help: NonNull
           </p>
         </div>
       ))}
-      <div className="flex gap-1.5" data-ile-sans-deploiement="">
+      <div className={light ? "flex items-center gap-2 rounded-full bg-[#F1FAF6] py-1 pr-1 pl-3 ring-1 ring-[#BFE6D4]" : "flex gap-1.5"} data-ile-sans-deploiement="">
+        {light && <MessageCircle className="size-4 shrink-0" style={{ color: L.green }} aria-hidden="true" />}
         <input
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
@@ -774,14 +775,14 @@ function Help({ item, help, light = false }: { item: IslandAdvice; help: NonNull
             if (event.key === "Enter") ask();
           }}
           maxLength={400}
-          placeholder="Ex. : peut-on le prendre enceinte ?"
-          className={light ? "h-9 min-w-0 flex-1 rounded-full border border-[#CFE3DA] bg-white px-3 text-[12.5px] text-[#0F2F2A] outline-none focus:border-[#0E8A7B]" : "h-8 min-w-0 flex-1 rounded-lg bg-white px-2.5 text-[12px] text-[#0F2F2A] outline-none"}
+          placeholder={light ? "Une question du patient ?" : "Ex. : peut-on le prendre enceinte ?"}
+          className={light ? "h-8 min-w-0 flex-1 bg-transparent text-[12.5px] text-[#0F2F2A] outline-none" : "h-8 min-w-0 flex-1 rounded-lg bg-white px-2.5 text-[12px] text-[#0F2F2A] outline-none"}
         />
-        <button type="button" onClick={ask} className={light ? "h-9 shrink-0 rounded-full px-3.5 text-[12px] font-bold text-white" : "h-8 shrink-0 rounded-lg px-2.5 text-[11.5px] font-bold"} style={light ? { background: L.green } : { background: C.accent, color: "#04261A" }}>
+        <button type="button" onClick={ask} className={light ? "h-8 shrink-0 rounded-full px-3 text-[12px] font-bold text-white" : "h-8 shrink-0 rounded-lg px-2.5 text-[11.5px] font-bold"} style={light ? { background: L.green } : { background: C.accent, color: "#04261A" }}>
           Demander
         </button>
       </div>
-      <p className="text-[10px]" style={{ color: light ? L.muted : C.inkSoft }}>Aide du modèle : vérifiez sur la notice ou le RCP avant de conseiller.</p>
+      {!light && <p className="text-[10px]" style={{ color: C.inkSoft }}>Aide du modèle : vérifiez sur la notice ou le RCP avant de conseiller.</p>}
     </div>
   );
 }
@@ -856,7 +857,6 @@ function Monogram({ name, size = 48 }: { name: string; size?: number }) {
  * une réponse mène à un autre produit du stock —, les autres possibilités en stock et l'aide.
  */
 function AdviceIsland({ item, width, sold, onClose, onCancelSold, alternatives, help }: { item: IslandAdvice; width: number; sold: boolean; onClose?: () => void; onCancelSold: () => void; alternatives: { item: IslandAdvice; go: () => void }[]; help?: MixIslandProps["help"] }) {
-  const [helping, setHelping] = useState(false);
   const tell = (item.sheet?.usage ?? []).slice(0, TELL_MAX).map((line) => line.text);
   const reason = item.sheet?.reasons[0] || item.reason;
   const said = tell.length > 0 ? tell : reason ? [reason] : [];
@@ -934,16 +934,10 @@ function AdviceIsland({ item, width, sold, onClose, onCancelSold, alternatives, 
                 </div>
               </div>
             )}
+            {/* L'Aide en une seule ligne, toujours là au bas de la fiche (fondateur, 29 oct. 2026, proposition D). */}
             {help && (
-              <div>
-                <button type="button" onClick={() => setHelping((value) => !value)} className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold hover:underline" style={{ color: L.muted }}>
-                  <LifeBuoy className="size-3.5" aria-hidden="true" /> Une question du patient ? Aide
-                </button>
-                {helping && (
-                  <div className="mt-1.5 rounded-xl bg-[#E4F6EE] p-2.5 ring-1 ring-[#BFE6D4]">
-                    <Help item={item} help={help} light />
-                  </div>
-                )}
+              <div className="border-t border-[#E3EBE8] pt-2.5">
+                <Help item={item} help={help} light />
               </div>
             )}
           </div>
