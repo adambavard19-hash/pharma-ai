@@ -7,7 +7,7 @@ import { greetingText } from "../../../agent/src/greeting-text";
  * l'île sans poste Windows (`/poste/ile?essai=1`, et l'aperçu `/robot-apercu/poste`). Aucune donnée réelle.
  */
 
-const ENTRY: HostEntry = {
+export const ESSAI_ENTRY: HostEntry = {
   id: "essai",
   reference: "ESSAI",
   label: "Médicament détecté",
@@ -76,7 +76,7 @@ const ENTRY: HostEntry = {
 };
 
 const ALERT_ENTRY: HostEntry = {
-  ...ENTRY,
+  ...ESSAI_ENTRY,
   id: "essai-garde",
   reference: "ESSAI-2",
   subject: "DOXYCYCLINE 100 mg",
@@ -92,18 +92,18 @@ const ALERT_ENTRY: HostEntry = {
  */
 export const QUESTION_TEXT = "Diarrhée depuis hier, adulte";
 export const QUESTION_ENTRY: HostEntry = {
-  ...ENTRY,
+  ...ESSAI_ENTRY,
   id: "essai-question",
   reference: "ESSAI-3",
   label: "Demande",
   subject: QUESTION_TEXT,
   signature: "essai-question-1",
   boxes: [],
-  items: [{ ...ENTRY.items[1], id: "essai-q1", drug: "", reason: "Diarrhée passagère de l'adulte", ...(ENTRY.items[1].sheet ? { sheet: { ...ENTRY.items[1].sheet, reasons: ["Diarrhée passagère de l'adulte"] } } : {}) }],
+  items: [{ ...ESSAI_ENTRY.items[1], id: "essai-q1", drug: "", reason: "Diarrhée passagère de l'adulte", ...(ESSAI_ENTRY.items[1].sheet ? { sheet: { ...ESSAI_ENTRY.items[1].sheet, reasons: ["Diarrhée passagère de l'adulte"] } } : {}) }],
 };
 
 /** Une vente d'exemple n'a pas de page dans PharmaBoost : ses cartes se lisent sans s'ouvrir. */
-export const isEssaiSale = (id: string) => id === ENTRY.id || id === ALERT_ENTRY.id || id === QUESTION_ENTRY.id;
+export const isEssaiSale = (id: string) => id === ESSAI_ENTRY.id || id === ALERT_ENTRY.id || id === QUESTION_ENTRY.id;
 
 export type TimedCommand = { at: number; command: HostCommand };
 
@@ -113,7 +113,7 @@ export const ESSAI_SEQUENCE: TimedCommand[] = [
   // Le bonjour du robot à l'ouverture de session (agent/src/greeting.ts), avec un prénom d'exemple ; il se range seul.
   { at: 600, command: { op: "greet", text: greetingText("Léa") } },
   { at: 12500, command: { op: "scan" } },
-  { at: 14200, command: { op: "show", entry: ENTRY } },
+  { at: 14200, command: { op: "show", entry: ESSAI_ENTRY } },
   // La bannière reste une minute : le temps d'ouvrir les cartes, les questions et la routine.
   { at: 74000, command: { op: "done", info: { id: "essai", title: "Vente terminée — résultats enregistrés", lines: ["1 vendu · 0 non vendu · 1 sans réponse", "✓ Bilan envoyé au patient."], badge: "3e conseil vendu aujourd'hui", warning: false } } },
   // « Qui a servi ce patient ? » tient l'écran de fin jusqu'à 8 s, puis la confirmation : la vente suivante vient après.

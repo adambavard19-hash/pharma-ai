@@ -163,8 +163,6 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
   const width = narrow ? (open ? 330 : 300) : open ? 400 : 400;
 
   if (cards) {
-    const unsold = order.filter((i) => !sold(i));
-    const total = possibleMargin(unsold.map((i) => items[i]));
     return (
       <>
         <style>{`${ROUTINE_CSS}\n${SCAN_CSS}\n${CARDS_CSS}`}</style>
@@ -243,8 +241,9 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
             {belowHead}
 
             {/* Plus de bouton « Terminer » (fondateur, 29 oct. 2026 : « tout se passe depuis le LGO ») : la vente se termine quand le
-                logiciel de gestion la valide. Comme l'essai 1 : la routine, qui s'ouvre sur place, puis ce que la vente peut rapporter. */}
-            {(routine || total > 0) && <div className="mx-1.5 my-1.5 h-px bg-white/10" />}
+                logiciel de gestion la valide. Comme l'essai 1 : la routine, qui s'ouvre sur place. Plus de « Jusqu'à … sur cette vente »
+                (fondateur, 29 oct. 2026). */}
+            {routine && <div className="mx-1.5 my-1.5 h-px bg-white/10" />}
             {routine && (
               <div data-ile-cartes-routine="">
                 <button type="button" onClick={() => setRoutineOpen((value) => !value)} className="flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left hover:bg-white/[0.05]">
@@ -280,11 +279,6 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                   </div>
                 )}
               </div>
-            )}
-            {total > 0 && (
-              <p className="mt-1.5 px-1.5 text-[12px] text-white/60">
-                Jusqu&apos;à <b className="text-[#E8FF9C] tabular-nums">{eurosOf(total)}</b> sur cette vente
-              </p>
             )}
           </div>
         </IslandShell>
