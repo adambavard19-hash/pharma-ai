@@ -25,6 +25,8 @@ export default async function LegalPage() {
       <p className="mt-3 text-[14.5px] leading-7 text-text-secondary">PharmaBoost est un logiciel d&apos;aide au conseil officinal destiné aux professionnels de la pharmacie. Il ne constitue pas un dispositif médical, ne réalise aucun diagnostic, ne prescrit aucun traitement et ne se substitue pas à l&apos;avis du pharmacien, qui reste seul décisionnaire de ce qui est proposé au patient.</p>
       <h2 className="mt-10 text-[20px] font-semibold text-text-primary">Propriété intellectuelle</h2>
       <p className="mt-3 text-[14.5px] leading-7 text-text-secondary">Le site, l&apos;application, leurs textes, règles de conseil et éléments graphiques sont la propriété de {legalName}. Les informations médicamenteuses proviennent de la Base de données publique des médicaments et des bases de l&apos;Assurance maladie, citées avec leur date de mise à jour dans l&apos;application.</p>
+      <h2 className="mt-10 text-[20px] font-semibold text-text-primary">Photos de produits</h2>
+      <p className="mt-3 text-[14.5px] leading-7 text-text-secondary">Une partie des photos de produits provient des bases ouvertes <a href="https://world.openfoodfacts.org" className="text-brand-700 hover:underline">Open Food Facts</a>, <a href="https://world.openbeautyfacts.org" className="text-brand-700 hover:underline">Open Beauty Facts</a> et <a href="https://world.openproductsfacts.org" className="text-brand-700 hover:underline">Open Products Facts</a>, sous licence Creative Commons CC BY-SA ; elles ont été détourées et posées sur un fond uni.</p>
     </article>
   );
 }
