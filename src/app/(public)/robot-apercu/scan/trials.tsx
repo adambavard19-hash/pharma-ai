@@ -29,10 +29,10 @@ const ROUTINE: IslandRoutine = {
 const STEPS = ["Boîte lue", "Contre-indications", "Votre stock", "Conseils"];
 const PHOTOS = [ITEMS[0].image, ITEMS[1].image, ...ROUTINE.steps.map((step) => step.image)].filter(Boolean) as string[];
 
-type Phase = "scan" | "analyse" | "found" | "banner";
+export type Phase = "scan" | "analyse" | "found" | "banner";
 
 /** Le temps d'un essai : 0,6 s de scan, quatre étapes de 0,55 s, 0,9 s pour « 2 conseils », puis la bannière 6 s. */
-function useScanLoop(run: number) {
+export function useScanLoop(run: number, loopMs = 11000) {
   const [phase, setPhase] = useState<Phase>("scan");
   const [done, setDone] = useState(0);
   useEffect(() => {
@@ -48,9 +48,9 @@ function useScanLoop(run: number) {
       at(offset + 3500, () => setPhase("found"));
       at(offset + 4500, () => setPhase("banner"));
     };
-    for (let loop = 0; loop < 20; loop += 1) play(loop * 11000);
+    for (let loop = 0; loop < 20; loop += 1) play(loop * loopMs);
     return () => timers.forEach(clearTimeout);
-  }, [run]);
+  }, [run, loopMs]);
   return { phase, done };
 }
 
@@ -79,6 +79,11 @@ const subtitle = (phase: Phase, done: number) => (phase === "scan" ? "Boîte sca
 /* ------------------------------------------------------------------ A · La croix de pharmacie */
 function CrossTrial({ phase, done }: { phase: Phase; done: number }) {
   if (phase === "banner") return <Banner enter="enter-unfold" />;
+  return <CrossScan phase={phase} done={done} />;
+}
+
+/** L'essai A, retenu (fondateur, 29 oct. 2026) : la capsule de la croix, seule. */
+export function CrossScan({ phase, done }: { phase: Phase; done: number }) {
   // Les quatre bras s'allument un par un avec les étapes, le cœur bat ; trouvé : toute la croix s'allume, comme une enseigne.
   const arms = [
     { x: 14, y: 2 },
@@ -145,6 +150,11 @@ function LaserTrial({ phase, done }: { phase: Phase; done: number }) {
 /* ------------------------------------------------------------------ C · La gélule */
 function PillTrial({ phase, done }: { phase: Phase; done: number }) {
   if (phase === "banner") return <Banner enter="enter-pill" />;
+  return <PillScan phase={phase} done={done} />;
+}
+
+/** L'essai C, retenu (fondateur, 29 oct. 2026) : la capsule de la gélule, seule. */
+export function PillScan({ phase, done }: { phase: Phase; done: number }) {
   const fill = phase === "found" ? 100 : phase === "analyse" ? Math.round((done / STEPS.length) * 100) : 6;
   return (
     <Capsule>
@@ -251,7 +261,7 @@ function TrialCard({ title, text, letter, Trial }: { title: string; text: string
   );
 }
 
-const TRIAL_CSS = `
+export const TRIAL_CSS = `
 .scan-screen{background:linear-gradient(180deg,#E9EEF0 0%,#F5F7F8 60%),#F5F7F8;box-shadow:inset 0 1px 0 #fff,inset 0 0 0 1px #DCE3E6}
 .scan-capsule{border-radius:22px;background:linear-gradient(180deg,#072A25 0%,#03171A 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 14px 34px -14px rgba(0,0,0,.55);animation:cap-in .45s cubic-bezier(.2,.9,.3,1.2) both;position:relative;overflow:hidden}
 @keyframes cap-in{from{opacity:0;transform:translateY(-14px) scale(.92)}to{opacity:1;transform:none}}
