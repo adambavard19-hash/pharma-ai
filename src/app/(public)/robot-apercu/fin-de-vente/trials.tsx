@@ -359,6 +359,125 @@ const MIXES: { key: string; title: string; text: string; View: () => ReactNode }
   { key: "M6", title: "Deux lignes", text: "Le nom, et « Comptoir 1 · connecté » dessous : on voit d'un coup d'œil que le poste est branché.", View: MixTwoLines },
 ];
 
+/* ================================================================== ÉTAPE 1, BASE M3 QUI S'OUVRE, ET SUITE */
+
+/** Ce qui apparaît à l'ouverture, partout pareil : « Scannez une boîte » et « Une question ? ». */
+function Opened({ tone = "#E8FF9C" }: { tone?: string }) {
+  return (
+    <>
+      <span className="text-in text-[12.5px] font-bold whitespace-nowrap text-white">Scannez une boîte</span>
+      <span className="text-in ml-1 rounded-full px-2.5 py-1 text-[11px] font-bold whitespace-nowrap text-[#04261A]" style={{ background: tone, animationDelay: "80ms" }}>Une question ?</span>
+    </>
+  );
+}
+
+/** Une capsule qui s'ouvre au survol : fermée, `closed` ; ouverte, la croix (ou `lead`) puis « Scannez une boîte ». */
+function useOver() {
+  const [over, setOver] = useState(false);
+  return { over, bind: { onMouseEnter: () => setOver(true), onMouseLeave: () => setOver(false) } };
+}
+
+/** BASE · M3 qui s'ouvre comme M5 : le signal citron et « PharmaBoost », la lumière lente ; au survol, l'île grandit. */
+function BaseM3() {
+  const { over, bind } = useOver();
+  return (
+    <span {...bind}>
+      <Island slow height={over ? 44 : 36} className="gap-2.5 px-4 transition-all duration-300">
+        <Signal bars={4} tone="#E8FF9C" />
+        {over ? <Opened /> : <Wordmark size={13.5} />}
+      </Island>
+    </span>
+  );
+}
+
+/** F1 · Verre fumé : la capsule transparente et floue, un liseré d'un pixel qui tourne très lentement. */
+function F1Smoked() {
+  const { over, bind } = useOver();
+  return (
+    <span {...bind} className="smoke-wrap relative inline-flex rounded-full p-px" style={{ height: over ? 44 : 36 }}>
+      <span className="relative inline-flex h-full items-center gap-2.5 rounded-full bg-[rgba(8,14,12,.72)] px-4 backdrop-blur-xl transition-all duration-300">
+        <Signal bars={4} tone="#E8FF9C" />
+        {over ? <Opened /> : <Wordmark size={13.5} />}
+      </span>
+    </span>
+  );
+}
+
+/** F2 · Aurore : une lueur verte et citron qui dérive lentement DANS la capsule, derrière le nom. */
+function F2Aurora() {
+  const { over, bind } = useOver();
+  return (
+    <span {...bind} className="relative inline-flex items-center gap-2.5 overflow-hidden rounded-full bg-[#050807] px-4 shadow-[0_10px_30px_-10px_rgba(0,0,0,.6),0_0_0_1px_rgba(232,255,156,.14)] transition-all duration-300" style={{ height: over ? 44 : 36 }}>
+      <span className="aurora absolute inset-0" aria-hidden="true" />
+      <span className="relative"><Signal bars={4} tone="#E8FF9C" /></span>
+      <span className="relative inline-flex items-center gap-2.5">{over ? <Opened /> : <Wordmark size={13.5} />}</span>
+    </span>
+  );
+}
+
+/** F3 · Néon fin : un contour citron qui respire, le nom en petites capitales espacées, le signal en points. */
+function F3Neon() {
+  const { over, bind } = useOver();
+  return (
+    <span {...bind} className="neon inline-flex items-center gap-3 rounded-full bg-[#030504] px-4 transition-all duration-300" style={{ height: over ? 44 : 36 }}>
+      <span className="flex items-center gap-[3px]" aria-hidden="true">
+        {[0, 1, 2].map((i) => <i key={i} className="dot block size-[5px] rounded-full bg-[#E8FF9C]" style={{ animationDelay: `${i * 0.2}s` }} />)}
+      </span>
+      {over ? <Opened /> : <span className="text-[11px] font-bold tracking-[0.32em] whitespace-nowrap text-white uppercase">Pharma<span className="text-[#E8FF9C]">boost</span></span>}
+    </span>
+  );
+}
+
+/** F4 · Holographique : un liseré irisé (vert, turquoise, citron, une pointe de violet), un reflet qui traverse le nom. */
+function F4Holo() {
+  const { over, bind } = useOver();
+  return (
+    <span {...bind} className="holo-border relative inline-flex rounded-full p-[1.5px] transition-all duration-300" style={{ height: over ? 44 : 36 }}>
+      <span className="relative inline-flex h-full items-center gap-2.5 overflow-hidden rounded-full bg-[#050807] px-4">
+        <Signal bars={4} tone="#7BE0D0" />
+        {over ? <Opened tone="#B8F5E6" /> : <span className="shine text-[13.5px] font-bold tracking-[-0.01em] whitespace-nowrap">PharmaBoost</span>}
+      </span>
+    </span>
+  );
+}
+
+/** F5 · Sobre, façon Apple : noir pur, aucun liseré, un seul point citron qui respire ; l'ouverture se fait en fondu. */
+function F5Pure() {
+  const { over, bind } = useOver();
+  return (
+    <span {...bind} className="inline-flex items-center gap-2.5 rounded-full bg-black px-4 shadow-[0_12px_32px_-12px_rgba(0,0,0,.7)] transition-all duration-500 ease-[cubic-bezier(.2,.9,.3,1)]" style={{ height: over ? 44 : 34 }}>
+      <span className="breathe size-[7px] rounded-full bg-[#E8FF9C] shadow-[0_0_10px_#E8FF9C]" aria-hidden="true" />
+      {over ? <Opened /> : <span className="text-[13px] font-semibold tracking-[-0.01em] whitespace-nowrap text-white/90">PharmaBoost</span>}
+    </span>
+  );
+}
+
+/** F6 · Le radar : un petit cercle balayé comme un radar, qui guette le prochain bip, à la place du signal. */
+function F6Radar() {
+  const { over, bind } = useOver();
+  return (
+    <span {...bind}>
+      <Island slow height={over ? 44 : 36} className="gap-2.5 px-3.5 transition-all duration-300">
+        <span className="relative inline-flex size-4 shrink-0 overflow-hidden rounded-full border border-[#E8FF9C]/40" aria-hidden="true">
+          <span className="radar absolute inset-0" />
+          <span className="absolute top-1/2 left-1/2 size-1 -translate-1/2 rounded-full bg-[#E8FF9C]" />
+        </span>
+        {over ? <Opened /> : <Wordmark size={13.5} />}
+      </Island>
+    </span>
+  );
+}
+
+const FUTURES: { key: string; title: string; text: string; View: () => ReactNode }[] = [
+  { key: "Base", title: "M3 qui s'ouvre", text: "La base retenue : le signal citron et « PharmaBoost », la lumière lente. Au survol, l'île grandit : « Scannez une boîte » et « Une question ? ».", View: BaseM3 },
+  { key: "F1", title: "Verre fumé", text: "La capsule devient transparente et floue, comme du verre fumé ; un liseré d'un pixel tourne très lentement. Très classe sur l'écran de LGPI.", View: F1Smoked },
+  { key: "F2", title: "Aurore", text: "Une lueur verte et citron dérive lentement à l'intérieur de la capsule, derrière le nom. Vivant, sans bouger le texte.", View: F2Aurora },
+  { key: "F3", title: "Néon fin", text: "Un contour citron qui respire, le nom en petites capitales très espacées, trois points à la place du signal. Futuriste.", View: F3Neon },
+  { key: "F4", title: "Holographique", text: "Un liseré irisé (vert, turquoise, citron, une pointe de violet) et un reflet qui traverse le nom de temps en temps.", View: F4Holo },
+  { key: "F5", title: "Sobre, façon Apple", text: "Noir pur, sans liseré, un seul point citron qui respire ; l'ouverture se fait lentement, en douceur. Le plus « luxe ».", View: F5Pure },
+  { key: "F6", title: "Le radar", text: "Comme la base, mais un petit radar qui balaie à la place du signal : il guette le prochain bip.", View: F6Radar },
+];
+
 /* ================================================================== LA FIN DE LA VENTE */
 
 /* ---------------------------------------- La vraie fin de vente du poste (fin 3), figée */
@@ -480,6 +599,19 @@ const PAGE_CSS = `
 @property --ang{syntax:"<angle>";inherits:false;initial-value:0deg}
 @keyframes glow-rot{to{--ang:360deg}}
 .glow-slow{animation-duration:9s}
+.text-in{animation:text-in .35s ease both}
+@keyframes text-in{from{opacity:0;filter:blur(4px);transform:translateX(-4px)}to{opacity:1;filter:none;transform:none}}
+.smoke-wrap{background:conic-gradient(from var(--ang,0deg),rgba(255,255,255,.08),rgba(232,255,156,.7) 15%,rgba(255,255,255,.08) 35%);animation:glow-rot 12s linear infinite;box-shadow:0 14px 34px -14px rgba(0,0,0,.55)}
+.aurora{background:radial-gradient(40% 120% at 20% 50%,rgba(61,220,132,.45),transparent 70%),radial-gradient(35% 120% at 80% 50%,rgba(232,255,156,.3),transparent 70%);filter:blur(6px);animation:aurora 7s ease-in-out infinite alternate}
+@keyframes aurora{from{transform:translateX(-18%)}to{transform:translateX(18%)}}
+.neon{box-shadow:0 0 0 1px rgba(232,255,156,.65),0 0 14px rgba(232,255,156,.25);animation:neon 3s ease-in-out infinite}
+@keyframes neon{0%,100%{box-shadow:0 0 0 1px rgba(232,255,156,.65),0 0 14px rgba(232,255,156,.25)}50%{box-shadow:0 0 0 1px rgba(232,255,156,.35),0 0 4px rgba(232,255,156,.1)}}
+.dot{animation:dot 1.4s ease-in-out infinite}
+@keyframes dot{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1)}}
+.holo-border{background:conic-gradient(from var(--ang,0deg),#3DDC84,#5FD3E8,#E8FF9C,#B79CFF,#3DDC84);animation:glow-rot 6s linear infinite;box-shadow:0 14px 34px -14px rgba(0,0,0,.6)}
+.shine{background:linear-gradient(100deg,#fff 40%,#E8FF9C 48%,#B8F5E6 52%,#fff 60%);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shine 4s ease-in-out infinite}
+@keyframes shine{from{background-position:100% 0}to{background-position:-100% 0}}
+.radar{background:conic-gradient(from 0deg,rgba(232,255,156,.7),transparent 30%);animation:spin 1.8s linear infinite}
 .breathe{animation:breathe 2.4s ease-in-out infinite}
 @keyframes breathe{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
 .idle-arm{animation:idle-arm 2.8s ease-in-out infinite}
@@ -499,7 +631,7 @@ const PAGE_CSS = `
 .confetti{position:absolute;left:50%;top:50%;pointer-events:none}
 .confetti i{position:absolute;width:6px;height:6px;margin:-3px;border-radius:2px;background:var(--c);opacity:0;animation:conf 1.1s cubic-bezier(.2,.8,.3,1) both}
 @keyframes conf{0%{opacity:1;transform:rotate(var(--a)) translateY(0)}100%{opacity:0;transform:rotate(var(--a)) translateY(calc(var(--d) * -1)) rotate(180deg)}}
-@media (prefers-reduced-motion:reduce){.eq,.ring-spin,.glow-border,.breathe,.idle-arm,.idle-laser,.pop,.bravo-in,.countdown,.gauge,.confetti i{animation:none}}
+@media (prefers-reduced-motion:reduce){.text-in,.smoke-wrap,.aurora,.neon,.dot,.holo-border,.shine,.radar,.eq,.ring-spin,.glow-border,.breathe,.idle-arm,.idle-laser,.pop,.bravo-in,.countdown,.gauge,.confetti i{animation:none}}
 `;
 
 export function SaleEndTrials() {
@@ -512,7 +644,24 @@ export function SaleEndTrials() {
           Chaque étape de la vraie bannière, figée : prenez le temps de tout regarder. Les cartes et la routine se cliquent. Vente d&apos;exemple (vrais produits du stock, photos studio).
         </p>
 
-        <h2 className="mt-8 text-[20px] font-bold text-[#0F2F2A]">Étape 1 : le mélange D3 + D5</h2>
+        <h2 className="mt-8 text-[20px] font-bold text-[#0F2F2A]">Étape 1 : la base (M3 qui s&apos;ouvre) et de nouvelles pistes</h2>
+        <p className="mt-1 max-w-3xl text-[14.5px] leading-7 text-[#4D6B64]">Toutes s&apos;ouvrent au survol, comme la M5 : passez la souris dessus.</p>
+        <div className="mt-4 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          {FUTURES.map((item) => (
+            <article key={item.key} className={`flex flex-col gap-3 rounded-2xl border bg-white p-5 ${item.key === "Base" ? "border-[#0E7C5A] ring-1 ring-[#0E7C5A]" : "border-[#DCE7E2]"}`}>
+              <div>
+                <p className="text-[12px] font-bold tracking-[0.12em] text-[#4D6B64] uppercase">{item.key === "Base" ? "La base retenue" : `Proposition ${item.key}`}</p>
+                <h3 className="text-[17px] font-bold text-[#0F2F2A]">{item.title}</h3>
+                <p className="mt-1 text-[13px] leading-6 text-[#4D6B64]">{item.text}</p>
+              </div>
+              <Screen>
+                <item.View />
+              </Screen>
+            </article>
+          ))}
+        </div>
+
+        <h2 className="mt-12 text-[20px] font-bold text-[#0F2F2A]">Étape 1 : le mélange D3 + D5</h2>
         <p className="mt-1 max-w-3xl text-[14.5px] leading-7 text-[#4D6B64]">La capsule noire très fine et le signal de la D3, la lumière qui fait le tour et « PharmaBoost » de la D5. Passez la souris sur M5.</p>
         <div className="mt-4 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
           {MIXES.map((item) => (
