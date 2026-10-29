@@ -9,7 +9,7 @@ import { BURST_PIECES, CounterIsland, type IslandAdvice } from "@/components/isl
 import { STAGE_WIDTH } from "@/core/island/banner-flow";
 import { IslandShell, ISLAND_CSS } from "@/components/island/island-shell";
 import { IslandQuestions } from "@/components/island/island-questions";
-import { MixIsland, type HelpExchange } from "@/components/island/mix-island";
+import { MixIsland, type HelpExchange, type ReduceStyle } from "@/components/island/mix-island";
 import { Robot } from "@/components/robot";
 import {
   adviceLink,
@@ -555,6 +555,13 @@ export function PosteIsland() {
     const value = params.get("variante");
     return params.has("essai") && value && /^[a-f]$/.test(value) ? value : null;
   }, () => null);
+  // Réduire la bannière à tout moment (fondateur, 29 oct. 2026) : le bouton « – Réduire » (A) retenu et mis en ligne ; les autres
+  // façons restent en essai (`?essai=1&reduire=b…e`, /robot-apercu/reduire).
+  const reduce = useSyncExternalStore(noSubscribe, () => {
+    const params = new URLSearchParams(window.location.search);
+    const value = params.get("reduire");
+    return params.has("essai") && value && /^[a-e]$/.test(value) ? (value as ReduceStyle) : "a";
+  }, () => "a" as const);
   const everyAdvice = useSyncExternalStore(noSubscribe, () => new URLSearchParams(window.location.search).has("tous-les-conseils"), () => false);
 
   // « C'est un autre client ? » : la dernière boîte est arrivée plus de 30 secondes après la précédente (le serveur la marque).
@@ -752,6 +759,7 @@ export function PosteIsland() {
             everyAdvice={everyAdvice}
             cards={cards}
             enterFrom={scanLook ?? undefined}
+            reduce={reduce ?? undefined}
             help={{
               log: helpLog.sale === entry.id ? helpLog.log : [],
               onAsk: (question, advice) => {

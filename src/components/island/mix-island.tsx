@@ -2,7 +2,7 @@
 
 import { OVERSTOCK_LABEL } from "@/core/overstock/campaign";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Check, ChevronDown, ChevronLeft, ChevronRight, Hourglass, LifeBuoy, MessageCircle, Pill, Star, X } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Hourglass, LifeBuoy, MessageCircle, Minus, Pill, Star, X } from "lucide-react";
 import type { HelpAdvice } from "@/core/poste/island-bridge";
 import { BANNER } from "../../../agent/src/banner-design";
 import type { CounterSheetLine } from "../../../agent/src/counter-sheet";
@@ -14,7 +14,7 @@ import { IslandShell } from "./island-shell";
 import { HelixBackdrop } from "@/components/app/helix/helix-backdrop";
 import { islandTheme, MIX_PAPER, PHARMABOOST_GREEN } from "./island-theme";
 import { ROUTINE_CSS, RoutineIsland, RoutineThumbs, type IslandRoutine } from "./routine-island";
-import { SCAN_CSS, type ScanLook } from "./scan-capsule";
+import { GreenCross, SCAN_CSS, WHITE_PILL_WIDTH, WhitePill, shortAdviceName, whiteFoundWidth, type ScanLook } from "./scan-capsule";
 
 /**
  * La bannière « mix » du poste (fondateur, 19 oct. 2026, maquette 5 choisie) : le haut reste toujours à l'écran — le meilleur
@@ -127,12 +127,19 @@ export type MixIslandProps = {
   cards?: boolean;
   /** Le scan qui précède (la croix ou la gélule) : la bannière en cartes entre comme dans l'essai. */
   enterFrom?: ScanLook;
+  /**
+   * Réduire la bannière à tout moment, même en plein conseil (fondateur, 29 oct. 2026 : « elle peut gêner le pharmacien par
+   * rapport au LGO »), en essai : la façon de réduire (A à E, /robot-apercu/reduire). Le visuel seul : la vente continue.
+   */
+  reduce?: ReduceStyle;
 };
+
+export type ReduceStyle = "a" | "b" | "c" | "d" | "e";
 
 /** Une question à l'aide et sa réponse (vide tant qu'elle n'est pas arrivée). */
 export type HelpExchange = { advice: string; question: string; answer: string; error?: string };
 
-export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, onOpen, onClose, onFinish, onAnswer, boxes = [], help, startAt, everyAdvice = false, routineChip, routineBeside, headAside, belowHead, cards = false, enterFrom }: MixIslandProps) {
+export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, onOpen, onClose, onFinish, onAnswer, boxes = [], help, startAt, everyAdvice = false, routineChip, routineBeside, headAside, belowHead, cards = false, enterFrom, reduce }: MixIslandProps) {
   const challengedBoxes = boxes.filter((box) => box.challenge);
   // La routine (fondateur, 28 oct. 2026, essai « C » qui clignote) : ses étapes quittent la liste des conseils ; leurs photos
   // clignotent à droite de la petite bannière et, au survol, la routine s'ouvre dans une deuxième bannière.
@@ -162,6 +169,91 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
   };
   const width = narrow ? (open ? 330 : 300) : open ? 400 : 400;
 
+  // La bannière réduite : la petite bannière blanche (« pill »), ou la croix seule (« dot »). Elle se rouvre d'un clic ; la vente,
+  // elle, continue (rien n'est vendu ni refusé en réduisant).
+  const [reduced, setReduced] = useState<null | "pill" | "dot">(null);
+  const [over, setOver] = useState(false);
+  const reduceTo = (to: "pill" | "dot") => {
+    setRoutineOpen(false);
+    if (open && onClose) onClose();
+    setReduced(to);
+  };
+  // D : la bannière se réduit seule 8 secondes après que la souris l'a quittée, et se rouvre au survol.
+  useEffect(() => {
+    if (reduce !== "d" || reduced || over) return;
+    const id = setTimeout(() => reduceTo("pill"), 8000);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reduceTo ne dépend que de l'état courant
+  }, [reduce, reduced, over]);
+
+  if (cards && reduce && reduced) {
+    const count = heads.length + (routine ? 1 : 0);
+    const reopen = () => setReduced(null);
+    if (reduced === "dot") {
+      return (
+        <>
+          <style>{`${SCAN_CSS}\n${CARDS_CSS}`}</style>
+          <IslandShell width={52} tone="accent" className="crd-white" contentKey="reduite-croix" label="Bannière réduite (cliquez pour rouvrir)">
+            <button type="button" data-ile-reduite="croix" onClick={reopen} title="Rouvrir les conseils" className="relative flex size-[52px] items-center justify-center">
+              <GreenCross lit={4} size={26} />
+              <span className="absolute top-1 right-1 flex size-[17px] items-center justify-center rounded-full bg-[#0E8A7B] text-[10px] font-extrabold text-white ring-2 ring-white">{count}</span>
+            </button>
+          </IslandShell>
+        </>
+      );
+    }
+    if (reduce === "b") {
+      const found = heads.map((head) => ({ name: shortAdviceName(items[head].name), challenge: items[head].challenge, shortDate: Boolean(items[head].shortDate) }));
+      return (
+        <>
+          <style>{`${SCAN_CSS}\n${CARDS_CSS}`}</style>
+          <IslandShell width={whiteFoundWidth(found) + 26} tone="accent" className="crd-white" contentKey="reduite-noms" label="Bannière réduite (cliquez pour rouvrir)">
+            <button type="button" data-ile-reduite="noms" onClick={reopen} title="Rouvrir les conseils" className="flex w-full items-center pr-3">
+              <span className="min-w-0 flex-1"><WhitePill phase="found" found={found} /></span>
+              <ChevronDown className="size-4 shrink-0 text-[#0E8A7B]" aria-hidden="true" />
+            </button>
+          </IslandShell>
+        </>
+      );
+    }
+    return (
+      <>
+        <style>{`${SCAN_CSS}\n${CARDS_CSS}`}</style>
+        <IslandShell width={WHITE_PILL_WIDTH + 44} tone="accent" className="crd-white" contentKey="reduite-pastille" label="Bannière réduite (cliquez pour rouvrir)" onPointerEnter={reduce === "d" ? () => { setOver(true); reopen(); } : undefined}>
+          <button type="button" data-ile-reduite="pastille" onClick={reopen} title="Rouvrir les conseils" className="flex h-10 w-full items-center justify-center gap-2.5 px-4">
+            <GreenCross lit={4} />
+            <span className="text-[11px] font-bold tracking-[0.22em] whitespace-nowrap text-[#0F2B26] uppercase">
+              Pharma<span className="text-[#0E8A7B]">boost</span>
+            </span>
+            <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#0E8A7B] px-1 text-[10.5px] font-extrabold text-white">{count}</span>
+            <ChevronDown className="size-4 text-[#0E8A7B]" aria-hidden="true" />
+          </button>
+        </IslandShell>
+      </>
+    );
+  }
+
+  // Le haut de la bannière en essai : la croix et PHARMABOOST à gauche, les boutons pour réduire à droite, dans le cadre menthe.
+  const reduceBar = reduce && reduce !== "b" && (
+    <div data-ile-reduire-barre="" className="flex h-7 items-center gap-1.5 px-1.5 pb-1">
+      <GreenCross lit={4} size={15} />
+      <span className="text-[9.5px] font-bold tracking-[0.2em] text-[#0F2B26] uppercase">
+        Pharma<span className="text-[#0E8A7B]">boost</span>
+      </span>
+      {reduce === "d" && <span className="ml-1 text-[10px] font-medium text-[#0F2B26]/55">se réduit seule</span>}
+      <span className="flex-1" />
+      <button type="button" data-ile-reduire="" onClick={() => reduceTo(reduce === "e" ? "dot" : "pill")} title="Réduire la bannière" aria-label="Réduire la bannière" className="inline-flex h-6 items-center gap-1 rounded-full bg-white/85 px-2 text-[10.5px] font-bold text-[#0E7A4E] shadow-sm ring-1 ring-[#0E8A7B]/25 hover:bg-white">
+        <Minus className="size-3.5" strokeWidth={3} />
+        {reduce !== "e" && reduce !== "c" && "Réduire"}
+      </button>
+      {reduce === "c" && (
+        <button type="button" data-ile-masquer="" onClick={() => reduceTo("dot")} title="Ne garder que la croix" aria-label="Ne garder que la croix" className="inline-flex size-6 items-center justify-center rounded-full bg-white/85 text-[#0E7A4E] shadow-sm ring-1 ring-[#0E8A7B]/25 hover:bg-white">
+          <X className="size-3.5" strokeWidth={3} />
+        </button>
+      )}
+    </div>
+  );
+
   if (cards) {
     return (
       <>
@@ -173,12 +265,15 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
           className={`crd-light${enterFrom ? ` crd-enter-${enterFrom}` : ""}`}
           contentKey="cartes"
           label="Conseils de la vente (cliquez sur un conseil pour l'ouvrir)"
+          onPointerEnter={reduce === "d" ? () => setOver(true) : undefined}
+          onPointerLeave={reduce === "d" ? () => setOver(false) : undefined}
         >
           <div className="relative overflow-hidden rounded-[22px] crd-frame bg-[#EFF3F1]">
             <div className="pointer-events-none absolute inset-0 isolate" aria-hidden="true">
               <HelixBackdrop position="contained" framing="app" lazy className="[&_canvas]:scale-[1.6]" />
             </div>
             <div className="crd-pad relative p-2">
+              {reduceBar}
               <div data-ile-cartes="" className="rounded-[18px] bg-white p-1.5 shadow-[0_12px_32px_-18px_rgba(15,43,38,0.55)]" style={{ color: L.ink }}>
                 {heads.map((head, row) => {
                   const advice = items[head];
@@ -277,6 +372,11 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                   </div>
                 )}
               </div>
+              {reduce === "b" && (
+                <button type="button" data-ile-reduire="" onClick={() => reduceTo("pill")} title="Réduire la bannière" aria-label="Réduire la bannière" className="mx-auto mt-1 -mb-1 flex h-5 items-center gap-1 rounded-full px-3 text-[10px] font-bold tracking-[0.08em] text-[#0E5C45] uppercase hover:bg-white/50">
+                  <ChevronUp className="size-3.5" strokeWidth={3} /> Réduire
+                </button>
+              )}
             </div>
           </div>
         </IslandShell>
