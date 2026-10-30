@@ -30,6 +30,7 @@ vi.mock("@/components/island/app-island", async () => {
   const { useRobotInBrowser } = await import("@/components/robot/robot-presence");
   return { AppIsland: () => createElement("div", null, useRobotInBrowser() ? "ILE-DE-L-ESPACE AVEC-ROBOT" : "ILE-DE-L-ESPACE SANS-ROBOT") };
 });
+vi.mock("@/components/app/demo-view-switch", () => ({ DemoViewSwitch: () => null }));
 vi.mock("@/components/robot/app-companion", () => ({ AppRobotCompanion: () => createElement("div", null, "ROBOT-DU-COIN") }));
 vi.mock("@/components/app/topbar", () => ({
   Topbar: ({ island }: { island?: ReactNode }) => createElement("header", null, island ?? "BANNIERE-SANS-ILE"),
