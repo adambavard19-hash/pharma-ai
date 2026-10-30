@@ -10,6 +10,8 @@ const NAV = [
   // « Suivi pharmaceutique » retiré du menu (fondateur, 21 oct. 2026) : la section reste sur l'accueil.
   // « Stock et marge » retiré du menu (fondateur, 20 oct. 2026) : la section reste sur l'accueil.
   { href: "/decouvrir/pourquoi", label: "Pourquoi" },
+  // Le film « PharmaBoost en bref », sorti de l'accueil dans son propre onglet (fondateur, 30 oct. 2026).
+  { href: "/decouvrir/video-explication", label: "Vidéo d'explication" },
   { href: "/decouvrir#tarif", label: "Offre" },
   // L'appli des patients et les partenaires (laboratoires, marques), dans le menu principal (fondateur, 22 oct. 2026).
   { href: "/decouvrir/application", label: "Appli" },
@@ -110,6 +112,7 @@ export function SiteFooter({ contactEmail }: { contactEmail: string }) {
         <ul className="space-y-2 text-[13.5px]">
           {[
             { href: "/decouvrir/pourquoi", label: "Pourquoi PharmaBoost" },
+            { href: "/decouvrir/video-explication", label: "Vidéo d'explication" },
             { href: "/decouvrir/application", label: "L'appli PharmaBoost" },
             { href: "/decouvrir/partenaires", label: "Partenaires" },
             { href: "/decouvrir/affiliation", label: "Affiliation" },

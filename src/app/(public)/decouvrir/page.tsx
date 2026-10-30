@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Check } from "lucide-react";
 import { fr, Kicker, SectionHead } from "./_components/site-shell";
-import { VideoButton } from "./_components/video-dialog";
 import { AutoVideo } from "./_components/auto-video";
 import { AppPhoneVisual } from "./_components/app-visual";
 import { loadLiveProof } from "@/server/services/site-leads";
@@ -145,15 +144,10 @@ export default async function SitePage() {
       {/* ---- 2. Qu'est-ce que PharmaBoost ? ---------------------------- */}
       <section id="banniere" className="scroll-mt-20 border-t border-border-subtle bg-surface-card">
         <div className="mx-auto max-w-6xl px-5 py-20 md:py-28">
-          <Reveal>
-            <SectionHead title="PharmaBoost en trois étapes." center />
-          </Reveal>
-          <div className="mt-8 flex justify-center">
-            <VideoButton film="enBref" label="Voir PharmaBoost en vidéo" />
-          </div>
+          {/* Sans titre ni bouton vidéo (fondateur, 30 oct. 2026) : le film est dans l'onglet « Vidéo d'explication ». */}
           {/* La bannière d'aujourd'hui, deux conseils, la routine, le challenge et la date courte : petite, puis ouverte, sur un
               fond noir d'écran Windows (fondateur, 28 oct. 2026). */}
-          <div className="mx-auto mt-12 max-w-[1100px]">
+          <div className="mx-auto max-w-[1100px]">
             <BannerSteps />
           </div>
           <p className="mt-8 text-center text-[13px] text-text-tertiary">La bannière PharmaBoost, reproduite pour le site : au scan, puis ouverte. Médicaments, produits et prix : exemples.</p>
