@@ -89,6 +89,34 @@ export function LiveCards({ items, startOpen, initialPanel }: { items: IslandAdv
   );
 }
 
+/**
+ * 5 · Le bilan complet, sur l'appli du patient (fondateur, 30 oct. 2026 : « le bilan complet sur l'application ») : la même vente
+ * d'exemple — ses médicaments, les conseils pris et la routine, avec le moment de chaque prise et le rappel de fin de cure.
+ */
+function AppBilan({ brand }: { brand: string }) {
+  const line = (name: string, why: string, when: string, advice = false) => (
+    <li key={name} className="py-2 first:pt-0 last:pb-0">
+      <p className={advice ? "text-[13px] font-semibold text-brand-800" : "font-mono text-[12.5px] font-semibold text-text-primary"}>{name}</p>
+      <p className="text-[11.5px] text-text-secondary">{why}</p>
+      <span className="mt-1 inline-block rounded-md bg-brand-50 px-2 py-0.5 text-[11px] text-brand-900">{when}</span>
+    </li>
+  );
+  return (
+    <div className="w-full max-w-[300px] rounded-[30px] border-[6px] border-ink-900 bg-surface-card p-3.5 shadow-xl">
+      <p className="text-center text-[10px] font-bold tracking-[0.14em] text-brand-700 uppercase">{brand} · votre pharmacie</p>
+      <p className="mt-1 text-center text-[15px] font-bold text-text-primary">Votre bilan conseil</p>
+      <ul className="mt-2.5 divide-y divide-border-subtle">
+        {line("CURACNÉ 20 mg", "Votre traitement", "Selon l'ordonnance")}
+        {line("Cicaplast Lèvres", "Conseil : répare les lèvres sèches", "Plusieurs fois par jour", true)}
+        {line("IMODIUM 2 mg", "Votre traitement", "Selon l'ordonnance")}
+        {line("Lactibiane Imedia", "Conseil : aide la flore à se remettre", "Une fois par jour", true)}
+        {line("Routine peau · 3 produits", "Nettoyer, hydrater, protéger", "Matin et soir", true)}
+      </ul>
+      <div className="mt-2.5 rounded-xl bg-brand-600 px-3 py-2 text-[11.5px] font-medium text-white">Rappel 7 jours avant la fin de la cure</div>
+    </div>
+  );
+}
+
 export function BannerSteps({ entry = ESSAI_ENTRY, brand = "PharmaBoost" }: { entry?: Pick<HostEntry, "items">; brand?: string }) {
   const items = entryItems(entry);
   const found = items.filter((item) => !item.sheet?.routine).map((item) => ({ name: shortAdviceName(item.name), challenge: item.challenge, shortDate: Boolean(item.shortDate) }));
@@ -130,6 +158,14 @@ export function BannerSteps({ entry = ESSAI_ENTRY, brand = "PharmaBoost" }: { en
         chips={[{ label: "Étape par étape", tone: "#E4DDFF" }, { label: "Prix et marge", tone: "#FFE58A" }]}
       >
         <LiveCards items={items} initialPanel="routine" />
+      </Moment>
+      <Moment
+        n={5}
+        title="Le bilan complet, sur l'application"
+        text="Le patient retrouve tout dans l'appli : ses médicaments, les conseils pris, la routine, quand les prendre, et un rappel avant la fin de la cure."
+        chips={[{ label: "Médicaments", tone: "#DDF3EC" }, { label: "Conseils", tone: "#DDF3EC" }, { label: "Rappel", tone: "#FFE58A" }]}
+      >
+        <AppBilan brand={brand} />
       </Moment>
     </div>
   );
