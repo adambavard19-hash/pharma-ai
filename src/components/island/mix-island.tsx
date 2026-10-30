@@ -257,12 +257,15 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
   );
 
   if (cards) {
+    // Plus étroite sur l'écran du logiciel (fondateur, 30 oct. 2026 : « trop large, prend trop d'espace ») : même police, même
+    // taille d'écriture, 340 px au lieu de 400.
+    const cardsWidth = narrow ? 300 : 340;
     return (
       <>
         <style>{`${ROUTINE_CSS}\n${SCAN_CSS}\n${CARDS_CSS}`}</style>
         {/* Fond blanc sur l'ADN, comme la routine et le conseil ouverts (fondateur, 29 oct. 2026 : « le fond blanc sur toutes les bannières »). */}
         <IslandShell
-          width={width}
+          width={cardsWidth}
           tone="accent"
           className={`crd-light${enterFrom ? ` crd-enter-${enterFrom}` : ""}`}
           contentKey="cartes"
@@ -299,7 +302,8 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                         <span className="min-w-0 flex-1">
                           {/* Le nom entier sur deux lignes au plus, jamais coupé à côté de la coche « Vendu » (fondateur, 29 oct. 2026). */}
                           <span className="flex items-start gap-1.5 text-[15.5px] leading-[20px] font-bold">
-                            <span className="line-clamp-2">{advice.name}</span>
+                            {/* Trois lignes au plus depuis la bannière plus étroite (30 oct. 2026) : le nom reste entier. */}
+                            <span className="line-clamp-3">{advice.name}</span>
                             {sold(head) && <Check className="mt-0.5 size-3.5 shrink-0" strokeWidth={3} style={{ color: L.green }} aria-label="Vendu" />}
                           </span>
                           {advice.drug && <span className="block truncate text-[11.5px]" style={{ color: L.muted }}>pour {advice.drug}</span>}
@@ -324,17 +328,17 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                   );
                 })}
 
+                {/* La boîte scannée en challenge, en pastille comme la marge et le stock (fondateur, 30 oct. 2026 : « juste le nom du
+                    produit, l'étoile, le challenge et 1 € par boîte ») : sans le nom de l'opération du laboratoire. */}
                 {challengedBoxes.length > 0 && (
-                  <div data-ile-challenge="" className="mx-1.5 mt-1 flex items-start gap-1.5 rounded-lg bg-[#FFF6DD] px-2.5 py-1.5 text-[11.5px] leading-[15px] font-semibold text-[#8A5A00]">
-                    <Star className="mt-px size-3 shrink-0 fill-current" aria-hidden="true" />
-                    <span className="min-w-0 flex-1">
-                      {challengedBoxes.map((box) => (
-                        <span key={box.id} className="block">
-                          {/^challenge\b/i.test(box.challenge ?? "") ? box.challenge : `Challenge ${box.challenge}`} : {box.name}
-                          {box.reward ? <span data-ile-challenge-gain=""> · {box.reward}</span> : null}
-                        </span>
-                      ))}
-                    </span>
+                  <div data-ile-challenge="" className="mx-1.5 mt-1 flex flex-wrap gap-1">
+                    {challengedBoxes.map((box) => (
+                      <span key={box.id} className="inline-flex items-center gap-1 rounded-full bg-[#EEFFC2] px-2 py-0.5 text-[11px] font-semibold text-[#3F5A00]">
+                        <Star className="size-3 shrink-0 fill-current" aria-hidden="true" />
+                        {T.challenge} · {box.name}
+                        {box.reward ? <span data-ile-challenge-gain=""> · {box.reward}</span> : null}
+                      </span>
+                    ))}
                   </div>
                 )}
 
@@ -386,7 +390,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
         {open && !routineOpen && (
           <AdviceIsland
             item={item}
-            width={width}
+            width={cardsWidth}
             sold={sold(index)}
             onClose={onClose}
             onCancelSold={() => onAnswer(index, null)}
@@ -395,7 +399,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
           />
         )}
         {/* La routine s'ouvre dans sa deuxième bannière, comme la version en ligne (fondateur, 29 oct. 2026 : « j'aurais voulu garder ça »). */}
-        {routine && routineOpen && <RoutineIsland routine={routine.view} width={width} cards onClose={() => setRoutineOpen(false)} />}
+        {routine && routineOpen && <RoutineIsland routine={routine.view} width={cardsWidth} cards onClose={() => setRoutineOpen(false)} />}
       </>
     );
   }
