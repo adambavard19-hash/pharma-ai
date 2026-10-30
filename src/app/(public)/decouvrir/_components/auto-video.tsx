@@ -1,75 +1,51 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Pause, Play, Volume2, VolumeX } from "lucide-react";
+import { Pause, Play, RotateCcw, Volume2, VolumeX } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * La présentation de PharmaBoost, lancée d'elle-même sous le héros de l'accueil, comme sur limova.ai (fondateur, 20 oct. 2026).
+ * La présentation de PharmaBoost sous le héros de l'accueil, comme sur limova.ai (fondateur, 20 oct. 2026) ; depuis le 30 oct. 2026,
+ * elle ne se lance plus d'elle-même et ne tourne plus en boucle : un clic la lance, un clic la relance une fois finie.
  *
- * Avec le son dès que possible (fondateur, 23 oct. 2026) : elle essaie d'abord de démarrer avec le son (certains navigateurs
- * l'acceptent, pour un visiteur qui revient souvent). Refusé — le cas le plus courant, aucun navigateur ne laisse une page
- * jouer du son avant un geste du visiteur —, elle tourne sans le son, et le son s'active au premier clic, toucher ou touche du
- * clavier n'importe où sur la page, la vidéo repartant du début. Le défilement seul ne compte pas comme un geste pour le
- * navigateur. Un visiteur qui a coupé le son lui-même n'est jamais contredit.
+ * Lancée par un clic du visiteur, elle part avec le son ; un bouton le coupe.
  *
  * En bas, comme sur limova.ai (fondateur, 25 oct. 2026) : lecture / pause, le temps, et une barre pour revenir en arrière ou
  * avancer. `vertical` : un film 9:16 (le Reel « Le Cercle », page Pourquoi).
  */
 export function AutoVideo({ src, poster, vertical = false, className }: { src: string; poster: string; vertical?: boolean; className?: string }) {
   const ref = useRef<HTMLVideoElement>(null);
-  const [muted, setMuted] = useState(true);
-  const [playing, setPlaying] = useState(true);
+  // Plus de lecture automatique (fondateur, 30 oct. 2026 : « je veux qu'on puisse cliquer pour qu'elle se lance ») : la vidéo
+  // attend un clic, et se lance alors avec le son (le clic du visiteur le permet). Finie, elle s'arrête : un clic la relance.
+  const [muted, setMuted] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const [ended, setEnded] = useState(false);
+  const [started, setStarted] = useState(false);
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  // Le visiteur a choisi lui-même (bouton) : on ne touche plus au son.
-  const chosen = useRef(false);
 
   useEffect(() => {
     const video = ref.current;
-    if (!video) return;
     // Les métadonnées peuvent être lues avant l'hydratation : leur événement est alors déjà passé.
-    if (video.readyState >= 1) setDuration(video.duration);
-    const events = ["pointerdown", "keydown", "touchstart"] as const;
-    const unmuteOnGesture = () => {
-      events.forEach((name) => window.removeEventListener(name, unmuteOnGesture, true));
-      if (chosen.current || !video.muted) return;
-      video.currentTime = 0;
-      video.muted = false;
-      setMuted(false);
-      void video.play().catch(() => {
-        video.muted = true;
-        setMuted(true);
-      });
-    };
-    video.muted = false;
-    video
-      .play()
-      .then(() => setMuted(false))
-      .catch(() => {
-        video.muted = true;
-        setMuted(true);
-        void video.play().catch(() => undefined);
-        events.forEach((name) => window.addEventListener(name, unmuteOnGesture, { capture: true, passive: true }));
-      });
-    return () => events.forEach((name) => window.removeEventListener(name, unmuteOnGesture, true));
+    if (video && video.readyState >= 1) setDuration(video.duration);
   }, []);
 
   const toggle = () => {
     const video = ref.current;
     if (!video) return;
-    chosen.current = true;
-    if (muted) video.currentTime = 0;
     video.muted = !muted;
     setMuted(!muted);
-    void video.play().catch(() => undefined);
   };
 
   const togglePlay = () => {
     const video = ref.current;
     if (!video) return;
-    if (video.paused) void video.play().catch(() => undefined);
-    else video.pause();
+    if (video.paused) {
+      if (video.ended) video.currentTime = 0;
+      setStarted(true);
+      setEnded(false);
+      void video.play().catch(() => undefined);
+    } else video.pause();
   };
 
   const seek = (value: number) => {
@@ -91,19 +67,26 @@ export function AutoVideo({ src, poster, vertical = false, className }: { src: s
         ref={ref}
         src={src}
         poster={poster}
-        autoPlay
-        muted
-        loop
         playsInline
         preload="metadata"
         onClick={togglePlay}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
+        onEnded={() => setEnded(true)}
         onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
         onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
         onDurationChange={(e) => setDuration(e.currentTarget.duration)}
         className={cn("block w-full cursor-pointer object-cover", vertical ? "aspect-[9/16]" : "aspect-video")}
       />
+      {/* Avant le premier clic, et une fois finie : un grand bouton au centre (« Lire » ou « Revoir »). */}
+      {(!started || ended) && (
+        <button type="button" onClick={togglePlay} aria-label={ended ? "Revoir la vidéo" : "Lire la vidéo"} className="absolute inset-0 flex items-center justify-center bg-black/20 transition-colors hover:bg-black/10">
+          <span className="inline-flex items-center gap-2.5 rounded-full bg-white/95 px-6 py-3.5 text-[15px] font-semibold text-[#0F2F2A] shadow-xl">
+            {ended ? <RotateCcw className="size-5" aria-hidden="true" /> : <Play className="size-5 fill-current" aria-hidden="true" />}
+            {ended ? "Revoir" : "Lire la vidéo"}
+          </span>
+        </button>
+      )}
       <div className="absolute inset-x-0 bottom-0 flex items-center gap-3 bg-gradient-to-t from-black/60 to-transparent px-4 pt-8 pb-3 text-white">
         <button type="button" onClick={togglePlay} aria-label={playing ? "Mettre en pause" : "Lire la vidéo"} className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white/15 backdrop-blur-md hover:bg-white/25">
           {playing ? <Pause className="size-4 fill-current" aria-hidden="true" /> : <Play className="size-4 translate-x-px fill-current" aria-hidden="true" />}
