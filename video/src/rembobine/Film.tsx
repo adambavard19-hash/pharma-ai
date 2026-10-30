@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { AbsoluteFill, Sequence, staticFile, useCurrentFrame } from "remotion";
 import { Audio } from "@remotion/media";
-import { DROP, FPS, SCENES, TOTAL_FRAMES, VOICE_AT, type SceneId } from "./timeline";
+import { DROP, DROPPED_VOICES, FPS, SCENES, TOTAL_FRAMES, VOICE_AT, filmTime, storyTime, type SceneId } from "./timeline";
 import { SCENE_COMPONENTS } from "./scenes";
 import { Cues, cue, type Cue } from "./kit/sound";
 import { Captions } from "./kit/captions";
@@ -25,18 +25,20 @@ import VOIX from "../../public/rembobine/voix/voix.json";
 export type FilmProps = { debug?: boolean; only?: SceneId | null };
 
 /** La scène reçoit le temps ABSOLU du film. */
-function SceneHost({ id, from }: { id: SceneId; from: number }) {
+function SceneHost({ id, from, offset }: { id: SceneId; from: number; offset: number }) {
   const frame = useCurrentFrame() + from;
   const Comp = SCENE_COMPONENTS[id].Scene;
   return (
-    <FilmClock offset={from}>
-      <Comp t={frame / FPS} />
+    <FilmClock offset={from + Math.round(offset * FPS)}>
+      <Comp t={frame / FPS + offset} />
     </FilmClock>
   );
 }
 
 const CUTS = VOIX.cuts as Record<string, { dur: number; who: string }>;
-const VOICE_SPANS = Object.entries(VOICE_AT).map(([id, at]) => [at, at + CUTS[id].dur, CUTS[id].who === "yann" ? 1 : 1.25] as const);
+/** Les répliques dites, posées en temps du FILM (le chapitre des marques est coupé). */
+const VOICES = Object.entries(VOICE_AT).filter(([id]) => !DROPPED_VOICES.includes(id)).map(([id, at]) => [id, filmTime(at)] as const);
+const VOICE_SPANS = VOICES.map(([id, at]) => [at, at + CUTS[id].dur, CUTS[id].who === "yann" ? 1 : 1.25] as const);
 
 /** 0 hors de la voix, 1 sous la voix (attaque 0,2 s avant, relâche 0,45 s après) ; un peu plus bas sous les répliques. */
 function duckAt(t: number) {
@@ -73,7 +75,8 @@ export function RembobineFilm({ debug = false, only = null }: FilmProps) {
   const frame = useCurrentFrame();
   const t = frame / FPS;
   const ids = only ? SCENES.filter((s) => s.id === only) : SCENES;
-  const cues = useMemo(() => [...BED, ...SCENES.flatMap((s) => SCENE_COMPONENTS[s.id].cues)], []);
+  // Les bruitages de chaque scène, en temps du FILM (ceux de la partie coupée tombent).
+  const cues = useMemo(() => [...BED, ...SCENES.flatMap((s) => SCENE_COMPONENTS[s.id].cues.filter((c) => s.offset === 0 || c.at - s.offset >= s.start - 0.5).map((c) => ({ ...c, at: c.at - s.offset })))], []);
   return (
     <AbsoluteFill style={{ background: A1.ink }}>
       {[...ids].reverse().map((s) => {
@@ -81,15 +84,15 @@ export function RembobineFilm({ debug = false, only = null }: FilmProps) {
         const dur = Math.min(TOTAL_FRAMES, Math.round(s.end * FPS)) - from;
         return (
           <Sequence key={s.id} from={from} durationInFrames={dur} name={`${s.id} · ${s.name}`}>
-            <SceneHost id={s.id} from={from} />
+            <SceneHost id={s.id} from={from} offset={s.offset} />
           </Sequence>
         );
       })}
       <Grain t={t} opacity={0.025} />
       <Vignette strength={0.2} />
-      <Captions t={t} />
+      <Captions t={storyTime(t)} />
       {debug && <Clock t={t} />}
-      {Object.entries(VOICE_AT).map(([id, at]) => (
+      {VOICES.map(([id, at]) => (
         <Sequence key={`voix-${id}`} from={Math.round(at * FPS)} layout="none" name={`Voix ${id}`}>
           <Audio src={staticFile(`rembobine/voix/${id}.wav`)} volume={1} />
         </Sequence>

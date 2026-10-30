@@ -1,5 +1,5 @@
 import { useId, type CSSProperties, type ReactNode } from "react";
-import { AbsoluteFill } from "remotion";
+import { AbsoluteFill, useCurrentFrame } from "remotion";
 import { clamp01, lerp, prog, ressort, wobble, EXIT, IN_OUT, POP, SNAP } from "../../presentation/motion/kit/ease";
 import { hash, rnd } from "../../presentation/motion/kit/random";
 import { A1, JAKARTA, PB, rgba } from "./brand";
@@ -294,34 +294,41 @@ function MedIcon({ kind, color }: { kind: MedKind; color: string }) {
 }
 
 /** La face avant d'une boîte, dessinée dans 300 × 180. */
-function MedFront({ kind, mood = "pb" }: { kind: MedKind; mood?: Mood }) {
+/**
+ * La face de la boîte (dessinée en 300 × 180, à l'échelle `s`). Les TEXTES sont posés à leur taille finale, hors du groupe
+ * mis à l'échelle : sous un `scale` SVG, Chrome dessinait parfois « Amoxicilline » à sa taille non réduite, une image sur
+ * deux selon l'onglet de rendu (le texte « tremblait », 30 oct. 2026).
+ */
+function MedFront({ kind, mood = "pb", s = 1 }: { kind: MedKind; mood?: Mood; s?: number }) {
   const m = MED[kind];
   const c = tones({ K: m.color, white: "#FFFFFF", ink: "#0F2A26", form: "#6A7B77" }, mood, 0.94);
   const K = c.K;
   return (
     <g>
-      <rect width={300} height={180} rx={4} fill={c.white} />
-      <path d="M0,0 H300 V52 C230,70 150,38 0,62 Z" fill={K} />
-      <path d="M0,68 C150,44 230,76 300,58 V64 C230,82 150,50 0,74 Z" fill={K} opacity={0.3} />
-      <circle cx={258} cy={30} r={22} fill={c.white} />
-      <g transform="translate(258 30)">
-        <MedIcon kind={kind} color={K} />
+      <g transform={`scale(${s})`}>
+        <rect width={300} height={180} rx={4} fill={c.white} />
+        <path d="M0,0 H300 V52 C230,70 150,38 0,62 Z" fill={K} />
+        <path d="M0,68 C150,44 230,76 300,58 V64 C230,82 150,50 0,74 Z" fill={K} opacity={0.3} />
+        <circle cx={258} cy={30} r={22} fill={c.white} />
+        <g transform="translate(258 30)">
+          <MedIcon kind={kind} color={K} />
+        </g>
+        <rect x={18} y={20} width={64} height={6} rx={3} fill="#FFFFFF" opacity={0.7} />
+        <rect x={18} y={32} width={42} height={6} rx={3} fill="#FFFFFF" opacity={0.45} />
+        <rect y={168} width={300} height={12} fill={K} />
+        <rect x={1} y={1} width={298} height={178} rx={4} fill="none" stroke="rgba(15,47,42,0.12)" strokeWidth={2} />
       </g>
-      <rect x={18} y={20} width={64} height={6} rx={3} fill="#FFFFFF" opacity={0.7} />
-      <rect x={18} y={32} width={42} height={6} rx={3} fill="#FFFFFF" opacity={0.45} />
-      <text x={18} y={m.sub ? 116 : 124} fontFamily={JAKARTA} fontWeight={800} fontSize={m.name.length > 11 ? 33 : 35} letterSpacing={-0.6} fill={c.ink}>
+      <text x={18 * s} y={(m.sub ? 116 : 124) * s} fontFamily={JAKARTA} fontWeight={800} fontSize={(m.name.length > 11 ? 33 : 35) * s} letterSpacing={-0.6 * s} fill={c.ink}>
         {m.name}
       </text>
       {m.sub && (
-        <text x={18} y={153} fontFamily={JAKARTA} fontWeight={800} fontSize={30} letterSpacing={-0.4} fill={K}>
+        <text x={18 * s} y={153 * s} fontFamily={JAKARTA} fontWeight={800} fontSize={30 * s} letterSpacing={-0.4 * s} fill={K}>
           {m.sub}
         </text>
       )}
-      <text x={282} y={155} textAnchor="end" fontFamily={JAKARTA} fontWeight={600} fontSize={16} fill={c.form}>
+      <text x={282 * s} y={155 * s} textAnchor="end" fontFamily={JAKARTA} fontWeight={600} fontSize={16 * s} fill={c.form}>
         {m.form}
       </text>
-      <rect y={168} width={300} height={12} fill={K} />
-      <rect x={1} y={1} width={298} height={178} rx={4} fill="none" stroke="rgba(15,47,42,0.12)" strokeWidth={2} />
     </g>
   );
 }
@@ -355,8 +362,8 @@ function MedGlyph({ kind, w, side = 1, xray = 0, shadow = true, mood = "pb" }: {
           <path d={top} fill={cc.top} />
           {side !== 0 && <path d={flank} fill={cc.flank} />}
           {side !== 0 && <path d={flankBand} fill={K} opacity={0.82} />}
-          <g transform={`translate(${-w / 2} ${-h}) scale(${s})`}>
-            <MedFront kind={kind} mood={mood} />
+          <g transform={`translate(${-w / 2} ${-h})`}>
+            <MedFront kind={kind} mood={mood} s={s} />
           </g>
         </g>
       )}
@@ -434,6 +441,9 @@ export function MedBox({
   const W = R - L;
   const H = B - T;
   const abs = x !== undefined && y !== undefined;
+  // Le texte SVG est remis en page à chaque image : Chrome ne le recalcule pas quand la caméra zoome, il restait à la
+  // taille de la première image vue par l'onglet de rendu (« Amoxicilline » qui changeait de taille, 30 oct. 2026).
+  const relayout = useCurrentFrame();
   return (
     <div
       style={{
@@ -447,7 +457,7 @@ export function MedBox({
         ...style,
       }}
     >
-      <svg width={W} height={H} viewBox={`${L} ${T} ${W} ${H}`} style={{ position: "absolute", inset: 0, overflow: "visible" }}>
+      <svg key={relayout} width={W} height={H} viewBox={`${L} ${T} ${W} ${H}`} style={{ position: "absolute", inset: 0, overflow: "visible" }}>
         {ghost ? <GhostGlyph w={w} color={ghost} t={t} /> : <MedGlyph kind={kind} w={w} side={side} xray={xray === true ? 1 : xray === false ? 0 : xray} shadow={shadow} mood={mood} />}
       </svg>
       {children !== undefined && (
@@ -464,6 +474,9 @@ export function Ordonnance({ w = 260, x, y, flat = 0, rotate = 0, write = 1, moo
   const abs = x !== undefined && y !== undefined;
   const c = tones({ paper: "#FFFEFA", ink: "#23408E", ink2: "#3A4F8F", grey: "#C9D2CF", grey2: "#8E9C98", rule: "#DDE4E1" }, mood, 0.95);
   const show = (from: number) => clamp01((write - from) / 0.15);
+  // Le texte SVG est remis en page à chaque image : Chrome ne le recalcule pas quand la caméra zoome, il restait à la
+  // taille de la première image vue par l'onglet de rendu (« Amoxicilline » qui changeait de taille, 30 oct. 2026).
+  const relayout = useCurrentFrame();
   return (
     <div
       style={{
@@ -472,12 +485,14 @@ export function Ordonnance({ w = 260, x, y, flat = 0, rotate = 0, write = 1, moo
         top: abs ? y - h / 2 : undefined,
         width: w,
         height: h,
-        transform: `perspective(${w * 4}px) rotateX(${flat * 72}deg) rotate(${rotate}deg)`,
-        transformOrigin: "50% 50%",
+        // À plat sur le comptoir : l'écrasement et la rotation se font DANS le dessin (ci-dessous), plus en CSS. Sous une
+        // transformation CSS (3D, puis même 2D non uniforme), Chrome dessinait le texte « Amoxicilline 1 g » différemment
+        // selon l'onglet de rendu : il changeait de taille d'une image à l'autre (30 oct. 2026).
         ...style,
       }}
     >
-      <svg width={w} height={h} viewBox="0 0 300 414" style={{ position: "absolute", inset: 0, overflow: "visible" }}>
+      <svg key={relayout} width={w} height={h} viewBox="0 0 300 414" style={{ position: "absolute", inset: 0, overflow: "visible" }}>
+        <g transform={`translate(150 207) scale(1 ${Math.cos((flat * 72 * Math.PI) / 180).toFixed(4)}) rotate(${rotate}) translate(-150 -207)`}>
         <rect x={5} y={8} width={300} height={414} rx={6} fill="rgba(6,17,15,0.16)" />
         <rect width={300} height={414} rx={6} fill={c.paper} />
         <g transform="translate(36 34)">
@@ -520,6 +535,7 @@ export function Ordonnance({ w = 260, x, y, flat = 0, rotate = 0, write = 1, moo
           strokeDashoffset={1 - clamp01((write - 0.6) / 0.4)}
         />
         <rect x={24} y={388} width={150} height={5} rx={2.5} fill={c.rule} />
+        </g>
       </svg>
     </div>
   );
@@ -631,6 +647,9 @@ export function PharmacyBag({
   const abs = x !== undefined && y !== undefined;
   const Wd = w + pad * 2;
   const Ht = H + pad * 2;
+  // Le texte SVG est remis en page à chaque image : Chrome ne le recalcule pas quand la caméra zoome, il restait à la
+  // taille de la première image vue par l'onglet de rendu (« Amoxicilline » qui changeait de taille, 30 oct. 2026).
+  const relayout = useCurrentFrame();
   return (
     <div
       style={{
@@ -644,7 +663,7 @@ export function PharmacyBag({
         ...style,
       }}
     >
-      <svg width={Wd} height={Ht} viewBox={`${-Wd / 2} ${-pad} ${Wd} ${Ht}`} style={{ position: "absolute", inset: 0, overflow: "visible" }}>
+      <svg key={relayout} width={Wd} height={Ht} viewBox={`${-Wd / 2} ${-pad} ${Wd} ${Ht}`} style={{ position: "absolute", inset: 0, overflow: "visible" }}>
         <BagGlyph w={w} kinds={kindsOf(boxes)} peek={peek} xray={xray === true ? 1 : xray === false ? 0 : xray} mood={mood} />
       </svg>
     </div>
@@ -1163,9 +1182,12 @@ export function Pharmacienne({
     );
   };
 
+  // Le texte SVG est remis en page à chaque image : Chrome ne le recalcule pas quand la caméra zoome, il restait à la
+  // taille de la première image vue par l'onglet de rendu (« Amoxicilline » qui changeait de taille, 30 oct. 2026).
+  const relayout = useCurrentFrame();
   return (
     <div style={{ position: "absolute", left: x, top: y, width: 0, height: 0, transform: `scale(${scale})`, transformOrigin: "0 0" }}>
-      <svg width={640} height={520} viewBox="-260 -420 640 520" style={{ position: "absolute", left: -260, top: -420, overflow: "visible" }}>
+      <svg key={relayout} width={640} height={520} viewBox="-260 -420 640 520" style={{ position: "absolute", left: -260, top: -420, overflow: "visible" }}>
         <defs>
           <clipPath id={`cut${uid}`}>
             <rect x={-400} y={-600} width={900} height={600} />
@@ -1438,9 +1460,12 @@ export function Patient({
     </g>
   );
 
+  // Le texte SVG est remis en page à chaque image : Chrome ne le recalcule pas quand la caméra zoome, il restait à la
+  // taille de la première image vue par l'onglet de rendu (« Amoxicilline » qui changeait de taille, 30 oct. 2026).
+  const relayout = useCurrentFrame();
   return (
     <div style={{ position: "absolute", left: pose.x, top: pose.y, width: 0, height: 0, opacity: pose.opacity, transform: `scale(${S})`, transformOrigin: "0 0" }}>
-      <svg width={700} height={1000} viewBox="-350 -940 700 1000" style={{ position: "absolute", left: -350, top: -940, overflow: "visible" }}>
+      <svg key={relayout} width={700} height={1000} viewBox="-350 -940 700 1000" style={{ position: "absolute", left: -350, top: -940, overflow: "visible" }}>
         <defs>
           <radialGradient id={`ps${uid}`}>
             <stop offset="0%" stopColor="#06110F" stopOpacity={mood === "act1" ? 0.45 : 0.24} />

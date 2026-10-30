@@ -65,7 +65,7 @@ import {
 // ---- Le temps ---------------------------------------------------------------------------------------------------------
 
 const N12 = MOTS.N12.words; // PharmaBoost. Le copilote IA du comptoir de votre pharmacie.
-const D5 = MOTS.D5.words; // Il vous fallait autre chose ?
+const D5 = MOTS.D5.words; // Merci PharmaBoost !
 const w12 = (i: number) => N12[i].at;
 
 const SLAM = N12[0].at; // 65,75
@@ -483,10 +483,10 @@ function ScreenRobot({ t }: { t: number }) {
   );
 }
 
-/** Le texte de la bulle, mot à mot sur la voix : « Il vous fallait » en petit, « autre chose ? » en grand. */
+/** Le texte de la bulle, mot à mot sur la voix : « Merci » en petit, « PharmaBoost ! » en grand (30 oct. 2026). */
 function BubbleText({ t }: { t: number }) {
   const word = (i: number, text: string) => {
-    const k = prog(t, D5[i].at - 2 * F, 0.2, SNAP);
+    const k = prog(t, (D5[i] ?? D5[D5.length - 1]).at - 2 * F, 0.2, SNAP);
     return (
       <span key={i} style={{ display: "inline-block", opacity: 0.18 + 0.82 * k, transform: `translateY(${(1 - k) * 0.12}em)` }}>
         {text}
@@ -495,12 +495,8 @@ function BubbleText({ t }: { t: number }) {
   };
   return (
     <span style={{ display: "block" }}>
-      <span style={{ display: "block", fontSize: "0.62em", fontWeight: 700, opacity: 0.86, marginBottom: "0.08em" }}>
-        {word(0, "Il")} {word(1, "vous")} {word(2, "fallait")}
-      </span>
-      <span style={{ display: "block" }}>
-        {word(3, "autre")} {word(4, "chose ?")}
-      </span>
+      <span style={{ display: "block", fontSize: "0.62em", fontWeight: 700, opacity: 0.86, marginBottom: "0.08em" }}>{word(0, "Merci")}</span>
+      <span style={{ display: "block" }}>{word(1, "PharmaBoost !")}</span>
     </span>
   );
 }

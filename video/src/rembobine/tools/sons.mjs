@@ -11,10 +11,10 @@
 // Les coups (one-shots) sont ramenés à une crête de −3 dBFS, les ambiances à −23 LUFS : le `gain` des repères a ainsi le
 // même sens d'un fichier à l'autre.
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { DROP, TOTAL, FINAL_HIT } from "../timeline.ts";
+import { DROP, TOTAL, FINAL_HIT, CUT, GAP } from "../timeline.ts";
 
 const RAW = join("out", "rembobine", "raw-sfx");
 const MRAW = join("out", "rembobine", "raw-music");
@@ -230,4 +230,14 @@ ff(
     `[x][y]amix=inputs=2:normalize=0,loudnorm=I=-16:TP=-2:LRA=11[m]`,
   "-map", "[m]", "-ar", "48000", "-ac", "2", "-c:a", "pcm_s16le", join(MUSIC_OUT, "musique.wav"),
 );
+// La coupe du chapitre des marques (30 oct. 2026) : on retire GAP secondes à CUT (trois mesures : le temps fort reste
+// sur le temps fort), avec un fondu enchaîné de 20 ms. La musique suit alors le film : groove jusqu'à 70 − GAP, accord final à
+// FINAL_HIT − GAP.
+{
+  const story = join(MUSIC_OUT, "musique.wav");
+  const tmp = join(MUSIC_OUT, "musique-histoire.wav");
+  renameSync(story, tmp);
+  ff("-i", tmp, "-filter_complex", `[0:a]asplit=2[p][q];[p]atrim=end=${CUT + 0.01},asetpts=PTS-STARTPTS[a];[q]atrim=start=${CUT + GAP - 0.01},asetpts=PTS-STARTPTS[b];[a][b]acrossfade=d=0.02:c1=tri:c2=tri[m]`, "-map", "[m]", "-ar", "48000", "-ac", "2", "-c:a", "pcm_s16le", story);
+  rmSync(tmp);
+}
 console.log(`musique.wav : M1 0 → ${DROP - 0.9} s ; M2 (coup à ${M2_DOWNBEAT} s du morceau) à ${DROP} s, mesure répétée à ${SPLICE_FILM} s, groove jusqu'à 70 s ; porte 35 → 40 s ; accord final (bruitages) à ${FINAL_HIT} s`);

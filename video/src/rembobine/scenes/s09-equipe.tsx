@@ -206,7 +206,7 @@ export function Scene({ t }: { t: number }) {
       </Camera>
       <Mention t={t} from={CARD_AT + 0.1} to={49.2} />
       <ChapterFix t={t} hideUntil={CH_AT + 0.16 + 0.08}>
-        <ChapterTitle t={t} at={CH_AT} n="1/3" text="POUR *L’ÉQUIPE*" exitAt={CH_EXIT} />
+        <ChapterTitle t={t} at={CH_AT} n="1/2" text="POUR *L’ÉQUIPE*" exitAt={CH_EXIT} />
       </ChapterFix>
       {/* La bande de la sortie, côté S9 : un liseré sombre qui ombre le bord découpé. */}
       {kOut > 0 && kOut < 1 && <AbsoluteFill style={{ background: `rgba(0,0,0,${0.35 * kOut})` }} />}

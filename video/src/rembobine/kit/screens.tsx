@@ -379,15 +379,17 @@ export type ChipSpec = { kind: ChipKind; text: string; at?: number };
  * l'or au challenge) ; le challenge en OR métal avec ★ ; la date courte en ROUGE BRIQUE.
  */
 function chipLook(kind: ChipKind, onDark: boolean): { bg: string; fg: string; ring: string } {
+  // Les couleurs de la bannière d'aujourd'hui (mix-island.tsx, 30 oct. 2026) : stock vert, marge jaune, challenge citron,
+  // date courte rouge.
   switch (kind) {
     case "stock":
-      return { bg: "#7BE0B0", fg: "#063B26", ring: onDark ? "none" : "inset 0 0 0 2px rgba(6,59,38,.12)" };
+      return { bg: "#E3F6EC", fg: "#0E7A4E", ring: "inset 0 0 0 2px rgba(14,122,78,.14)" };
     case "marge":
-      return { bg: PB.citron, fg: "#3D4F00", ring: onDark ? `0 0 18px ${rgba(PB.citron, 0.25)}` : "inset 0 0 0 2px rgba(61,79,0,.2)" };
+      return { bg: "#FFE58A", fg: "#4A3500", ring: "inset 0 0 0 2px rgba(74,53,0,.12)" };
     case "challenge":
-      return { bg: `linear-gradient(180deg, ${PB.goldHi} 0%, ${PB.gold} 100%)`, fg: "#3A2600", ring: `inset 0 0 0 2px rgba(255,236,190,.6), 0 6px 18px ${rgba(PB.gold, 0.42)}` };
+      return { bg: "#EEFFC2", fg: "#3F5A00", ring: "inset 0 0 0 2px rgba(63,90,0,.14)" };
     case "date":
-      return { bg: PB.date, fg: "#FFFFFF", ring: `inset 0 0 0 2px rgba(255,255,255,.14), 0 6px 16px ${rgba(PB.date, 0.35)}` };
+      return { bg: "#FFE4E0", fg: "#C23A2B", ring: "inset 0 0 0 2px rgba(194,58,43,.16)" };
     default:
       return onDark ? { bg: "rgba(255,255,255,0.14)", fg: U.head, ring: "none" } : { bg: "rgba(15,47,42,0.08)", fg: PB.ink, ring: "none" };
   }
@@ -402,7 +404,7 @@ export function Chip({ t, kind, text, at, size = 24, onDark = false, x, y, scale
   const beat = ((since % 1.3) + 1.3) % 1.3 / 1.3;
   const icon =
     kind === "stock" ? (
-      <span style={{ width: size * 0.42, height: size * 0.42, borderRadius: 99, background: "#0E8A55", boxShadow: `0 0 0 ${size * 0.28 * beat}px rgba(14,138,85,${0.35 * (1 - beat)})`, flexShrink: 0 }} />
+      <span style={{ width: size * 0.42, height: size * 0.42, borderRadius: 99, background: "#14A374", boxShadow: `0 0 0 ${size * 0.28 * beat}px rgba(20,163,116,${0.35 * (1 - beat)})`, flexShrink: 0 }} />
     ) : kind === "challenge" ? (
       <Star size={size * 0.9} fill={look.fg} strokeWidth={0} style={{ flexShrink: 0, transform: `rotate(${wobble(t, 8, 10, 1.4)}deg)` }} />
     ) : kind === "date" ? (
@@ -443,20 +445,123 @@ export function Chip({ t, kind, text, at, size = 24, onDark = false, x, y, scale
 }
 
 // ---- La bannière repliée ---------------------------------------------------------------------------------------------
+//
+// La bannière d'aujourd'hui (fondateur, 30 oct. 2026 : « que ce soit la nouvelle bannière qui soit affichée ») :
+// src/components/island/scan-capsule.tsx (la petite bannière blanche, la croix verte) et mix-island.tsx (les cartes menthe).
 
-export type BannerLine = { n: number; drug: string; product: string; chips?: ChipSpec[]; at: number };
+export type BannerLine = { n: number; drug: string; product: string; chips?: ChipSpec[]; at: number; price?: string; challenge?: boolean; shortDate?: boolean };
 
-const HEAD = { padX: 22, padY: 18, robot: 72, row: 140, idle: 100 } as const;
+const HEAD = { padX: 22, padY: 18, row: 140, idle: 100, top: 58 } as const;
 const headSpring = (t: number, at: number) => ressort(t, at, { damping: 13, stiffness: 190, mass: 0.7 });
+/** Le nom de chaque conseil s'affiche dans la petite bannière à son `at` ; les cartes s'ouvrent ensuite. */
+export const bannerOpenAt = (lines: BannerLine[]) => (lines.length ? Math.max(...lines.map((l) => l.at)) + 0.34 : Infinity);
+const rowAt = (lines: BannerLine[], i: number) => bannerOpenAt(lines) + 0.09 * i;
+/** La hauteur de la bannière à l'instant t (scale 1) : la petite bannière, puis les cartes qui arrivent en ressort. */
+export function bannerHeadHeight(t: number, lines: BannerLine[]) {
+  return Math.max(HEAD.idle, 36 + lines.reduce((s, _l, i) => s + HEAD.row * headSpring(t, rowAt(lines, i)), 0));
+}
 
-/** Le centre (px, relatif au coin haut gauche de la capsule, scale 1) de la ligne n à l'instant t — pour y poser un curseur. */
+/** Le centre (px, relatif au coin haut gauche de la bannière, scale 1) de la carte n à l'instant t. */
 export function bannerRowCenter(lines: BannerLine[], n: number, t: number, width = 920): { x: number; y: number } {
   let top = HEAD.padY;
-  for (const l of lines) {
-    if (l.n === n) return { x: HEAD.padX + HEAD.robot + 18 + (width - HEAD.padX * 2 - HEAD.robot - 18 - 210) / 2, y: top + HEAD.row / 2 };
-    top += HEAD.row * headSpring(t, l.at);
+  for (const [i, l] of lines.entries()) {
+    if (l.n === n) return { x: width / 2, y: top + HEAD.row / 2 };
+    top += HEAD.row * headSpring(t, rowAt(lines, i));
   }
   return { x: width / 2, y: top };
+}
+
+/** La croix de pharmacie verte : ses bras s'allument un à un pendant l'analyse (scan-capsule.tsx, GreenCross). */
+function PillCross({ lit = 4, size = 24, heart = 1 }: { lit?: number; size?: number; heart?: number }) {
+  return (
+    <svg viewBox="0 0 40 40" style={{ width: size, height: size, flexShrink: 0 }}>
+      {[{ x: 14, y: 2 }, { x: 26, y: 14 }, { x: 14, y: 26 }, { x: 2, y: 14 }].map((a, i) => (
+        <rect key={i} x={a.x} y={a.y} width={12} height={12} rx={2.5} fill={i < lit ? "#0E8A7B" : "rgba(14,138,123,.16)"} />
+      ))}
+      <rect x={14} y={14} width={12} height={12} rx={2.5} fill="#0E8A7B" opacity={heart} />
+    </svg>
+  );
+}
+
+const MINT = { frame: "linear-gradient(160deg, #BDEBD7 0%, #8FDDBE 100%)", ring: "#3DBF8E", ink: "#0F2B26", green: "#0E8A7B", muted: "#5B6B66", line: "#E3EBE8", active: "#EAF6F0", soft: "#F1FAF6" } as const;
+
+/** Le cadre menthe et son hélice d'ADN (crd-frame : l'hélice en « multiply » à 75 %). */
+function MintFrame({ t, radius, children, style }: { t: number; radius: number; children: ReactNode; style?: CSSProperties }) {
+  return (
+    <div style={{ position: "absolute", overflow: "hidden", borderRadius: radius, background: MINT.frame, boxShadow: `0 0 0 3px ${MINT.ring}, 0 44px 90px -34px rgba(14,124,90,.55)`, ...style }}>
+      <AdnBackdrop t={t} tone="paper" width={1300} focus={[0.62, 0.45]} style={{ mixBlendMode: "multiply", opacity: 0.75, background: "transparent" }} />
+      {children}
+    </div>
+  );
+}
+
+/** « PHARMABOOST » et le bouton « – Réduire » en haut du cadre menthe. */
+function MintHeader({ size = 1, close = false }: { size?: number; close?: boolean }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12 * size, height: "100%" }}>
+      <PillCross size={30 * size} />
+      <span style={{ fontFamily: JAKARTA, fontWeight: 700, fontSize: 21 * size, letterSpacing: "0.2em", color: MINT.ink }}>
+        PHARMA<span style={{ color: MINT.green }}>BOOST</span>
+      </span>
+      <span style={{ flex: 1 }} />
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 8 * size, height: 46 * size, padding: `0 ${18 * size}px`, borderRadius: 999, background: "rgba(255,255,255,.88)", boxShadow: `0 0 0 2px ${rgba(MINT.green, 0.25)}`, fontFamily: JAKARTA, fontWeight: 700, fontSize: 21 * size, color: "#0E7A4E" }}>
+        <span style={{ width: 16 * size, height: 4 * size, borderRadius: 2, background: "#0E7A4E" }} />
+        Réduire
+      </span>
+      {close && (
+        <span style={{ display: "inline-flex", width: 46 * size, height: 46 * size, borderRadius: 99, alignItems: "center", justifyContent: "center", background: "#E9F0ED", color: MINT.muted, fontFamily: JAKARTA, fontWeight: 700, fontSize: 26 * size }}>×</span>
+      )}
+    </div>
+  );
+}
+
+/** Les initiales du produit quand il n'a pas de photo studio (mix-island.tsx, Monogram). */
+export function Monogram({ name, size = 92, radius = 22 }: { name: string; size?: number; radius?: number }) {
+  const words = name.replace(/[^A-Za-zÀ-ÿ ]/g, " ").split(/\s+/).filter(Boolean);
+  const initials = (words.length > 1 ? words[0][0] + words[1][0] : (words[0] ?? "?").slice(0, 2)).toUpperCase();
+  return (
+    <span style={{ display: "inline-flex", width: size, height: size, flexShrink: 0, borderRadius: radius, alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg, #14A374 0%, #0A5C46 100%)", color: "#FFFFFF", fontFamily: JAKARTA, fontWeight: 800, fontSize: size * 0.36, letterSpacing: "0.02em", boxShadow: "0 0 0 2px #FFFFFF, 0 0 0 4px #E3EBE8" }}>
+      {initials}
+    </span>
+  );
+}
+
+/** Le nom court du conseil dans la petite bannière (scan-capsule.tsx, shortAdviceName). */
+const shortName = (name: string) => name.split(/,|\s[-–]\s|\(/)[0].trim().slice(0, 22);
+
+/** La petite bannière blanche au repos (croix + PHARMABOOST), au scan (les bras s'allument), puis le nom des conseils. */
+function WhitePillContent({ t, lines, width }: { t: number; lines: BannerLine[]; width: number }) {
+  const first = lines[0]?.at ?? Infinity;
+  const scanFrom = first - 0.5;
+  const scanning = t >= scanFrom && t < first;
+  const found = lines.filter((l) => t >= l.at);
+  const lit = scanning ? Math.min(4, Math.floor((t - scanFrom) / 0.1) + 1) : 4;
+  const heart = 0.6 + 0.4 * Math.cos((t * Math.PI * 2) / 1);
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 18, height: "100%", width, padding: "0 30px", boxSizing: "border-box" }}>
+      <PillCross lit={lit} size={56} heart={scanning ? heart : 1} />
+      {found.length > 0 ? (
+        <span style={{ display: "flex", alignItems: "center", gap: 22, whiteSpace: "nowrap" }}>
+          {found.map((l, i) => {
+            const k = prog(t, l.at, 0.26, SNAP);
+            return (
+              <span key={l.n} style={{ display: "inline-flex", alignItems: "center", gap: 10, opacity: k, transform: `translateY(${(1 - k) * 10}px) scale(${0.9 + 0.1 * k})` }}>
+                {i > 0 && <span style={{ width: 2, height: 30, marginRight: 12, background: rgba(MINT.green, 0.25) }} />}
+                {l.challenge ? <Star size={30} fill="#B8D400" color="#8AA000" strokeWidth={1.4} /> : l.shortDate ? <Hourglass size={28} color="#C23A2B" strokeWidth={2.4} /> : null}
+                <span style={{ fontFamily: JAKARTA, fontWeight: 700, fontSize: 30, color: MINT.ink }}>{shortName(l.product)}</span>
+              </span>
+            );
+          })}
+        </span>
+      ) : scanning ? (
+        <span style={{ fontFamily: JAKARTA, fontWeight: 700, fontSize: 27, letterSpacing: "0.14em", textTransform: "uppercase", color: MINT.ink, whiteSpace: "nowrap" }}>{lines[0]?.drug}</span>
+      ) : (
+        <span style={{ fontFamily: JAKARTA, fontWeight: 700, fontSize: 28, letterSpacing: "0.22em", color: MINT.ink, whiteSpace: "nowrap" }}>
+          PHARMA<span style={{ color: MINT.green }}>BOOST</span>
+        </span>
+      )}
+    </div>
+  );
 }
 
 export function BannerHead({
@@ -465,135 +570,99 @@ export function BannerHead({
   highlight,
   pressed,
   width = 920,
-  idle = "En attente de scan…",
   x,
   y,
   scale,
   rot,
   style,
 }: Place & { t: number; lines: BannerLine[]; highlight?: { n: number; at: number }; pressed?: { n: number; at: number }; width?: number; idle?: string }) {
-  const rs = lines.map((l) => headSpring(t, l.at));
-  const H = Math.max(HEAD.idle, HEAD.padY * 2 + rs.reduce((s, r) => s + HEAD.row * r, 0));
-  const k0 = lines.length ? prog(t, lines[0].at, 0.25, SNAP) : 0;
-  const left = HEAD.padX + HEAD.robot + 18;
-  const btnW = 196;
-  const rowW = width - left - HEAD.padX - btnW - 6;
-  const shimmer = ((t * 0.7) % 1) * 1.4 - 0.2;
-  let top = HEAD.padY;
-  // La boîte garde la hauteur FINALE (toutes les lignes arrivées) : la capsule part du haut et grandit vers le bas.
+  const open = bannerOpenAt(lines);
+  const rs = lines.map((_l, i) => headSpring(t, rowAt(lines, i)));
+  const H = bannerHeadHeight(t, lines);
+  const k0 = prog(t, open, 0.3, SNAP);
+  // La boîte garde la hauteur FINALE : la bannière part du haut et grandit vers le bas.
   const boxH = Math.max(HEAD.idle, HEAD.padY * 2 + HEAD.row * lines.length);
+  const pillW = Math.min(width, 640 + 210 * Math.max(0, lines.filter((l) => t >= l.at).length - 1));
+  let top = HEAD.padY;
   return (
     <Placed x={x} y={y} scale={scale} rot={rot} style={style}>
       <div style={{ position: "relative", width, height: boxH }}>
-      <div
-        style={{
-          position: "absolute",
-          left: 0,
-          top: 0,
-          width,
-          height: H,
-          borderRadius: lerp(HEAD.idle / 2, 46, k0),
-          overflow: "hidden",
-          background: U.night,
-          boxShadow: `0 0 0 2px ${rgba(PB.citron, 0.2)}, 0 0 70px -14px ${rgba(PB.mint, 0.45)}, 0 44px 90px -34px rgba(0,0,0,.7)`,
-        }}
-      >
-        <AdnBackdrop t={t} tone="night" width={1150} focus={[0.62, 0.5]} opacity={0.62} />
-        {/* Le robot (mix-island : Robot 30 px, humeur heureuse). */}
-        <div style={{ position: "absolute", left: HEAD.padX - 4, top: lerp((HEAD.idle - HEAD.robot) / 2, HEAD.padY - 4, k0) }}>
-          <LogoRobot t={t} size={HEAD.robot} seed={2} />
-        </div>
-        {/* Au repos : « En attente de scan… ». */}
+        {/* La petite bannière blanche, au repos puis au scan. */}
         {k0 < 1 && (
-          <div style={{ position: "absolute", left, top: 0, height: HEAD.idle, display: "flex", alignItems: "center", gap: 14, opacity: 1 - k0, fontFamily: JAKARTA, fontWeight: 700, fontSize: 30, letterSpacing: "-0.01em" }}>
-            <ScanLine size={32} color={PB.citron} strokeWidth={2.4} />
-            <span style={{ color: "transparent", backgroundImage: `linear-gradient(90deg, rgba(242,255,249,.5) ${shimmer * 100 - 20}%, #FFFFFF ${shimmer * 100}%, rgba(242,255,249,.5) ${shimmer * 100 + 20}%)`, WebkitBackgroundClip: "text", backgroundClip: "text" }}>{idle}</span>
+          <div style={{ position: "absolute", left: (width - pillW) / 2, top: 0, width: pillW, height: HEAD.idle, borderRadius: 999, overflow: "hidden", background: "#FFFFFF", boxShadow: `0 28px 60px -26px rgba(15,43,38,.5), 0 0 0 2px ${rgba(MINT.green, 0.25)}`, opacity: 1 - k0, transform: `scale(${1 + 0.06 * k0})` }}>
+            <AdnBackdrop t={t} tone="paper" width={900} focus={[0.62, 0.4]} style={{ mixBlendMode: "multiply", opacity: 0.42, background: "transparent" }} />
+            <div style={{ position: "relative", height: "100%" }}>
+              <WhitePillContent t={t} lines={lines} width={pillW} />
+            </div>
           </div>
         )}
-        {lines.map((l, i) => {
-          const rowTop = top;
-          top += HEAD.row * rs[i];
-          if (t < l.at) return null;
-          const p = prog(t, l.at, 0.34, SNAP);
-          const hl = highlight && highlight.n === l.n ? prog(t, highlight.at, 0.22, SNAP) : 0;
-          const breath = hl * (0.5 + 0.5 * Math.sin((t - (highlight?.at ?? 0)) * 5));
-          const pr = pressed && pressed.n === l.n ? keys(t, [[pressed.at - 0.06, 1], [pressed.at + 0.03, 0.965, SNAP], [pressed.at + 0.17, 1.012, SNAP], [pressed.at + 0.36, 1, IN_OUT]]) : 1;
-          const rip = pressed && pressed.n === l.n ? prog(t, pressed.at, 0.5, SNAP) : 0;
-          const num = ressort(t, l.at + 0.04, { damping: 9, stiffness: 320, mass: 0.5 });
-          const nameColor = hl > 0 ? `color-mix(in srgb, ${PB.citron} ${Math.round(hl * 100)}%, ${U.head})` : U.head;
-          return (
-            <div
-              key={l.n}
-              style={{
-                position: "absolute",
-                left: left - 14,
-                top: rowTop,
-                width: rowW + 28,
-                height: HEAD.row - 4,
-                opacity: clamp01(p * 1.6),
-                transform: `translateX(${(1 - p) * -56}px) scale(${pr})`,
-                transformOrigin: "40% 50%",
-                filter: p < 1 ? `blur(${(1 - p) * 5}px)` : undefined,
-              }}
-            >
-              {i > 0 && <div style={{ position: "absolute", left: 14, right: 14, top: -2, height: 2, background: "rgba(242,255,249,.12)" }} />}
-              {(hl > 0 || rip > 0) && (
-                <div style={{ position: "absolute", inset: "6px 0 4px 0", borderRadius: 22, overflow: "hidden", background: rgba(PB.citron, 0.1 * hl + 0.06 * breath), boxShadow: `inset 0 0 0 2px ${rgba(PB.citron, 0.55 * hl)}, 0 0 ${30 * hl}px ${rgba(PB.citron, 0.18 * hl)}` }}>
-                  <div style={{ position: "absolute", left: 0, top: 10, bottom: 10, width: 7, borderRadius: 4, background: PB.citron, transform: `scaleY(${hl})` }} />
-                  <Sheen k={prog(t, (highlight?.at ?? 0) + 0.04, 0.6, IN_OUT)} alpha={0.28} width="30%" />
-                  {rip > 0 && rip < 1 && <div style={{ position: "absolute", left: "50%", top: "50%", width: 900 * rip, height: 900 * rip, marginLeft: -450 * rip, marginTop: -450 * rip, borderRadius: "50%", background: `rgba(255,255,255,${0.22 * (1 - rip)})` }} />}
-                </div>
-              )}
-              <div style={{ position: "relative", padding: "12px 14px 0 14px", textShadow: "0 2px 10px rgba(0,0,0,.75)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12, height: 42 }}>
-                  {i === 0 && <span style={{ width: 12, height: 12, borderRadius: 99, flexShrink: 0, background: PB.citron, boxShadow: `0 0 ${8 + 8 * (0.5 + 0.5 * Math.sin(t * 6))}px ${PB.citron}` }} />}
-                  <span style={{ display: "inline-flex", width: 40, height: 40, flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: 99, background: U.green, color: "#FFFFFF", fontFamily: JAKARTA, fontWeight: 800, fontSize: 23, textShadow: "none", transform: `scale(${Math.max(0, num)})` }}>{l.n}</span>
-                  <span style={{ fontFamily: JAKARTA, fontWeight: 700, fontSize: 33, letterSpacing: "-0.015em", color: nameColor, whiteSpace: "nowrap" }}>{l.product}</span>
-                </div>
-                <div style={{ marginTop: 2, fontFamily: JAKARTA, fontWeight: 700, fontSize: 24, lineHeight: "30px", color: "rgba(242,255,249,.84)", whiteSpace: "nowrap" }}>pour {l.drug}</div>
-                <div style={{ marginTop: 8, display: "flex", gap: 10, alignItems: "center" }}>
-                  {(l.chips ?? []).map((c, k) => (
-                    <Chip key={k} t={t} kind={c.kind} text={c.text} at={c.at ?? l.at + 0.22 + 0.1 * k} size={22} onDark />
-                  ))}
-                </div>
-              </div>
-              {hl > 0 && <Sparkle t={t} at={(highlight?.at ?? 0) + 0.05} x={rowW - 10} y={34} size={64} color={PB.citron} />}
+        {/* Les cartes menthe : l'en-tête, la feuille blanche, une carte par conseil. */}
+        {k0 > 0 && (
+          <MintFrame t={t} radius={40} style={{ left: 0, top: -HEAD.top, width, height: H + HEAD.top, opacity: clamp01(k0 * 1.6), transform: `scale(${0.96 + 0.04 * k0})`, transformOrigin: "50% 0%" }}>
+            <div style={{ position: "absolute", left: 24, right: 20, top: 8, height: HEAD.top - 12 }}>
+              <MintHeader size={0.95} />
             </div>
-          );
-        })}
-        {/* « Terminer → » (aur-btn). */}
-        <div style={{ position: "absolute", right: HEAD.padX, top: HEAD.padY + 2, height: 64, width: btnW, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 999, border: "2px solid rgba(242,255,249,.45)", background: "rgba(255,255,255,.08)", color: U.head, fontFamily: JAKARTA, fontWeight: 700, fontSize: 25, opacity: k0, boxSizing: "border-box" }}>
-          Terminer →
-        </div>
-      </div>
+            <div style={{ position: "absolute", left: 12, right: 12, top: HEAD.top, bottom: 12, borderRadius: 30, background: "#FFFFFF", boxShadow: "0 18px 40px -26px rgba(15,43,38,.6)" }} />
+            {lines.map((l, i) => {
+              const rowTop = top + HEAD.top;
+              top += HEAD.row * rs[i];
+              const at = rowAt(lines, i);
+              if (t < at) return null;
+              const p = prog(t, at, 0.34, SNAP);
+              const hl = highlight && highlight.n === l.n ? prog(t, highlight.at, 0.22, SNAP) : 0;
+              const pr = pressed && pressed.n === l.n ? keys(t, [[pressed.at - 0.06, 1], [pressed.at + 0.03, 0.965, SNAP], [pressed.at + 0.17, 1.012, SNAP], [pressed.at + 0.36, 1, IN_OUT]]) : 1;
+              const rip = pressed && pressed.n === l.n ? prog(t, pressed.at, 0.5, SNAP) : 0;
+              return (
+                <div key={l.n} style={{ position: "absolute", left: 22, top: rowTop - 6, width: width - 44, height: HEAD.row - 6, opacity: clamp01(p * 1.6), transform: `translateY(${(1 - p) * -18}px) scale(${pr})`, transformOrigin: "40% 50%" }}>
+                  {i > 0 && <div style={{ position: "absolute", left: 12, right: 12, top: -3, height: 2, background: MINT.line }} />}
+                  {(hl > 0 || rip > 0) && (
+                    <div style={{ position: "absolute", inset: "4px 0", borderRadius: 26, overflow: "hidden", background: rgba("#EAF6F0", hl), boxShadow: `inset 0 0 0 2px ${rgba(MINT.ring, 0.6 * hl)}` }}>
+                      <Sheen k={prog(t, (highlight?.at ?? 0) + 0.04, 0.6, IN_OUT)} alpha={0.5} width="30%" />
+                      {rip > 0 && rip < 1 && <div style={{ position: "absolute", left: "50%", top: "50%", width: 900 * rip, height: 900 * rip, marginLeft: -450 * rip, marginTop: -450 * rip, borderRadius: "50%", background: `rgba(14,138,123,${0.16 * (1 - rip)})` }} />}
+                    </div>
+                  )}
+                  <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 22, height: "100%", padding: "0 18px 0 14px" }}>
+                    <Monogram name={l.product} size={96} radius={24} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontFamily: JAKARTA, fontWeight: 700, fontSize: 35, letterSpacing: "-0.015em", color: MINT.ink, whiteSpace: "nowrap" }}>{l.product}</div>
+                      <div style={{ fontFamily: JAKARTA, fontWeight: 600, fontSize: 22, color: MINT.muted, whiteSpace: "nowrap" }}>pour {l.drug}</div>
+                      <div style={{ marginTop: 8, display: "flex", gap: 10, alignItems: "center", height: 38 }}>
+                        {(l.chips ?? []).map((c, k) => (
+                          <Chip key={k} t={t} kind={c.kind} text={c.text} at={c.at ?? at + 0.22 + 0.1 * k} size={21} />
+                        ))}
+                      </div>
+                    </div>
+                    {l.price && <span style={{ fontFamily: JAKARTA, fontWeight: 800, fontSize: 38, color: MINT.green, fontVariantNumeric: "tabular-nums" }}>{l.price}</span>}
+                  </div>
+                  {hl > 0 && <Sparkle t={t} at={(highlight?.at ?? 0) + 0.05} x={width - 90} y={30} size={64} color="#3DBF8E" />}
+                </div>
+              );
+            })}
+          </MintFrame>
+        )}
       </div>
     </Placed>
   );
 }
 
-// ---- La grande carte dépliée -------------------------------------------------------------------------------------------
+// ---- La fiche du conseil ouverte ---------------------------------------------------------------------------------------
 
 export type BannerTab = "questions" | "discours" | "fiche";
 export type BannerQuestion = { text: string; at?: number };
 
-const TABS: { id: BannerTab; label: string; w: number }[] = [
-  { id: "questions", label: "Questions", w: 170 },
-  { id: "discours", label: "Discours", w: 154 },
-  { id: "fiche", label: "Fiche", w: 110 },
-];
-const tabX = (id: BannerTab) => TABS.slice(0, TABS.findIndex((x) => x.id === id)).reduce((s, x) => s + x.w, 0);
-const tabW = (id: BannerTab) => TABS.find((x) => x.id === id)?.w ?? 120;
-
-const CARD = { W: 920, H: 860, pad: 18, top: 62, gap: 12, lPad: 18, padX: 30, padY: 26, photo: 112, sp: 14, chip: 22, chipRow: 38, chipGap: 10, tabs: 60, act: 66, dots: 28 } as const;
-/** La carte blanche : coin haut gauche et taille, dans la grande carte. */
-const WHITE = { x: CARD.pad + CARD.lPad, y: CARD.pad + CARD.top + CARD.gap + CARD.lPad, w: CARD.W - 2 * CARD.pad - 2 * CARD.lPad, h: CARD.H - 2 * CARD.pad - CARD.top - CARD.gap - CARD.dots - 2 * CARD.lPad } as const;
+const CARD = { W: 920, H: 860, pad: 18, top: 62, gap: 12, lPad: 18, padX: 30, padY: 26, photo: 112, sp: 14, chip: 22, chipRow: 38, chipGap: 10, act: 66 } as const;
+/** La feuille blanche : coin haut gauche et taille, dans la fiche. */
+const WHITE = { x: CARD.pad + CARD.lPad, y: CARD.pad + CARD.top + CARD.gap + CARD.lPad, w: CARD.W - 2 * CARD.pad - 2 * CARD.lPad, h: CARD.H - 2 * CARD.pad - CARD.top - CARD.gap - 2 * CARD.lPad } as const;
 const WHITE_IN = WHITE.w - 2 * CARD.padX;
+/** Les deux parties de la fiche (mix-island.tsx, AdviceIsland) : « À dire au patient », puis les deux questions. */
+const SAY = { y: 372, h: 112 } as const;
+const ASK = { y: 494, h: 214 } as const;
 
 /** Largeur estimée d'une pastille (Jakarta 700), un peu large exprès : la rangée passe à la ligne plutôt que de déborder. */
 function chipWidth(c: ChipSpec, size: number) {
   return Array.from(c.text).length * size * 0.56 + 2 * 0.62 * size + (c.kind === "marge" || c.kind === "plain" ? 0 : size * 1.15);
 }
-/** Les rangées de pastilles de la carte (1 ou 2), toutes les pastilles comptées même avant leur arrivée. */
+/** Les rangées de pastilles de la fiche (1 ou 2), toutes les pastilles comptées même avant leur arrivée. */
 function chipRows(chips: ChipSpec[]) {
   let rows = chips.length ? 1 : 0;
   let w = 0;
@@ -607,96 +676,26 @@ function chipRows(chips: ChipSpec[]) {
   return Math.min(2, Math.max(1, rows));
 }
 
-/** Repères de la grande carte (px, relatifs à son coin haut gauche, scale 1). */
+/** Repères de la fiche (px, relatifs à son coin haut gauche, scale 1). */
 export const BANNER_CARD = {
   W: CARD.W,
   H: CARD.H,
-  /** Le centre du bouton « Vendu » (ancré au bas de la carte). */
-  vendu: { x: WHITE.x + CARD.padX + ((WHITE_IN - 14) * 1.3) / 2.3 / 2, y: WHITE.y + WHITE.h - CARD.padY - CARD.act / 2 },
-  /** Le centre d'un onglet (les pastilles peuvent tenir sur deux rangées : passer les mêmes `chips`). */
-  tab: (id: BannerTab, chips: ChipSpec[] = []) => {
-    const rows = chipRows(chips);
-    const y = WHITE.y + CARD.padY + CARD.photo + CARD.sp + rows * CARD.chipRow + (rows - 1) * 8 + CARD.sp + CARD.tabs / 2;
-    return { x: WHITE.x + CARD.padX + WHITE_IN - 7 - (TABS.reduce((s, x) => s + x.w, 0) - tabX(id) - tabW(id) / 2), y };
-  },
+  /** Le centre de la ligne du bas (« ✓ Vendu » une fois la vente validée). */
+  vendu: { x: WHITE.x + WHITE.w / 2, y: WHITE.y + WHITE.h - CARD.padY - CARD.act / 2 },
+  /** Le titre d'une partie : « Questions à poser » (questions) ou « À dire au patient » (discours, fiche). */
+  tab: (id: BannerTab, _chips: ChipSpec[] = []) => (id === "questions" ? { x: WHITE.x + CARD.padX + 120, y: ASK.y + 16 } : { x: WHITE.x + CARD.padX + 110, y: SAY.y + 16 }),
+  /** Les deux parties, pour les entourer (px depuis le coin haut gauche). */
+  say: { x: WHITE.x + 14, y: SAY.y - 8, w: WHITE.w - 28, h: SAY.h + 12 },
+  ask: { x: WHITE.x + 14, y: ASK.y - 8, w: WHITE.w - 28, h: ASK.h + 12 },
 };
 
-const DEFAULT_QUESTIONS: BannerQuestion[] = [{ text: "Avez-vous déjà eu des troubles digestifs avec un antibiotique ?" }, { text: "Prenez-vous déjà un probiotique ?" }];
+const DEFAULT_QUESTIONS: BannerQuestion[] = [{ text: "Avez-vous déjà eu des troubles digestifs avec un antibiotique ?" }, { text: "Prenez-vous déjà un probiotique ?" }];
 const DEFAULT_DISCOURS = { text: "Avec un antibiotique, la flore intestinale peut être perturbée. Je vous conseille un probiotique pendant le traitement." };
-const DEFAULT_FICHE = { reason: "Avec un antibiotique, la flore intestinale peut être perturbée.", posology: "1 gélule par jour, pendant toute la durée du traitement.", tell: ["À prendre à distance de l'antibiotique."] };
 
-function Label({ children, color = U.muted, size = 18 }: { children: ReactNode; color?: string; size?: number }) {
-  return <div style={{ fontFamily: JAKARTA, fontWeight: 700, fontSize: size, letterSpacing: "0.14em", textTransform: "uppercase", color, lineHeight: 1 }}>{children}</div>;
-}
-
-function QuestionsBody({ t, questions }: { t: number; questions: BannerQuestion[] }) {
+function SectionTitle({ children, glow = 0 }: { children: ReactNode; glow?: number }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-      {questions.slice(0, 2).map((q, i) => {
-        const p = enter(t, q.at, 0.36);
-        const num = q.at === undefined ? 1 : ressort(t, q.at + 0.03, { damping: 9, stiffness: 320, mass: 0.5 });
-        return (
-          <div key={i} style={{ opacity: q.at !== undefined && t < q.at ? 0 : clamp01(p * 1.8), transform: `translateX(${(1 - p) * 46}px)` }}>
-            <div style={{ display: "flex", gap: 14, fontFamily: JAKARTA, fontWeight: 600, fontSize: 25, lineHeight: "33px", color: U.ink }}>
-              <span style={{ display: "inline-flex", width: 32, height: 32, flexShrink: 0, marginTop: 1, alignItems: "center", justifyContent: "center", borderRadius: 99, background: U.green, color: "#FFF", fontWeight: 800, fontSize: 18, transform: `scale(${Math.max(0, num)})` }}>{i + 1}</span>
-              <span>{q.text}</span>
-            </div>
-            <div style={{ display: "flex", gap: 8, marginTop: 8, marginLeft: 46 }}>
-              {["Oui", "Non"].map((a, k) => {
-                const pk = q.at === undefined ? 1 : ressort(t, q.at + 0.22 + 0.06 * k, { damping: 11, stiffness: 300, mass: 0.5 });
-                return (
-                  <span key={a} style={{ display: "inline-flex", alignItems: "center", height: 38, padding: "0 18px", borderRadius: 99, border: `2px solid ${U.tabLine}`, background: "#FFF", color: U.ink, fontFamily: JAKARTA, fontWeight: 600, fontSize: 20, transform: `scale(${Math.max(0, pk)})`, transformOrigin: "0 50%" }}>
-                    {a}
-                  </span>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function DiscoursBody({ t, discours }: { t: number; discours: { text: string; at?: number; dur?: number } }) {
-  const chars = Array.from(discours.text);
-  const dur = discours.dur ?? chars.length * 0.028;
-  const n = discours.at === undefined ? chars.length : Math.floor(chars.length * clamp01((t - discours.at) / dur));
-  const typing = n < chars.length;
-  const caretOn = typing || Math.floor(t * 2.4) % 2 === 0;
-  return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <Quote size={20} color={U.green} strokeWidth={2.6} />
-        <Label>À dire au patient</Label>
-      </div>
-      <div style={{ marginTop: 12, minHeight: 196, boxSizing: "border-box", borderRadius: 24, padding: "20px 26px", background: U.raised, color: U.head, fontFamily: JAKARTA, fontWeight: 600, fontSize: 27, lineHeight: "37px", letterSpacing: "-0.01em", boxShadow: `0 14px 30px -18px ${rgba(U.raised, 0.8)}` }}>
-        {chars.slice(0, n).join("")}
-        <span style={{ display: "inline-block", width: 3, height: 30, marginLeft: 3, verticalAlign: "-5px", borderRadius: 2, background: PB.citron, opacity: caretOn ? 1 : 0, boxShadow: `0 0 10px ${PB.citron}` }} />
-      </div>
-    </div>
-  );
-}
-
-function FicheBody({ fiche }: { fiche: { reason?: string; posology?: string; tell?: string[] } }) {
-  const txt: CSSProperties = { fontFamily: JAKARTA, fontWeight: 500, fontSize: 23, lineHeight: "31px", color: U.ink };
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      {fiche.reason && <div style={{ ...txt, border: `3px solid ${U.reason}`, borderRadius: 22, padding: "10px 20px" }}>{fiche.reason}</div>}
-      {fiche.posology && (
-        <div>
-          <Label size={17}>Posologie</Label>
-          <div style={{ ...txt, marginTop: 6 }}>{fiche.posology}</div>
-        </div>
-      )}
-      {fiche.tell && fiche.tell.length > 0 && (
-        <div>
-          <Label size={17}>À dire au patient</Label>
-          {fiche.tell.slice(0, 2).map((l) => (
-            <div key={l} style={{ ...txt, marginTop: 6 }}>· {l}</div>
-          ))}
-        </div>
-      )}
+    <div style={{ display: "inline-flex", alignItems: "center", gap: 10, height: 32, padding: "0 10px", marginLeft: -10, borderRadius: 10, background: rgba(MINT.ring, 0.22 * glow), boxShadow: glow > 0 ? `0 0 0 2px ${rgba(MINT.ring, 0.7 * glow)}` : undefined, fontFamily: JAKARTA, fontWeight: 700, fontSize: 19, letterSpacing: "0.14em", textTransform: "uppercase", color: MINT.green }}>
+      {children}
     </div>
   );
 }
@@ -712,9 +711,6 @@ export function BannerCard({
   sold,
   at,
   price,
-  rank = "À proposer en premier",
-  fiche = DEFAULT_FICHE,
-  count = 2,
   x,
   y,
   scale,
@@ -728,14 +724,13 @@ export function BannerCard({
   questions?: BannerQuestion[];
   discours?: { text: string; at?: number; dur?: number };
   chips?: ChipSpec[];
-  /** Le pharmacien clique « Vendu » à ce temps. */
+  /** La vente est validée à ce temps : « ✓ Vendu » se trace. */
   sold?: number;
-  /** La carte se DÉPLIE à ce temps (sinon déjà ouverte ; rien avant `at`). */
+  /** La fiche se DÉPLIE à ce temps (sinon déjà ouverte ; rien avant `at`). */
   at?: number;
   price?: string;
   rank?: string;
   fiche?: { reason?: string; posology?: string; tell?: string[] };
-  /** Nombre de conseils de la vente (points sous la carte). */
   count?: number;
 }) {
   if (at !== undefined && t < at - F) return null;
@@ -743,134 +738,117 @@ export function BannerCard({
   const st = (d: number, dur = 0.34) => (at === undefined ? 1 : prog(t, at + d, dur, SNAP));
   const tabFn = asFn(tab);
   const cur = tabFn(t);
-  const { since, prev } = sinceChange(t, tabFn, 0.5);
-  const sw = since === Infinity ? 1 : SNAP(clamp01(since / 0.3));
-  const flash = since === Infinity ? 0 : pulse(since, 0, 0.05, 0.06, 0.4);
-  const indX = lerp(tabX(prev), tabX(cur), sw);
-  const indW = lerp(tabW(prev), tabW(cur), sw);
+  const { since } = sinceChange(t, tabFn, 0.5);
+  const flash = since === Infinity ? 0 : pulse(since, 0, 0.05, 0.06, 0.6);
+  const glowAsk = cur === "questions" ? Math.max(0.35, flash) : 0;
+  const glowSay = cur !== "questions" ? Math.max(0.35, flash) : 0;
   const soldK = sold === undefined ? 0 : prog(t, sold + 0.16, 0.3, SNAP);
-  const press = sold === undefined ? 1 : keys(t, [[sold - 0.08, 1], [sold + 0.02, 0.92, SNAP], [sold + 0.14, 1.06, SNAP], [sold + 0.32, 1, IN_OUT]]);
   const soldGlow = sold === undefined ? 0 : pulse(t, sold, 0.08, 0.12, 0.7);
   const tick = sold === undefined ? 0 : ressort(t, sold + 0.2, { damping: 10, stiffness: 300, mass: 0.5 });
   const draw = sold === undefined ? 0 : prog(t, sold + 0.28, 0.22, SNAP);
   const rows = chipRows(chips);
-  const bodyFor = (id: BannerTab) => (id === "questions" ? <QuestionsBody t={t} questions={questions} /> : id === "discours" ? <DiscoursBody t={t} discours={discours} /> : <FicheBody fiche={fiche} />);
+  // « À dire au patient » s'écrit (discours.at, dur) ; sans temps, déjà écrit.
+  const sayK = discours.at === undefined ? 1 : clamp01((t - discours.at) / (discours.dur ?? 1.2));
+  const sayText = discours.text.slice(0, Math.round(discours.text.length * sayK));
   return (
     <Placed x={x} y={y} scale={scale} rot={rot} style={style}>
-      <div
-        style={{
-          position: "relative",
-          width: CARD.W,
-          height: CARD.H,
-          borderRadius: 46,
-          overflow: "hidden",
-          background: U.night,
-          clipPath: unfold < 1 ? `inset(0 0 ${(1 - unfold) * 86}% 0 round 46px)` : undefined,
-          boxShadow: `0 0 0 2px ${rgba(PB.citron, 0.2 + 0.6 * soldGlow)}, 0 0 ${70 + 60 * soldGlow}px -14px ${rgba(soldGlow > 0 ? PB.citron : PB.mint, 0.45)}, 0 50px 100px -40px rgba(0,0,0,.75)`,
-        }}
-      >
-        <AdnBackdrop t={t} tone="night" width={1250} focus={[0.6, 0.3]} opacity={0.55} />
-        {/* La ligne du haut : « À proposer en premier · pour … » et les flèches. */}
-        <div style={{ position: "absolute", left: CARD.pad, right: CARD.pad, top: CARD.pad, height: CARD.top, display: "flex", alignItems: "center", gap: 14, opacity: st(0) }}>
-          <LogoRobot t={t} size={56} seed={2} />
-          <span style={{ flex: 1, minWidth: 0, fontFamily: JAKARTA, fontWeight: 700, fontSize: 24, color: U.head, textShadow: "0 2px 8px rgba(0,0,0,.7)", whiteSpace: "nowrap", overflow: "hidden" }}>
-            {rank} · pour {drug}
-          </span>
-          <span style={{ display: "inline-flex", width: 50, height: 50, borderRadius: 99, alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,.14)" }}>
-            <ChevronLeft size={28} color={U.head} strokeWidth={2.6} />
-          </span>
-          <span style={{ display: "inline-flex", width: 50, height: 50, borderRadius: 99, alignItems: "center", justifyContent: "center", background: PB.citron }}>
-            <ChevronRight size={28} color="#04261A" strokeWidth={2.6} />
-          </span>
-        </div>
-        {/* Le papier de l'hélice, la carte blanche dedans (essai « L »). */}
-        <div style={{ position: "absolute", left: CARD.pad, top: WHITE.y - CARD.lPad, width: WHITE.w + 2 * CARD.lPad, height: WHITE.h + 2 * CARD.lPad, borderRadius: 44, overflow: "hidden", background: U.paper }}>
-          <AdnBackdrop t={t + 3} tone="paper" width={1100} focus={[0.72, 0.42]} />
+      <div style={{ position: "relative", width: CARD.W, height: CARD.H, clipPath: unfold < 1 ? `inset(0 0 ${(1 - unfold) * 86}% 0 round 46px)` : undefined }}>
+        <MintFrame t={t} radius={46} style={{ inset: 0, boxShadow: `0 0 0 3px ${MINT.ring}, 0 0 ${60 * soldGlow}px ${rgba(MINT.ring, soldGlow)}, 0 50px 100px -40px rgba(14,124,90,.6)` }}>
+          <div style={{ position: "absolute", left: CARD.pad + 10, right: CARD.pad + 4, top: CARD.pad, height: CARD.top, opacity: st(0) }}>
+            <MintHeader close />
+          </div>
           <div
             style={{
               position: "absolute",
-              left: CARD.lPad,
-              top: CARD.lPad,
+              left: WHITE.x,
+              top: WHITE.y,
               width: WHITE.w,
               height: WHITE.h,
               boxSizing: "border-box",
               padding: `${CARD.padY}px ${CARD.padX}px`,
-              display: "flex",
-              flexDirection: "column",
               borderRadius: 36,
               background: "#FFFFFF",
               boxShadow: "0 24px 60px -34px rgba(15,43,38,.6)",
-              color: U.ink,
+              color: MINT.ink,
             }}
           >
-            {/* Photo + « pour … » + titre. */}
-            <div style={{ display: "flex", alignItems: "center", gap: 24, height: CARD.photo, flexShrink: 0, opacity: st(0.08), transform: `translateY(${(1 - st(0.08)) * 24}px)` }}>
-              <div style={{ width: CARD.photo, height: CARD.photo, flexShrink: 0, borderRadius: 26, background: "#FFF", boxShadow: "inset 0 0 0 2px #E3EBE8", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <div style={{ transform: `translateY(${wobble(t, 4, 3, 1.2)}px) rotate(${wobble(t, 6, 2, 0.9)}deg)` }}>
-                  <MiniBox name={product} w={78} />
-                </div>
-              </div>
+            {/* Photo (ou initiales) + « pour … » + nom et prix. */}
+            <div style={{ display: "flex", alignItems: "center", gap: 24, height: CARD.photo, opacity: st(0.08), transform: `translateY(${(1 - st(0.08)) * 24}px)` }}>
+              <Monogram name={product} size={CARD.photo} radius={26} />
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontFamily: JAKARTA, fontWeight: 700, fontSize: 19, letterSpacing: "0.14em", textTransform: "uppercase", color: U.green }}>pour {drug}</div>
-                <div style={{ marginTop: 8, fontFamily: JAKARTA, fontWeight: 700, fontSize: 46, lineHeight: 1.05, letterSpacing: "-0.025em", whiteSpace: "nowrap" }}>
+                <div style={{ fontFamily: JAKARTA, fontWeight: 700, fontSize: 19, letterSpacing: "0.14em", textTransform: "uppercase", color: MINT.green }}>pour {drug}</div>
+                <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 14, fontFamily: JAKARTA, fontWeight: 700, fontSize: 46, lineHeight: 1.05, letterSpacing: "-0.025em", whiteSpace: "nowrap" }}>
                   {product}
-                  {price && <span style={{ marginLeft: 18, color: U.green, fontVariantNumeric: "tabular-nums" }}>{price}</span>}
+                  {price && <span style={{ color: MINT.green, fontVariantNumeric: "tabular-nums" }}>{price}</span>}
+                  {soldK > 0 && (
+                    <span style={{ display: "inline-flex", width: 44, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 99, background: MINT.green, transform: `scale(${Math.max(0, tick)})` }}>
+                      <svg width={28} height={28} viewBox="0 0 26 26">
+                        <path d="M6 13.5 L11 18.5 L20.5 8" fill="none" stroke="#FFF" strokeWidth={3.6} strokeLinecap="round" strokeLinejoin="round" strokeDasharray={24} strokeDashoffset={24 * (1 - draw)} />
+                      </svg>
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
             {/* Les pastilles (une ou deux rangées). */}
-            <div style={{ display: "flex", flexWrap: "wrap", columnGap: CARD.chipGap, rowGap: 8, marginTop: CARD.sp, height: rows * CARD.chipRow + (rows - 1) * 8, flexShrink: 0, alignContent: "flex-start", alignItems: "center" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", columnGap: CARD.chipGap, rowGap: 8, marginTop: CARD.sp, height: rows * CARD.chipRow + (rows - 1) * 8, alignContent: "flex-start", alignItems: "center" }}>
               {chips.map((c, k) => (
                 <Chip key={k} t={t} kind={c.kind} text={c.text} at={c.at ?? (at === undefined ? undefined : at + 0.2 + 0.08 * k)} size={CARD.chip} />
               ))}
             </div>
-            {/* Les onglets, à droite. */}
-            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: CARD.sp, height: CARD.tabs, flexShrink: 0, opacity: st(0.18) }}>
-              <div style={{ position: "relative", display: "flex", padding: 5, borderRadius: 20, border: `2px solid ${U.tabLine}`, background: U.soft, boxSizing: "border-box" }}>
-                <div style={{ position: "absolute", left: 5 + indX, top: 5, width: indW, height: 46, borderRadius: 14, background: "#FFFFFF", boxShadow: `0 2px 8px rgba(15,43,38,.2), 0 0 0 ${3 * flash}px ${rgba(PB.citron, 0.9 * flash)}, 0 0 ${24 * flash}px ${rgba(PB.citron, flash)}` }} />
-                {TABS.map((x) => (
-                  <span key={x.id} style={{ position: "relative", width: x.w, height: 46, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: JAKARTA, fontWeight: x.id === cur ? 700 : 600, fontSize: 23, color: x.id === cur ? U.ink : U.muted }}>
-                    {x.label}
-                  </span>
-                ))}
-              </div>
-            </div>
-            {/* Le corps de l'onglet : la place qui reste. */}
-            <div style={{ position: "relative", marginTop: CARD.sp, flex: 1, minHeight: 0, overflow: "hidden", opacity: st(0.26) }}>
-              {sw < 1 && prev !== cur && <div style={{ position: "absolute", inset: 0, opacity: 1 - clamp01(sw * 2.2), transform: `translateX(${-40 * sw}px)` }}>{bodyFor(prev)}</div>}
-              <div style={{ position: "absolute", inset: 0, opacity: clamp01(sw * 1.4), transform: `translateX(${(1 - sw) * 44}px)` }}>{bodyFor(cur)}</div>
-            </div>
-            {/* Vendu / Non vendu, puis la ligne « ✓ Vendu » — ancrés en bas. */}
-            <div style={{ position: "relative", marginTop: CARD.sp, height: CARD.act, flexShrink: 0, opacity: st(0.32) }}>
-              {soldK < 1 && (
-                <div style={{ position: "absolute", inset: 0, display: "flex", gap: 14, opacity: 1 - soldK, transform: `scaleY(${1 - 0.3 * soldK})` }}>
-                  <div style={{ flex: 1.3, display: "flex", alignItems: "center", justifyContent: "center", gap: 12, borderRadius: 20, background: U.pick, color: "#FFF", fontFamily: JAKARTA, fontWeight: 800, fontSize: 27, transform: `scale(${press})`, boxShadow: `0 10px 24px -12px ${rgba(U.pick, 0.9)}` }}>
-                    <Check size={30} strokeWidth={3.2} />
-                    Vendu
-                  </div>
-                  <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 20, background: "#E6EDF1", color: "#4B5F6C", fontFamily: JAKARTA, fontWeight: 700, fontSize: 25 }}>Non vendu</div>
-                </div>
-              )}
-              {soldK > 0 && (
-                <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", gap: 14, padding: "0 10px 0 16px", borderRadius: 20, background: U.soft, boxShadow: `inset 0 0 0 2px ${rgba(U.pick, 0.25)}`, opacity: soldK, transform: `translateY(${(1 - soldK) * 18}px)` }}>
-                  <span style={{ display: "inline-flex", width: 40, height: 40, alignItems: "center", justifyContent: "center", borderRadius: 99, background: U.green, transform: `scale(${Math.max(0, tick)})` }}>
-                    <svg width={26} height={26} viewBox="0 0 26 26">
-                      <path d="M6 13.5 L11 18.5 L20.5 8" fill="none" stroke="#FFF" strokeWidth={3.6} strokeLinecap="round" strokeLinejoin="round" strokeDasharray={24} strokeDashoffset={24 * (1 - draw)} />
-                    </svg>
-                  </span>
-                  <span style={{ flex: 1, fontFamily: JAKARTA, fontWeight: 800, fontSize: 28, color: U.ink }}>Vendu</span>
-                  <span style={{ height: 48, display: "inline-flex", alignItems: "center", padding: "0 20px", borderRadius: 14, background: U.green, color: "#FFF", fontFamily: JAKARTA, fontWeight: 700, fontSize: 21 }}>Conseil suivant</span>
-                </div>
-              )}
+          </div>
+          {/* « À dire au patient » : la phrase, qui s'écrit. */}
+          <div style={{ position: "absolute", left: WHITE.x + CARD.padX, right: WHITE.x + CARD.padX, top: SAY.y, height: SAY.h, opacity: st(0.2) }}>
+            <SectionTitle glow={glowSay}>
+              <Quote size={20} strokeWidth={2.6} /> À dire au patient
+            </SectionTitle>
+            <div style={{ marginTop: 8, fontFamily: JAKARTA, fontWeight: 500, fontSize: 25, lineHeight: 1.32, color: MINT.ink }}>
+              « {sayText}
+              {sayK < 1 && <span style={{ display: "inline-block", width: 3, height: 26, marginLeft: 2, verticalAlign: "-4px", background: MINT.green }} />}
+              {sayK >= 1 && " »"}
             </div>
           </div>
-        </div>
-        {/* Les points des conseils (le vendu passe en citron). */}
-        <div style={{ position: "absolute", left: 0, right: 0, bottom: 9, display: "flex", justifyContent: "center", gap: 10 }}>
-          {Array.from({ length: Math.max(1, count) }, (_, i) => (
-            <span key={i} style={{ width: i === 0 ? 32 : 12, height: 12, borderRadius: 99, background: i === 0 ? (soldK > 0.5 ? PB.citron : "#FFFFFF") : "rgba(255,255,255,.3)" }} />
-          ))}
-        </div>
+          {/* Les deux questions, chacune avec ses réponses. */}
+          <div style={{ position: "absolute", left: WHITE.x + CARD.padX, right: WHITE.x + CARD.padX, top: ASK.y, height: ASK.h, opacity: st(0.26) }}>
+            <SectionTitle glow={glowAsk}>Questions à poser</SectionTitle>
+            {questions.slice(0, 2).map((q, i) => {
+              const k = q.at === undefined ? 1 : prog(t, q.at, 0.3, SNAP);
+              return (
+                <div key={i} style={{ marginTop: 12, opacity: k, transform: `translateX(${(1 - k) * 30}px)` }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, fontFamily: JAKARTA, fontWeight: 600, fontSize: 24, color: MINT.ink, whiteSpace: "nowrap" }}>
+                    <span style={{ display: "inline-flex", width: 30, height: 30, flexShrink: 0, borderRadius: 99, alignItems: "center", justifyContent: "center", background: MINT.green, color: "#FFF", fontWeight: 800, fontSize: 18 }}>{i + 1}</span>
+                    {q.text}
+                  </div>
+                  <div style={{ marginTop: 6, marginLeft: 42, display: "flex", gap: 10 }}>
+                    {(i === 0 ? ["Oui, déjà", "Pas encore"] : ["Oui", "Non"]).map((a) => (
+                      <span key={a} style={{ height: 34, padding: "0 16px", display: "inline-flex", alignItems: "center", borderRadius: 999, boxShadow: "inset 0 0 0 2px #CFE3DA", fontFamily: JAKARTA, fontWeight: 600, fontSize: 19, color: MINT.ink }}>{a}</span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {/* La ligne du bas : « Une question du patient ? » (l'aide), puis « ✓ Vendu » une fois la vente validée. */}
+          <div style={{ position: "absolute", left: WHITE.x + CARD.padX, right: WHITE.x + CARD.padX, top: WHITE.y + WHITE.h - CARD.padY - CARD.act, height: CARD.act, opacity: st(0.32) }}>
+            {soldK < 1 && (
+              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", gap: 14, padding: "0 8px 0 22px", borderRadius: 999, background: MINT.soft, boxShadow: `inset 0 0 0 2px #BFE6D4`, opacity: 1 - soldK }}>
+                <Quote size={24} color={MINT.green} strokeWidth={2.4} />
+                <span style={{ flex: 1, fontFamily: JAKARTA, fontWeight: 500, fontSize: 23, color: MINT.muted }}>Une question du patient ?</span>
+                <span style={{ height: 50, padding: "0 24px", display: "inline-flex", alignItems: "center", borderRadius: 999, background: MINT.green, color: "#FFF", fontFamily: JAKARTA, fontWeight: 700, fontSize: 22 }}>Demander</span>
+              </div>
+            )}
+            {soldK > 0 && (
+              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", gap: 14, padding: "0 22px", borderRadius: 999, background: "#E3F6EC", boxShadow: `inset 0 0 0 2px ${rgba(MINT.green, 0.35)}`, opacity: soldK, transform: `translateY(${(1 - soldK) * 18}px)` }}>
+                <span style={{ display: "inline-flex", width: 40, height: 40, alignItems: "center", justifyContent: "center", borderRadius: 99, background: MINT.green, transform: `scale(${Math.max(0, tick)})` }}>
+                  <svg width={26} height={26} viewBox="0 0 26 26">
+                    <path d="M6 13.5 L11 18.5 L20.5 8" fill="none" stroke="#FFF" strokeWidth={3.6} strokeLinecap="round" strokeLinejoin="round" strokeDasharray={24} strokeDashoffset={24 * (1 - draw)} />
+                  </svg>
+                </span>
+                <span style={{ flex: 1, fontFamily: JAKARTA, fontWeight: 800, fontSize: 28, color: "#0E7A4E" }}>Vendu</span>
+              </div>
+            )}
+          </div>
+        </MintFrame>
       </div>
     </Placed>
   );

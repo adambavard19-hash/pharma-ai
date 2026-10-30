@@ -13,10 +13,26 @@ export const FPS = 60;
 
 /** Le DROP : la bande a fini de rembobiner, PharmaBoost entre en scène, la musique explose. */
 export const DROP = 20;
-/** Le dernier accord de la musique (le logo claque une dernière fois). */
+/**
+ * LA COUPE (fondateur, 30 oct. 2026 : « supprime la partie 3 sur 3 pour les marques ») : le chapitre des marques (S12, N11)
+ * est retiré. Les scènes, les voix, les sous-titres et la musique gardent leur temps « d'histoire » (celui du montage
+ * d'origine, 75 s) ; le film saute GAP secondes à CUT. 6 s = trois mesures de la musique (120 BPM) : le temps fort reste
+ * sur le temps fort. Temps du film = filmTime(temps d'histoire) ; l'inverse : storyTime.
+ */
+export const CUT = 59.6;
+export const GAP = 6;
+export const filmTime = (story: number) => (story >= CUT + GAP ? story - GAP : story);
+export const storyTime = (film: number) => (film >= CUT ? film + GAP : film);
+/** Les répliques qui ne sont plus dites (le chapitre des marques). */
+export const DROPPED_VOICES = ["N11"];
+
+/** Le dernier accord de la musique (le logo claque une dernière fois), en temps d'histoire. */
 export const FINAL_HIT = 72;
+/** La fin, en temps d'histoire (S13 et la musique le lisent). */
 export const TOTAL = 75;
-export const TOTAL_FRAMES = Math.round(TOTAL * FPS);
+/** La durée du FILM, après la coupe. */
+export const FILM_TOTAL = TOTAL - GAP;
+export const TOTAL_FRAMES = Math.round(FILM_TOTAL * FPS);
 
 /** Le début de chaque fichier de voix, en temps du film (le fichier commence ≈ 50 ms avant la parole). */
 export const VOICE_AT: Record<string, number> = {
@@ -34,13 +50,14 @@ export const VOICE_AT: Record<string, number> = {
   N8: 45.0, // « Pour l'équipe : chaque conseil vendu se compte, en direct. »
   N9: 48.7, // « Pour le patient : son bilan par e-mail, et un rappel avant la fin de sa cure. »
   N10: 53.45, // reprise « scanné » (25 oct.), calée sur les mots de la 1re prise — « Et bientôt, l'application PharmaBoost : scanner ses boîtes, suivre ses cures, profiter d'offres. »
-  N11: 59.8, // « Pour les marques : leurs challenges sur l'écran du comptoir, au bon moment. Et chaque vente, comptée. »
+  N11: 59.8, // (retirée : DROPPED_VOICES) « Pour les marques : leurs challenges sur l'écran du comptoir, au bon moment. Et chaque vente, comptée. »
   N12: 65.7, // « PharmaBoost. Le copilote IA du comptoir de votre pharmacie. »
   D5: 70.0, // pharmacienne : « Il vous fallait autre chose ? »
 };
 
-export type SceneId = "S1" | "S2" | "S3" | "S4" | "S5" | "S6" | "S7" | "S8" | "S9" | "S10" | "S11" | "S12" | "S13";
-export type SceneWindow = { id: SceneId; file: string; name: string; start: number; end: number };
+export type SceneId = "S1" | "S2" | "S3" | "S4" | "S5" | "S6" | "S7" | "S8" | "S9" | "S10" | "S11" | "S13";
+/** `start`, `end` : en temps du FILM ; `offset` : ce qu'on ajoute au temps du film pour donner son temps d'histoire à la scène. */
+export type SceneWindow = { id: SceneId; file: string; name: string; start: number; end: number; offset: number };
 
 /**
  * Les fenêtres des scènes. `end` déborde de 0,5 s sur la scène suivante : la transition se fait dans ce chevauchement
@@ -59,15 +76,16 @@ const CUTS: [SceneId, string, string, number][] = [
   ["S9", "s09-equipe", "L'équipe", 44.8],
   ["S10", "s10-patient", "Le patient", 48.5],
   ["S11", "s11-application", "L'application", 53.3],
-  ["S12", "s12-marques", "Les marques", 59.6],
-  ["S13", "s13-signature", "La signature", 65.5],
+  // S12 « Les marques » (59,6 → 65,5) : retirée le 30 oct. 2026. La signature arrive sous la sortie de S11.
+  ["S13", "s13-signature", "La signature", 65.5 - GAP],
 ];
 export const SCENES: SceneWindow[] = CUTS.map(([id, file, name, start], i) => ({
   id,
   file,
   name,
   start,
-  end: i < CUTS.length - 1 ? CUTS[i + 1][3] + OVER : TOTAL,
+  end: i < CUTS.length - 1 ? CUTS[i + 1][3] + OVER : FILM_TOTAL,
+  offset: start >= CUT - 0.2 ? GAP : 0,
 }));
 
 export const sceneById = (id: SceneId) => SCENES.find((s) => s.id === id) as SceneWindow;
