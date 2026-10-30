@@ -14,6 +14,7 @@ import {
   SCREEN_UI,
   Sparkle,
   bannerRowCenter,
+  bannerHeadHeight,
   clamp01,
   cue,
   keys,
@@ -64,8 +65,9 @@ const T = {
   line1: 26.6,
   beam2: 26.96,
   line2: 27.08,
-  /** « bon » 27,22 : la ligne 1 s'illumine. */
-  bon: 27.24,
+  /** « bon conseil » : la carte 1 s'illumine, juste après l'ouverture des cartes (la petite bannière nomme d'abord les
+   * conseils, 30 oct. 2026). */
+  bon: 27.62,
   /** « pris » 28,40 : le panneau du stock entre. */
   pris: 28.38,
   lock: 28.62,
@@ -81,8 +83,8 @@ const T = {
 } as const;
 
 export const S6_LINES: BannerLine[] = [
-  { n: 1, drug: AMOXI, product: "Probiotique", chips: [{ kind: "stock", text: "12 en stock", at: T.stock }], at: T.line1 },
-  { n: 2, drug: PARA, product: "Pastilles gorge", chips: [{ kind: "stock", text: "8 en stock", at: T.stock2 }], at: T.line2 },
+  { n: 1, drug: AMOXI, product: "Probiotique", challenge: true, chips: [{ kind: "stock", text: "12 en stock", at: T.stock }], at: T.line1 },
+  { n: 2, drug: PARA, product: "Pastilles gorge", shortDate: true, chips: [{ kind: "stock", text: "8 en stock", at: T.stock2 }], at: T.line2 },
 ];
 
 /**
@@ -90,15 +92,14 @@ export const S6_LINES: BannerLine[] = [
  * BannerHead garde la hauteur finale de sa boîte et grandit vers le bas : on la recentre ici (même ressort que le kit).
  */
 const CAP = { x: 1240, y: 500, s: 1.2, w: 920, h: 18 * 2 + 140 * 2 } as const;
-const headSpring = (t: number, at: number) => ressort(t, at, { damping: 13, stiffness: 190, mass: 0.7 });
-const capHeight = (t: number, lines: BannerLine[]) => Math.max(100, 36 + lines.reduce((s, l) => s + 140 * headSpring(t, l.at), 0));
+const capHeight = (t: number, lines: BannerLine[]) => bannerHeadHeight(t, lines);
 const capTop = (t: number, lines: BannerLine[] = S6_LINES) => CAP.y - (capHeight(t, lines) / 2) * CAP.s;
 const capTL = (t: number) => ({ x: CAP.x - (CAP.w / 2) * CAP.s, y: capTop(t) });
 const inCap = (p: { x: number; y: number }, t: number) => ({ x: capTL(t).x + p.x * CAP.s, y: capTL(t).y + p.y * CAP.s });
-/** Le centre de la pastille de stock de la ligne 1 (mesuré dans BannerHead : x 112 + ½ pastille, y 131), capsule pleine. */
-const CHIP1 = inCap({ x: 112 + 86, y: 131 }, 40);
-/** Le début de la ligne n (là où arrive la traînée du scan), au moment où elle arrive. */
-const rowHead = (n: number, t: number) => inCap({ x: 150, y: 18 + 140 * (n - 1) + 36 }, t);
+/** Le centre de la pastille de stock de la carte 1 (BannerHead : x 154 + ½ pastille, y 120), bannière ouverte. */
+const CHIP1 = inCap({ x: 243, y: 120 }, 40);
+/** Là où arrive la traînée du scan : le nom du conseil n dans la petite bannière blanche. */
+const rowHead = (n: number, t: number) => inCap({ x: 360 + (n - 1) * 230, y: 50 }, t);
 
 /* ------------------------------------------------------------------ l'écran au repos, partagé avec S5 */
 

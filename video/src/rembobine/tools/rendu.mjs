@@ -41,9 +41,9 @@ if (mode === "brouillon") {
 } else if (mode === "son") {
   const wav = join(OUT, "son.wav");
   if (remotion(wav, "--codec=wav") !== 0) process.exit(1);
-  const desk = join(homedir(), "Desktop", "PharmaBoost-Rembobinons-4K.mp4");
+  const desk = join(homedir(), "Desktop", "PharmaBoost-Rembobinons-4K-v2.mp4");
   if (!existsSync(desk)) throw new Error(`${desk} introuvable : lancer « final ».`);
-  const done = join(OUT, "PharmaBoost-Rembobinons-4K.mp4");
+  const done = join(OUT, "PharmaBoost-Rembobinons-4K-v2.mp4");
   execFileSync("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-i", desk, "-i", wav, "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-af", loudnormArgs(wav), "-ar", "48000", "-c:a", "aac", "-b:a", "320k", "-shortest", "-movflags", "+faststart", done]);
   report(done);
   copyFileSync(done, desk);
@@ -75,10 +75,10 @@ if (mode === "brouillon") {
   const video = join(DIR, "video.mp4");
   execFileSync("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-f", "concat", "-safe", "0", "-i", list, "-c", "copy", video]);
   // 3. L'assemblage, son à −16 LUFS.
-  const done = join(OUT, "PharmaBoost-Rembobinons-4K.mp4");
+  const done = join(OUT, "PharmaBoost-Rembobinons-4K-v2.mp4");
   execFileSync("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-i", video, "-i", wav, "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-af", loudnormArgs(wav), "-ar", "48000", "-c:a", "aac", "-b:a", "320k", "-shortest", "-movflags", "+faststart", done]);
   report(done);
-  const desk = join(homedir(), "Desktop", "PharmaBoost-Rembobinons-4K.mp4");
+  const desk = join(homedir(), "Desktop", "PharmaBoost-Rembobinons-4K-v2.mp4");
   copyFileSync(done, desk);
   rmSync(DIR, { recursive: true, force: true });
   rmSync(done);

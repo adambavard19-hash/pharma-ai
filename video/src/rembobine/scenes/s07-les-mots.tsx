@@ -125,10 +125,10 @@ function cardPose(t: number) {
 
 /** Repères de la carte (px depuis son coin haut gauche, échelle 1), mesurés sur les planches. */
 const IN = {
-  /** La zone des questions (le corps de l'onglet). */
-  questions: { x: 50, y: 424, w: 820, h: 232 },
-  /** La boîte noire du discours. */
-  discours: { x: 54, y: 454, w: 812, h: 220 },
+  /** Les deux questions à poser (la fiche de la bannière d'aujourd'hui, 30 oct. 2026). */
+  questions: BANNER_CARD.ask,
+  /** « À dire au patient ». */
+  discours: BANNER_CARD.say,
   /** Le centre de chaque pastille posée. */
   slot: { marge: { x: 327, y: 281 }, challenge: { x: 297, y: 328 }, date: { x: 630, y: 328 } } as Record<string, { x: number; y: number }>,
 };

@@ -49,7 +49,9 @@ export const LINES: Line[] = [
   { id: "N11", who: "yann", say: "Pour les marques : leurs challenges sur l'écran du comptoir, au bon moment. Et chaque vente, comptée.", caption: "Pour les marques : leurs *challenges* sur l'écran du comptoir, au bon moment. Et chaque vente, *comptée*." },
   // ACTE 4 — la signature
   { id: "N12", who: "yann", say: "PharmaBoost. Le copilote IA du comptoir de votre pharmacie.", caption: "*PharmaBoost*. Le copilote IA du comptoir de votre pharmacie." },
-  { id: "D5", who: "clemence", say: "Il vous fallait autre chose ?", caption: "« Il vous fallait *autre chose* ? »" },
+  // La pharmacienne remercie (fondateur, 30 oct. 2026 : « à la place de dire ça, qu'elle dise "Merci PharmaBoost" ») : la
+  // phrase est REDITE seule (`retake`), le reste de sa voix ne change pas.
+  { id: "D5", who: "clemence", say: "Il vous fallait autre chose ?", retake: "Merci PharmaBoost !", caption: "« Merci *PharmaBoost* ! »" },
 ];
 
 /** Ce qui part à ElevenLabs pour une voix, d'un seul tenant : une phrase par ligne. */

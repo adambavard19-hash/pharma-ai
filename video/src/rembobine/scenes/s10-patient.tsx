@@ -366,7 +366,7 @@ export function Scene({ t }: { t: number }) {
         <Dust t={t} count={22} seed="s10-dust" color={PB.brand} size={[1.5, 3.5]} alpha={0.28} speed={0.07} />
       </Camera>
       <ChapterFix>
-        <ChapterTitle t={t} at={CH_AT} n="2/3" text="POUR *LE PATIENT*" exitAt={CH_EXIT} />
+        <ChapterTitle t={t} at={CH_AT} n="2/2" text="POUR *LE PATIENT*" exitAt={CH_EXIT} />
       </ChapterFix>
     </>
   );

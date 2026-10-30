@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
  * 2 250 images = 38 s. Un film refait change de durée : la changer ici dans le même temps.
  */
 export const FILMS = {
-  presentation: { src: "/video/pharmaboost-presentation.mp4", poster: "/video/pharmaboost-presentation.jpg", duration: "1 min 15", title: "Présentation de PharmaBoost" },
+  presentation: { src: "/video/pharmaboost-presentation.mp4", poster: "/video/pharmaboost-presentation.jpg", duration: "1 min 09", title: "Présentation de PharmaBoost" },
   // L'ancienne présentation (le robot pharmacien, voix « Yann », 15 oct. 2026), gardée à la demande du fondateur quand
   // « Rembobinons » l'a remplacée (25 oct. 2026) : section « PharmaBoost en trois étapes » de l'accueil. 50,2 s.
   enBref: { src: "/video/pharmaboost-en-bref.mp4", poster: "/video/pharmaboost-en-bref.jpg", duration: "50 s", title: "PharmaBoost en bref" },

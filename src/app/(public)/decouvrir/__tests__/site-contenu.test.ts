@@ -294,10 +294,10 @@ describe("chaque page se partage avec son propre titre, et garde l'image du site
 });
 
 describe("les durées affichées des films", () => {
-  it("suivent les films refaits : Comment ça marche 44 s, Avantages 38 s, Présentation « Rembobinons » 1 min 15", () => {
+  it("suivent les films refaits : Comment ça marche 44 s, Avantages 38 s, Présentation « Rembobinons » 1 min 09", () => {
     expect(FILMS.comment.duration).toBe("44 s");
     expect(FILMS.avantages.duration).toBe("38 s");
-    expect(FILMS.presentation.duration).toBe("1 min 15");
+    expect(FILMS.presentation.duration).toBe("1 min 09");
     // L'ancienne présentation, gardée ailleurs sur l'accueil : 50,2 s.
     expect(FILMS.enBref.duration).toBe("50 s");
     expect(FILMS.pourquoi.duration).toBe("34 s");

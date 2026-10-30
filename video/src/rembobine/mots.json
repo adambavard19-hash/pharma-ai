@@ -916,34 +916,19 @@
  "D5": {
   "who": "clemence",
   "at": 70,
-  "end": 71.513,
+  "end": 71.207,
   "say": "Il vous fallait autre chose ?",
-  "caption": "« Il vous fallait *autre chose* ? »",
+  "caption": "« Merci *PharmaBoost* ! »",
   "words": [
    {
-    "w": "Il",
-    "at": 69.981,
-    "end": 70.073
+    "w": "Merci",
+    "at": 70,
+    "end": 70.313
    },
    {
-    "w": "vous",
-    "at": 70.12,
-    "end": 70.224
-   },
-   {
-    "w": "fallait",
-    "at": 70.248,
-    "end": 70.48
-   },
-   {
-    "w": "autre",
-    "at": 70.549,
-    "end": 70.863
-   },
-   {
-    "w": "chose ?",
-    "at": 70.909,
-    "end": 71.513
+    "w": "PharmaBoost !",
+    "at": 70.348,
+    "end": 71.207
    }
   ]
  }

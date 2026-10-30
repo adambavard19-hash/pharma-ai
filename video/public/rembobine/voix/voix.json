@@ -1,0 +1,202 @@
+{
+  "voix": {
+    "yann": "Yann (ElevenLabs, eleven_multilingual_v2)",
+    "clemence": "Clémence (ElevenLabs, eleven_multilingual_v2)",
+    "eric": "Eric (ElevenLabs, eleven_multilingual_v2)"
+  },
+  "lignes": {
+    "N1": "Il repart avec son antibiotique… et rien pour sa flore intestinale.",
+    "N2": "Cette scène se répète chaque jour, dans toute la France.",
+    "N3": "Alors… rembobinons.",
+    "N4": "Même patient. Même ordonnance. Mais cette fois, PharmaBoost est au comptoir.",
+    "N5": "À chaque boîte scannée, le bon conseil s'affiche, pris dans votre stock.",
+    "N6": "Les questions à poser. Les mots à dire. La marge, le challenge, la date courte.",
+    "N7": "Le pharmacien décide. Le patient repart mieux conseillé.",
+    "N8": "Pour l'équipe : chaque conseil vendu se compte, en direct.",
+    "N9": "Pour le patient : son bilan par e-mail, et un rappel avant la fin de sa cure.",
+    "N10": "Et bientôt, l'application PharmaBoost : scanner ses boîtes, suivre ses cures, profiter d'offres.",
+    "N11": "Pour les marques : leurs challenges sur l'écran du comptoir, au bon moment. Et chaque vente, comptée.",
+    "N12": "PharmaBoost. Le copilote IA du comptoir de votre pharmacie.",
+    "D1": "Et avec ceci, il vous fallait autre chose ?",
+    "D3": "Avec votre antibiotique, je vous conseille un probiotique.",
+    "D5": "Il vous fallait autre chose ?",
+    "D2": "Non merci.",
+    "D4": "Ah oui, je veux bien !"
+  },
+  "cuts": {
+    "N1": {
+      "who": "yann",
+      "from": 0,
+      "to": 6.38,
+      "speechFrom": 0,
+      "speechTo": 6.13,
+      "dur": 6.38,
+      "lead": 0,
+      "speech": 6.13
+    },
+    "N2": {
+      "who": "yann",
+      "from": 6.465022675736962,
+      "to": 10.107,
+      "speechFrom": 6.513,
+      "speechTo": 9.857,
+      "dur": 3.641995,
+      "lead": 0.047977324263038135,
+      "speech": 3.3439999999999994
+    },
+    "N3": {
+      "who": "yann",
+      "from": 10.156791383219955,
+      "to": 12.173,
+      "speechFrom": 10.182,
+      "speechTo": 11.923,
+      "dur": 2.01619,
+      "lead": 0.025208616780044935,
+      "speech": 1.7409999999999997
+    },
+    "N4": {
+      "who": "yann",
+      "from": 12.257,
+      "to": 17.450147392290248,
+      "speechFrom": 12.307,
+      "speechTo": 17.392,
+      "dur": 5.193084,
+      "lead": 0.05000000000000071,
+      "speech": 5.084999999999999
+    },
+    "N5": {
+      "who": "yann",
+      "from": 17.450147392290248,
+      "to": 21.2074716553288,
+      "speechFrom": 17.45,
+      "speechTo": 21.177,
+      "dur": 3.757415,
+      "lead": 0,
+      "speech": 3.7270000000000003
+    },
+    "N6": {
+      "who": "yann",
+      "from": 21.208,
+      "to": 26.17452380952381,
+      "speechFrom": 21.258,
+      "speechTo": 26.134,
+      "dur": 4.966485,
+      "lead": 0.05000000000000071,
+      "speech": 4.876000000000001
+    },
+    "N7": {
+      "who": "yann",
+      "from": 26.235,
+      "to": 30.26359410430839,
+      "speechFrom": 26.285,
+      "speechTo": 30.14,
+      "dur": 4.028594,
+      "lead": 0.05000000000000071,
+      "speech": 3.8550000000000004
+    },
+    "N8": {
+      "who": "yann",
+      "from": 30.26359410430839,
+      "to": 33.5858843537415,
+      "speechFrom": 30.256,
+      "speechTo": 33.495,
+      "dur": 3.32229,
+      "lead": 0,
+      "speech": 3.238999999999997
+    },
+    "N9": {
+      "who": "yann",
+      "from": 33.5858843537415,
+      "to": 38.006,
+      "speechFrom": 33.576,
+      "speechTo": 37.756,
+      "dur": 4.420113,
+      "lead": 0,
+      "speech": 4.18
+    },
+    "N10": {
+      "who": "yann",
+      "retake": true,
+      "tempo": 1.034,
+      "from": 0,
+      "to": 6.315828,
+      "speechFrom": 0,
+      "speechTo": 6.316,
+      "dur": 6.123696,
+      "lead": 0,
+      "speech": 6.108317214700193
+    },
+    "N11": {
+      "who": "yann",
+      "from": 43.97665532879819,
+      "to": 49.303,
+      "speechFrom": 43.979,
+      "speechTo": 49.053,
+      "dur": 5.326304,
+      "lead": 0.002344671201811366,
+      "speech": 5.073999999999998
+    },
+    "N12": {
+      "who": "yann",
+      "from": 49.386,
+      "to": 53.127256235827666,
+      "speechFrom": 49.436,
+      "speechTo": 53.128,
+      "dur": 3.741247,
+      "lead": 0.04999999999999716,
+      "speech": 3.692
+    },
+    "D1": {
+      "who": "clemence",
+      "from": 0,
+      "to": 2.3782426303854876,
+      "speechFrom": 0,
+      "speechTo": 2.159,
+      "dur": 2.378209,
+      "lead": 0,
+      "speech": 2.159
+    },
+    "D3": {
+      "who": "clemence",
+      "from": 2.3782426303854876,
+      "to": 5.360079365079365,
+      "speechFrom": 2.368,
+      "speechTo": 5.166,
+      "dur": 2.981882,
+      "lead": 0,
+      "speech": 2.7980000000000005
+    },
+    "D5": {
+      "who": "clemence",
+      "retake": true,
+      "tempo": 1,
+      "from": 0,
+      "to": 1.207438,
+      "speechFrom": 0,
+      "speechTo": 1.207,
+      "dur": 1.207392,
+      "lead": 0,
+      "speech": 1.207
+    },
+    "D2": {
+      "who": "eric",
+      "from": 0,
+      "to": 0.7402834467120182,
+      "speechFrom": 0,
+      "speechTo": 0.662,
+      "dur": 0.740295,
+      "lead": 0,
+      "speech": 0.662
+    },
+    "D4": {
+      "who": "eric",
+      "from": 0.7402834467120182,
+      "to": 1.9504761904761905,
+      "speechFrom": 0.731,
+      "speechTo": 1.95,
+      "dur": 1.210181,
+      "lead": 0,
+      "speech": 1.2189999999999999
+    }
+  }
+}
