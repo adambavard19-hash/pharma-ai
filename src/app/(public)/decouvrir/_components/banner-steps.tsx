@@ -34,6 +34,9 @@ export function entryItems(entry: Pick<HostEntry, "items">): IslandAdvice[] {
 
 const noop = () => undefined;
 
+/** Au survol, la bannière se soulève, comme les cartes du site (fondateur, 29 oct. 2026). */
+const LIFT_CSS = `.site-lift section{transition:transform .25s cubic-bezier(.2,.8,.2,1),filter .25s}.site-lift section:hover{transform:translateY(-6px);filter:drop-shadow(0 18px 22px rgba(14,124,90,.22))}@media (prefers-reduced-motion:reduce){.site-lift section,.site-lift section:hover{transition:none;transform:none}}`;
+
 /** Un temps de la bannière : l'explication à gauche, la bannière à droite, sur le fond clair du site (l'hélice d'ADN, douce). */
 function Moment({ n, title, text, chips, children }: { n: number; title: string; text: string; chips: { label: string; tone: string }[]; children: ReactNode }) {
   return (
@@ -67,19 +70,22 @@ function Moment({ n, title, text, chips, children }: { n: number; title: string;
 export function LiveCards({ items, startOpen, initialPanel }: { items: IslandAdvice[]; startOpen?: number; initialPanel?: "routine" | "reduced" }) {
   const [open, setOpen] = useState(startOpen !== undefined);
   return (
-    <MixIsland
-      cards
-      reduce="a"
-      items={items}
-      outcomes={[]}
-      open={open}
-      startAt={startOpen}
-      initialPanel={initialPanel}
-      onOpen={() => setOpen(true)}
-      onClose={() => setOpen(false)}
-      onFinish={noop}
-      onAnswer={noop}
-    />
+    <div className="site-lift contents">
+      <style>{LIFT_CSS}</style>
+      <MixIsland
+        cards
+        reduce="a"
+        items={items}
+        outcomes={[]}
+        open={open}
+        startAt={startOpen}
+        initialPanel={initialPanel}
+        onOpen={() => setOpen(true)}
+        onClose={() => setOpen(false)}
+        onFinish={noop}
+        onAnswer={noop}
+      />
+    </div>
   );
 }
 
@@ -88,16 +94,18 @@ export function BannerSteps({ entry = ESSAI_ENTRY, brand = "PharmaBoost" }: { en
   const found = items.filter((item) => !item.sheet?.routine).map((item) => ({ name: shortAdviceName(item.name), challenge: item.challenge, shortDate: Boolean(item.shortDate) }));
   return (
     <div className="space-y-14">
-      <style>{`${ISLAND_CSS}\n${SCAN_CSS}`}</style>
+      <style>{`${ISLAND_CSS}\n${SCAN_CSS}\n${LIFT_CSS}`}</style>
       <Moment
         n={1}
         title="Au scan, la petite bannière"
         text={`Vous scannez les boîtes. En haut de l'écran, la petite bannière ${brand} s'allume et nomme les conseils, avec l'étoile du challenge ou le sablier de la date courte.`}
         chips={[{ label: "★ Challenge", tone: "#E8FF9C" }, { label: "⏳ Date courte", tone: "#FFD9D4" }]}
       >
-        <IslandShell width={whiteFoundWidth(found)} tone="accent" className="crd-white" contentKey="trouve" label="La petite bannière au scan">
-          <WhitePill phase="found" found={found} />
-        </IslandShell>
+        <div className="site-lift contents">
+          <IslandShell width={whiteFoundWidth(found)} tone="accent" className="crd-white" contentKey="trouve" label="La petite bannière au scan">
+            <WhitePill phase="found" found={found} />
+          </IslandShell>
+        </div>
       </Moment>
       <Moment
         n={2}
