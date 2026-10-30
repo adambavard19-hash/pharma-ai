@@ -10,9 +10,8 @@ import { loadPublicPricing } from "@/server/services/public-pricing";
 import { formatEuros } from "@/core/billing/subscription";
 import { PricingSection } from "./_components/pricing-section";
 import { FeatureCarousel, type FeatureSlide } from "./_components/feature-carousel";
-import { RoutineShowcase } from "./_components/routine-showcase";
 import { BannerSteps } from "./_components/banner-steps";
-import { FlowSteps, LoadVisual, Reveal } from "./_components/story";
+import { LoadVisual, Reveal } from "./_components/story";
 import { FAQ } from "./_components/site-content";
 import { HelixBackdrop } from "@/components/app/helix/helix-backdrop";
 import { Robot } from "@/components/robot";
@@ -147,38 +146,17 @@ export default async function SitePage() {
       <section id="banniere" className="scroll-mt-20 border-t border-border-subtle bg-surface-card">
         <div className="mx-auto max-w-6xl px-5 py-20 md:py-28">
           <Reveal>
-            <SectionHead title="PharmaBoost en trois étapes." center bodyClassName="text-[20px] leading-8 font-medium text-text-primary sm:text-[22px] sm:leading-9">
-              La bannière PharmaBoost vous montre, dans la foulée du scan, ce qu&apos;il est utile de conseiller. Chaque médicament est suivi d&apos;un ou plusieurs conseils.
-            </SectionHead>
+            <SectionHead title="PharmaBoost en trois étapes." center />
           </Reveal>
           <div className="mt-8 flex justify-center">
             <VideoButton film="enBref" label="Voir PharmaBoost en vidéo" />
           </div>
-          <FlowSteps />
           {/* La bannière d'aujourd'hui, deux conseils, la routine, le challenge et la date courte : petite, puis ouverte, sur un
               fond noir d'écran Windows (fondateur, 28 oct. 2026). */}
           <div className="mx-auto mt-12 max-w-[1100px]">
             <BannerSteps />
           </div>
           <p className="mt-8 text-center text-[13px] text-text-tertiary">La bannière PharmaBoost, reproduite pour le site : au scan, puis ouverte. Médicaments, produits et prix : exemples.</p>
-          {/* Les nouveautés de la bannière (fondateur, 22 oct. 2026). */}
-          <div className="mx-auto mt-10 grid max-w-5xl gap-3 sm:grid-cols-3" data-nouveautes-banniere="">
-            {[
-              { title: "Stock, marge, challenge", line: "Visibles avant même d'ouvrir le conseil, en couleurs." },
-              { title: "Demander un conseil", line: "Sans scan : écrivez la demande du patient, les conseils de votre stock arrivent." },
-              { title: "Aide", line: "Une question du patient sur le conseil ? Posez-la, l'aide répond en quelques phrases." },
-            ].map((feature) => (
-              <Reveal key={feature.title}>
-                <div className="h-full rounded-2xl border border-border-subtle bg-surface-app p-5">
-                  <p className="inline-flex items-center gap-2 text-[16px] font-semibold text-text-primary">
-                    <span className="rounded-full bg-brand-600 px-2 py-0.5 text-[10.5px] font-bold tracking-wide text-white uppercase">Nouveau</span>
-                    {feature.title}
-                  </p>
-                  <p className="mt-2 text-[14.5px] leading-6 text-text-secondary">{feature.line}</p>
-                </div>
-              </Reveal>
-            ))}
-          </div>
         </div>
       </section>
 
@@ -202,22 +180,6 @@ export default async function SitePage() {
               <Figure label="Ventes additionnelles" value={formatEuros(live.attributedCents)} />
             </div>
           )}
-        </div>
-      </section>
-
-      {/* ---- 4. La routine (fondateur, 28 oct. 2026 : l'essai B, l'onglet « La routine » seul) : plusieurs produits qui vont
-           ensemble, la vraie bannière à gauche. ---- */}
-      <section id="routine" className="scroll-mt-20 border-t border-border-subtle">
-        <div className="px-5 py-20 md:py-28">
-          <Reveal>
-            <div className="mx-auto mb-12 max-w-3xl text-center">
-              <h2 className="text-[34px] leading-[1.05] font-semibold tracking-[-0.03em] text-text-primary text-balance md:text-[48px]">Un conseil. Et maintenant, une routine.</h2>
-              <p className="mt-4 text-[17px] leading-7 text-text-secondary">Plutôt qu&apos;un seul produit, une prise en charge complète, étape par étape.</p>
-            </div>
-          </Reveal>
-          <Reveal delay={1}>
-            <RoutineShowcase />
-          </Reveal>
         </div>
       </section>
 

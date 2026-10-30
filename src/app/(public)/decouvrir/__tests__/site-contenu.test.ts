@@ -162,7 +162,8 @@ describe("les métadonnées : un titre sans doublon, l'image de partage", () => 
 describe("les mots du site suivent le code, sans promesse", () => {
   it("ne promet aucune vitesse : la bannière montre le conseil dans la foulée du scan, l'animation est une reproduction", () => {
     expect(homeText).not.toContain("aussitôt");
-    expect(homeText).toContain("La bannière PharmaBoost vous montre, dans la foulée du scan, ce qu'il est utile de conseiller. Chaque médicament est suivi d'un ou plusieurs conseils.");
+    // La phrase d'introduction est retirée (fondateur, 30 oct. 2026 : « beaucoup trop d'infos ») : la bannière parle d'elle-même.
+    expect(homeText).not.toContain("La bannière PharmaBoost vous montre");
     expect(homeText).not.toContain("fidèle");
     expect(homeText).toContain("La bannière PharmaBoost, reproduite pour le site : au scan, puis ouverte.");
     expect(homeText).toContain("Médicaments, produits et prix : exemples.");

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { ArrowRight, BadgePercent, Bell, Check, FlaskConical, MapPin, Megaphone, Pill, ScanLine, ShieldCheck, Store, Users } from "lucide-react";
+import { ArrowRight, BadgePercent, Bell, Check, FlaskConical, MapPin, Megaphone, Pill, ScanLine, Store, Users } from "lucide-react";
 import { HAIRLINE, Kicker, SectionHead, fr } from "../_components/site-shell";
 import { AppPhoneVisual, StoreBadges } from "../_components/app-visual";
 import { PLUS_PRICE_LABEL } from "@/core/patient-app/offers";
@@ -40,13 +40,6 @@ const STEPS = [
   { n: "02", title: "Son code-barres", line: "Il ouvre l'offre : un code à lui, valable une fois." },
   { n: "03", title: "Au comptoir", line: "Le pharmacien scanne le code et fait la remise." },
   { n: "04", title: "C'est compté", line: "L'offre passe « utilisée » sur le téléphone. Le titulaire et le laboratoire voient le nombre d'utilisations." },
-];
-
-const COMMITMENTS = [
-  { title: "Jamais un médicament", line: "Les offres portent sur la parapharmacie, les soins et les compléments alimentaires. Jamais sur un médicament." },
-  { title: "Aucune donnée de santé", line: "L'armoire reste sur le téléphone du patient. L'appli garde son adresse e-mail, chiffrée, et sa pharmacie." },
-  { title: "Des e-mails demandés", line: "Le patient n'est prévenu des offres que s'il l'a coché, et l'arrête d'un clic." },
-  { title: "Le pharmacien reste le conseil", line: "Une offre n'entre jamais dans un conseil du comptoir. Le pharmacien décide toujours." },
 ];
 
 export default function ApplicationPage() {
@@ -133,21 +126,6 @@ export default function ApplicationPage() {
             ))}
           </ol>
         </div>
-      </section>
-
-      {/* ---- Engagements --------------------------------------------- */}
-      <section className="mx-auto max-w-6xl px-5 py-20 md:py-28">
-        <SectionHead kicker="Engagements" title="Ce que l'appli ne fera jamais." />
-        <ul className="mt-10 grid gap-px overflow-hidden rounded-3xl border border-border-subtle bg-border-subtle sm:grid-cols-2">
-          {COMMITMENTS.map((c) => (
-            <li key={c.title} className="bg-surface-card p-5 sm:p-6">
-              <p className="flex items-start gap-2.5 text-[17px] leading-snug font-semibold text-text-primary">
-                <ShieldCheck className="mt-0.5 size-5 shrink-0 text-brand-600" aria-hidden="true" /> {c.title}
-              </p>
-              <p className="mt-2 text-[14.5px] leading-6 text-text-secondary">{fr(c.line)}</p>
-            </li>
-          ))}
-        </ul>
       </section>
 
       {/* ---- Télécharger --------------------------------------------- */}
