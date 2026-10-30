@@ -258,8 +258,8 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
 
   if (cards) {
     // Plus étroite sur l'écran du logiciel (fondateur, 30 oct. 2026 : « trop large, prend trop d'espace ») : même police, même
-    // taille d'écriture, 340 px au lieu de 400.
-    const cardsWidth = narrow ? 300 : 340;
+    // taille d'écriture, 310 px au lieu de 400 ; photo 48 px et marges plus fines (même jour, « toujours aussi grand »).
+    const cardsWidth = narrow ? 290 : 310;
     return (
       <>
         <style>{`${ROUTINE_CSS}\n${SCAN_CSS}\n${CARDS_CSS}`}</style>
@@ -296,7 +296,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                           if (active && onClose) onClose();
                           else show(head);
                         }}
-                        className={`flex w-full items-center gap-3 rounded-2xl px-1.5 py-1.5 text-left transition-colors ${active ? "bg-[#EAF6F0]" : "hover:bg-[#F3F7F5]"}`}
+                        className={`flex w-full items-center gap-2.5 rounded-2xl px-1 py-1.5 text-left transition-colors ${active ? "bg-[#EAF6F0]" : "hover:bg-[#F3F7F5]"}`}
                       >
                         <CardPhoto src={advice.image} name={advice.name} />
                         <span className="min-w-0 flex-1">
@@ -333,8 +333,8 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                 {challengedBoxes.length > 0 && (
                   <div data-ile-challenge="" className="mx-1.5 mt-1 flex flex-wrap gap-1">
                     {challengedBoxes.map((box) => (
-                      <span key={box.id} className="inline-flex items-center gap-1 rounded-full bg-[#EEFFC2] px-2 py-0.5 text-[11px] font-semibold text-[#3F5A00]">
-                        <Star className="size-3 shrink-0 fill-current" aria-hidden="true" />
+                      <span key={box.id} className="inline-block rounded-xl bg-[#EEFFC2] px-2 py-0.5 text-[11px] leading-[15px] font-semibold text-[#3F5A00]">
+                        <Star className="mr-1 inline-block size-3 -translate-y-px fill-current align-middle" aria-hidden="true" />
                         {T.challenge} · {box.name}
                         {box.reward ? <span data-ile-challenge-gain=""> · {box.reward}</span> : null}
                       </span>
@@ -930,11 +930,11 @@ const TELL_MAX = 2;
 /** La photo studio du conseil, sur sa tuile blanche ; sans photo studio, une tuile vide (jamais une photo inventée). */
 function CardPhoto({ src, name }: { src?: string; name: string }) {
   // Grandes photos (fondateur, 29 oct. 2026, variante A) : on lit de loin, depuis le comptoir.
-  if (!src) return <Monogram name={name} size={62} />;
+  if (!src) return <Monogram name={name} size={48} />;
   return (
-    <span className="inline-flex size-[62px] shrink-0 items-center justify-center overflow-hidden rounded-[14px] bg-white">
+    <span className="inline-flex size-[48px] shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-white">
       {/* eslint-disable-next-line @next/next/no-img-element -- image locale de l'agent ou du site, déjà dimensionnée */}
-      <img data-ile-mix-photo="" src={src} alt="" width={58} height={58} draggable={false} className="size-full object-contain p-0.5" />
+      <img data-ile-mix-photo="" src={src} alt="" width={46} height={46} draggable={false} className="size-full object-contain p-0.5" />
     </span>
   );
 }
