@@ -132,6 +132,8 @@ export type MixIslandProps = {
    * rapport au LGO »), en essai : la façon de réduire (A à E, /robot-apercu/reduire). Le visuel seul : la vente continue.
    */
   reduce?: ReduceStyle;
+  /** Le site (fondateur, 29 oct. 2026) : la bannière montrée d'emblée routine ouverte, ou réduite. */
+  initialPanel?: "routine" | "reduced";
 };
 
 export type ReduceStyle = "a" | "b" | "c" | "d" | "e";
@@ -139,12 +141,12 @@ export type ReduceStyle = "a" | "b" | "c" | "d" | "e";
 /** Une question à l'aide et sa réponse (vide tant qu'elle n'est pas arrivée). */
 export type HelpExchange = { advice: string; question: string; answer: string; error?: string };
 
-export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, onOpen, onClose, onFinish, onAnswer, boxes = [], help, startAt, everyAdvice = false, routineChip, routineBeside, headAside, belowHead, cards = false, enterFrom, reduce }: MixIslandProps) {
+export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, onOpen, onClose, onFinish, onAnswer, boxes = [], help, startAt, everyAdvice = false, routineChip, routineBeside, headAside, belowHead, cards = false, enterFrom, reduce, initialPanel }: MixIslandProps) {
   const challengedBoxes = boxes.filter((box) => box.challenge);
   // La routine (fondateur, 28 oct. 2026, essai « C » qui clignote) : ses étapes quittent la liste des conseils ; leurs photos
   // clignotent à droite de la petite bannière et, au survol, la routine s'ouvre dans une deuxième bannière.
   const routine = routineOf(items, outcomes);
-  const [routineOpen, setRoutineOpen] = useState(false);
+  const [routineOpen, setRoutineOpen] = useState(initialPanel === "routine");
   const allOrder = bestOrder(items);
   const order = routine && routine.indexes.length < items.length ? allOrder.filter((i) => !routine.indexes.includes(i)) : allOrder;
   const sold = (index: number) => outcomes[index] === "SOLD";
@@ -171,7 +173,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
 
   // La bannière réduite : la petite bannière blanche (« pill »), ou la croix seule (« dot »). Elle se rouvre d'un clic ; la vente,
   // elle, continue (rien n'est vendu ni refusé en réduisant).
-  const [reduced, setReduced] = useState<null | "pill" | "dot">(null);
+  const [reduced, setReduced] = useState<null | "pill" | "dot">(initialPanel === "reduced" ? "pill" : null);
   const [over, setOver] = useState(false);
   const reduceTo = (to: "pill" | "dot") => {
     setRoutineOpen(false);
