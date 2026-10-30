@@ -3,7 +3,9 @@ import type { ReactNode } from "react";
 import { CalendarCheck, CheckCircle2, FileText, HelpCircle, Home, XCircle } from "lucide-react";
 import { fr, SectionHead } from "../_components/site-shell";
 import { ExampleTag, HERO_ITEMS } from "../_components/visuals";
-import { CounterIslandStill } from "@/components/island/counter-island-still";
+import { ISLAND_CSS } from "@/components/island/island-shell";
+import { SCAN_CSS } from "@/components/island/scan-capsule";
+import { LiveCards } from "../_components/banner-steps";
 import { AutoVideo } from "../_components/auto-video";
 import { Reveal } from "../_components/story";
 import { pageShare } from "../_components/share-metadata";
@@ -78,7 +80,11 @@ export default function WhyPage() {
             <>
               {/* « propose », pas « affiche » : la bannière montre aussi ses mises en garde, que cette vignette ne reprend pas. */}
               <p className="text-[13.5px] text-text-secondary">Au scan, la bannière propose :</p>
-              <CounterIslandStill mix items={[{ ...HERO_ITEMS[0], name: SOLAIRE_NAME, image: SOLAIRE, pitchOpen: false }]} drug={DOXY} className="mt-2.5 flex justify-center [&_section]:max-w-full" />
+              {/* La bannière d'aujourd'hui, en cartes (fondateur, 29 oct. 2026). */}
+              <div className="mt-2.5 flex justify-center [&_section]:max-w-full">
+                <style>{`${ISLAND_CSS}\n${SCAN_CSS}`}</style>
+                <LiveCards items={[{ ...HERO_ITEMS[0], name: SOLAIRE_NAME, image: SOLAIRE, drug: DOXY }]} />
+              </div>
               {/* La bannière ne dit pas de phrase : celle-ci est sur l'écran de vente (« À dire au patient »). */}
               {DOXY_COUNTER_SCRIPT && (
                 <>

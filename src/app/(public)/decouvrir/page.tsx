@@ -11,7 +11,7 @@ import { formatEuros } from "@/core/billing/subscription";
 import { PricingSection } from "./_components/pricing-section";
 import { FeatureCarousel, type FeatureSlide } from "./_components/feature-carousel";
 import { RoutineShowcase } from "./_components/routine-showcase";
-import { BannerTwoStates } from "./_components/banner-two-states";
+import { BannerSteps } from "./_components/banner-steps";
 import { FlowSteps, LoadVisual, Reveal } from "./_components/story";
 import { FAQ } from "./_components/site-content";
 import { HelixBackdrop } from "@/components/app/helix/helix-backdrop";
@@ -158,7 +158,7 @@ export default async function SitePage() {
           {/* La bannière d'aujourd'hui, deux conseils, la routine, le challenge et la date courte : petite, puis ouverte, sur un
               fond noir d'écran Windows (fondateur, 28 oct. 2026). */}
           <div className="mx-auto mt-12 max-w-[1100px]">
-            <BannerTwoStates />
+            <BannerSteps />
           </div>
           <p className="mt-8 text-center text-[13px] text-text-tertiary">La bannière PharmaBoost, reproduite pour le site : au scan, puis ouverte. Médicaments, produits et prix : exemples.</p>
           {/* Les nouveautés de la bannière (fondateur, 22 oct. 2026). */}
