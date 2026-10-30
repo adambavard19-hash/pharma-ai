@@ -98,14 +98,16 @@ describe("l'en-tête mène d'abord à la bannière du comptoir", () => {
     // L'onglet « Affiliation » (18 oct. 2026) ferme le menu principal.
     // « Stock et marge » n'est plus dans le menu (fondateur, 20 oct. 2026).
     // « Appli » et « Partenaires » rejoignent le menu (fondateur, 22 oct. 2026).
-    expect(links).toHaveLength(6);
-    expect(links[3]).toEqual(["/decouvrir/application", "Appli"]);
-    expect(links[4]).toEqual(["/decouvrir/partenaires", "Partenaires"]);
-    expect(links[5]).toEqual(["/decouvrir/affiliation", "Affiliation"]);
+    // « Vidéo d'explication » rejoint le menu après « Pourquoi » (fondateur, 30 oct. 2026).
+    expect(links).toHaveLength(7);
+    expect(links[2]).toEqual(["/decouvrir/video-explication", "Vidéo d&#x27;explication"]);
+    expect(links[4]).toEqual(["/decouvrir/application", "Appli"]);
+    expect(links[5]).toEqual(["/decouvrir/partenaires", "Partenaires"]);
+    expect(links[6]).toEqual(["/decouvrir/affiliation", "Affiliation"]);
     expect(nav).not.toContain("#stock-marge");
     // « Suivi pharmaceutique » n'est plus dans le menu, « Tarif » s'appelle « Offre » (fondateur, 21 oct. 2026).
     expect(nav).not.toContain("#suivi");
-    expect(links[2]).toEqual(["/decouvrir#tarif", "Offre"]);
+    expect(links[3]).toEqual(["/decouvrir#tarif", "Offre"]);
     // La rubrique « Comment ça marche » a été retirée de la page (demande du fondateur, 11 oct. 2026) : plus de lien vers elle.
     expect(nav).not.toContain("#fonctionnement");
   });
