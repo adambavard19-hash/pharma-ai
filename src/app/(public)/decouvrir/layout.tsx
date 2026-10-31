@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SiteNudge } from "./_components/site-nudge";
 import type { ReactNode } from "react";
 import { SiteFooter, SiteHeader } from "./_components/site-shell";
 import { SHARE_BASE } from "./_components/share-metadata";
@@ -41,6 +42,7 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
       <main>{children}</main>
       <SiteFooter contactEmail={PUBLIC_CONTACT_EMAIL} />
       <VisitBeacon />
+      <SiteNudge />
     </div>
   );
 }
