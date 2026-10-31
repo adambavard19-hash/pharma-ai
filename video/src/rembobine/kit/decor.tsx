@@ -89,7 +89,7 @@ import { A1, JAKARTA, PB, rgba } from "./brand";
  * ======================================================================== */
 
 export type Mood = "act1" | "pb";
-export type MedKind = "amoxicilline" | "paracetamol" | "probiotique" | "pastilles";
+export type MedKind = "amoxicilline" | "paracetamol" | "curacne" | "probiotique" | "pastilles";
 export type Expression = "lasse" | "neutre" | "sourire";
 type Pt = { x: number; y: number };
 type Win = [number, number];
@@ -262,6 +262,7 @@ export function GreenCross({ t, flicker, mood = "pb", size = 120, x, y }: { t: n
 export const MED: Record<MedKind, { name: string; sub: string; form: string; color: string }> = {
   amoxicilline: { name: "Amoxicilline", sub: "1 g", form: "comprimés", color: "#3550C8" },
   paracetamol: { name: "Paracétamol", sub: "1 g", form: "comprimés", color: "#8448D0" },
+  curacne: { name: "Curacné", sub: "20 mg", form: "capsules", color: "#D0485F" },
   probiotique: { name: "Probiotique", sub: "", form: "gélules", color: "#109C7C" },
   pastilles: { name: "Pastilles", sub: "gorge", form: "à sucer", color: "#238DD0" },
 };
@@ -508,19 +509,28 @@ export function Ordonnance({ w = 260, x, y, flat = 0, rotate = 0, write = 1, moo
         </text>
         <line x1={24} y1={106} x2={276} y2={106} stroke={c.rule} strokeWidth={2} />
         <g opacity={show(0)}>
-          <text x={24} y={152} fontFamily={JAKARTA} fontWeight={800} fontSize={23} fontStyle="italic" fill={c.ink}>
+          <text x={24} y={140} fontFamily={JAKARTA} fontWeight={800} fontSize={23} fontStyle="italic" fill={c.ink}>
             Amoxicilline 1 g
           </text>
-          <text x={24} y={177} fontFamily={JAKARTA} fontWeight={600} fontSize={15.5} fontStyle="italic" fill={c.ink2}>
+          <text x={24} y={163} fontFamily={JAKARTA} fontWeight={600} fontSize={15.5} fontStyle="italic" fill={c.ink2}>
             1 cp matin et soir, 7 jours
           </text>
         </g>
         <g opacity={show(0.3)}>
-          <text x={24} y={228} fontFamily={JAKARTA} fontWeight={800} fontSize={23} fontStyle="italic" fill={c.ink}>
+          <text x={24} y={200} fontFamily={JAKARTA} fontWeight={800} fontSize={23} fontStyle="italic" fill={c.ink}>
             Paracétamol 1 g
           </text>
-          <text x={24} y={253} fontFamily={JAKARTA} fontWeight={600} fontSize={15.5} fontStyle="italic" fill={c.ink2}>
+          <text x={24} y={223} fontFamily={JAKARTA} fontWeight={600} fontSize={15.5} fontStyle="italic" fill={c.ink2}>
             si douleur ou fièvre
+          </text>
+        </g>
+        {/* La 3e ligne (fondateur, 31 oct. 2026 : « plusieurs médicaments, plusieurs conseils ») : l'isotrétinoïne. */}
+        <g opacity={show(0.6)}>
+          <text x={24} y={260} fontFamily={JAKARTA} fontWeight={800} fontSize={23} fontStyle="italic" fill={c.ink}>
+            Curacné 20 mg
+          </text>
+          <text x={24} y={283} fontFamily={JAKARTA} fontWeight={600} fontSize={15.5} fontStyle="italic" fill={c.ink2}>
+            1 capsule par jour, au repas
           </text>
         </g>
         <path
