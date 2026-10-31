@@ -96,6 +96,14 @@ export const ADMIN_NAV: AdminNavSpace[] = [
           { href: "/admin/directeur-commercial", label: "Directeur commercial", description: "Le compte qui gère l'équipe commerciale depuis son propre espace." },
         ],
       },
+      {
+        key: "site-internet",
+        label: "Site internet",
+        items: [
+          { href: "/admin/site-internet", label: "Réponses des visiteurs", description: "Le compteur des visiteurs et ce que la bulle « Vous êtes plutôt… ? » a recueilli : profils, intérêts, coordonnées." },
+          { href: "/admin/visiteurs", label: "Villes des visiteurs", description: "D'où viennent les visiteurs du site, ville par ville." },
+        ],
+      },
     ],
   },
   {
