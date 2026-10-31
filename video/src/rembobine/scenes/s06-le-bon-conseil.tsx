@@ -83,8 +83,8 @@ const T = {
 } as const;
 
 export const S6_LINES: BannerLine[] = [
-  { n: 1, drug: AMOXI, product: "Probiotique", challenge: true, chips: [{ kind: "stock", text: "12 en stock", at: T.stock }], at: T.line1 },
-  { n: 2, drug: PARA, product: "Pastilles gorge", shortDate: true, chips: [{ kind: "stock", text: "8 en stock", at: T.stock2 }], at: T.line2 },
+  { n: 1, drug: AMOXI, product: "Lactibiane Référence", image: "lactibiane-reference.jpg", challenge: true, chips: [{ kind: "stock", text: "12 en stock", at: T.stock }], at: T.line1 },
+  { n: 2, drug: PARA, product: "Phytoxil Toux", image: "phytoxil-toux.jpg", shortDate: true, chips: [{ kind: "stock", text: "8 en stock", at: T.stock2 }], at: T.line2 },
 ];
 
 /**
@@ -498,7 +498,7 @@ function TheCursor({ t }: { t: number }) {
 function Unfold({ t }: { t: number }) {
   if (t < T.unfold - 0.02) return null;
   const c = cardPose(t);
-  return <BannerCard t={t} at={T.unfold} product="Probiotique" for={AMOXI} tab="questions" questions={S7_QUESTIONS} chips={S7_CHIPS} x={c.x} y={c.y} scale={c.s} />;
+  return <BannerCard t={t} at={T.unfold} product="Lactibiane Référence" image="lactibiane-reference.jpg" for={AMOXI} tab="questions" questions={S7_QUESTIONS} chips={S7_CHIPS} x={c.x} y={c.y} scale={c.s} />;
 }
 
 /* ------------------------------------------------------------------ la scène */

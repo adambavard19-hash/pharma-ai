@@ -449,7 +449,7 @@ export function Chip({ t, kind, text, at, size = 24, onDark = false, x, y, scale
 // La bannière d'aujourd'hui (fondateur, 30 oct. 2026 : « que ce soit la nouvelle bannière qui soit affichée ») :
 // src/components/island/scan-capsule.tsx (la petite bannière blanche, la croix verte) et mix-island.tsx (les cartes menthe).
 
-export type BannerLine = { n: number; drug: string; product: string; chips?: ChipSpec[]; at: number; price?: string; challenge?: boolean; shortDate?: boolean };
+export type BannerLine = { n: number; drug: string; product: string; /** La vraie photo studio du produit (public/rembobine/images) ; absente : ses initiales. */ image?: string; chips?: ChipSpec[]; at: number; price?: string; challenge?: boolean; shortDate?: boolean };
 
 const HEAD = { padX: 22, padY: 18, row: 140, idle: 100, top: 58 } as const;
 const headSpring = (t: number, at: number) => ressort(t, at, { damping: 13, stiffness: 190, mass: 0.7 });
@@ -512,6 +512,16 @@ function MintHeader({ size = 1, close = false }: { size?: number; close?: boolea
         <span style={{ display: "inline-flex", width: 46 * size, height: 46 * size, borderRadius: 99, alignItems: "center", justifyContent: "center", background: "#E9F0ED", color: MINT.muted, fontFamily: JAKARTA, fontWeight: 700, fontSize: 26 * size }}>×</span>
       )}
     </div>
+  );
+}
+
+/** La photo studio du produit, comme la vraie bannière (fondateur, 31 oct. 2026 : « la vraie photo, pas les initiales ») ; sinon ses initiales. */
+export function ProductPic({ name, image, size, radius }: { name: string; image?: string; size: number; radius: number }) {
+  if (!image) return <Monogram name={name} size={size} radius={radius} />;
+  return (
+    <span style={{ display: "inline-flex", flexShrink: 0, width: size, height: size, borderRadius: radius, overflow: "hidden", background: "#FFFFFF", boxShadow: "inset 0 0 0 2px #E3EBE8", alignItems: "center", justifyContent: "center" }}>
+      <Img src={staticFile(`rembobine/images/${image}`)} style={{ width: "88%", height: "88%", objectFit: "contain" }} />
+    </span>
   );
 }
 
@@ -622,7 +632,7 @@ export function BannerHead({
                     </div>
                   )}
                   <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 22, height: "100%", padding: "0 18px 0 14px" }}>
-                    <Monogram name={l.product} size={96} radius={24} />
+                    <ProductPic name={l.product} image={l.image} size={96} radius={24} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontFamily: JAKARTA, fontWeight: 700, fontSize: 35, letterSpacing: "-0.015em", color: MINT.ink, whiteSpace: "nowrap" }}>{l.product}</div>
                       <div style={{ fontFamily: JAKARTA, fontWeight: 600, fontSize: 22, color: MINT.muted, whiteSpace: "nowrap" }}>pour {l.drug}</div>
@@ -703,6 +713,7 @@ function SectionTitle({ children, glow = 0 }: { children: ReactNode; glow?: numb
 export function BannerCard({
   t,
   product = "Probiotique",
+  image,
   for: drug = "Amoxicilline 1 g",
   tab = "questions",
   questions = DEFAULT_QUESTIONS,
@@ -719,6 +730,7 @@ export function BannerCard({
 }: Place & {
   t: number;
   product?: string;
+  image?: string;
   for?: string;
   tab?: Timed<BannerTab>;
   questions?: BannerQuestion[];
@@ -774,7 +786,7 @@ export function BannerCard({
           >
             {/* Photo (ou initiales) + « pour … » + nom et prix. */}
             <div style={{ display: "flex", alignItems: "center", gap: 24, height: CARD.photo, opacity: st(0.08), transform: `translateY(${(1 - st(0.08)) * 24}px)` }}>
-              <Monogram name={product} size={CARD.photo} radius={26} />
+              <ProductPic name={product} image={image} size={CARD.photo} radius={26} />
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontFamily: JAKARTA, fontWeight: 700, fontSize: 19, letterSpacing: "0.14em", textTransform: "uppercase", color: MINT.green }}>pour {drug}</div>
                 <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 14, fontFamily: JAKARTA, fontWeight: 700, fontSize: 46, lineHeight: 1.05, letterSpacing: "-0.025em", whiteSpace: "nowrap" }}>

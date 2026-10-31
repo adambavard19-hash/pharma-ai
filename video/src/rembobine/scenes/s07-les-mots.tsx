@@ -401,7 +401,7 @@ export function CardWorld({ t, sold, children }: { t: number; sold?: number; chi
         {/* la grande carte */}
         <div style={cardBox}>
           <div style={{ position: "absolute", left: 30, right: 30, top: 60, bottom: -10, borderRadius: 60, boxShadow: `0 50px 90px -30px ${rgba("#06110F", 0.45)}` }} />
-          <BannerCard t={t} at={S7_T.unfold} product="Probiotique" for={AMOXI} tab={tab} questions={QUESTIONS} discours={DISCOURS} chips={CHIPS} sold={sold} />
+          <BannerCard t={t} at={S7_T.unfold} product="Lactibiane Référence" image="lactibiane-reference.jpg" for={AMOXI} tab={tab} questions={QUESTIONS} discours={DISCOURS} chips={CHIPS} sold={sold} />
           <TabGlow t={t} at={S7_T.qTab} x={TAB_Q.x} y={TAB_Q.y} w={170} />
           <Marker t={t} at={S7_T.q1 + 0.04} outAt={S7_T.h1Out - 0.04} {...IN.questions} />
           <Marker t={t} at={S7_T.disc + 0.02} outAt={S7_T.h2Out + 0.12} {...IN.discours} />
