@@ -156,8 +156,8 @@ function NextToLgo({ t }: { t: number }) {
 
 // ---- 4. Au scan, le conseil et la routine -----------------------------------------------------------------------------
 const LINES: BannerLine[] = [
-  { n: 1, drug: "AMOXICILLINE 1 g", product: "Probiotique", price: "9,90 €", challenge: true, at: V(14.4), chips: [{ kind: "stock", text: "En stock · 8", at: V(17.6) }, { kind: "marge", text: "Marge 3,80 €", at: V(17.9) }] },
-  { n: 2, drug: "AMOXICILLINE 1 g", product: "Routine digestion · 3 produits", at: V(15.2), chips: [{ kind: "plain", text: "Routine" }] },
+  { n: 1, drug: "AMOXICILLINE 1 g", product: "Lactibiane Référence", image: "lactibiane-reference.jpg", price: "9,90 €", challenge: true, at: V(14.4), chips: [{ kind: "stock", text: "En stock · 8", at: V(17.6) }, { kind: "marge", text: "Marge 3,80 €", at: V(17.9) }] },
+  { n: 2, drug: "AMOXICILLINE 1 g", product: "Routine digestion · 3 produits", image: "lactibiane-imedia.jpg", at: V(15.2), chips: [{ kind: "plain", text: "Routine" }] },
 ];
 
 const DOUCHETTE = { x: 460, y: 425, angle: 12 };
