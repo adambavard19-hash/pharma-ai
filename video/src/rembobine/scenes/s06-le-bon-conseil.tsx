@@ -57,14 +57,19 @@ import { MENTION_POS, MENTION_TEXT } from "../../presentation/motion/kit/mention
 const NB = " ";
 const AMOXI = `Amoxicilline 1${NB}g`;
 const PARA = `Paracétamol 1${NB}g`;
+const CURACNE = `Curacné 20${NB}mg`;
 
 /** Les temps (secondes du film), calés sur mots.json (N5). */
 const T = {
   /** « boîte » : la boîte est sous la douchette, le laser part. */
-  beam1: 26.46,
-  line1: 26.6,
-  beam2: 26.96,
-  line2: 27.08,
+  beam1: 26.44,
+  line1: 26.56,
+  beam2: 26.74,
+  line2: 26.86,
+  /** La 3e boîte (Curacné, 31 oct. 2026) et sa routine, avant que les cartes ne s'ouvrent. */
+  beam3: 27.0,
+  line3: 27.1,
+  line4: 27.16,
   /** « bon conseil » : la carte 1 s'illumine, juste après l'ouverture des cartes (la petite bannière nomme d'abord les
    * conseils, 30 oct. 2026). */
   bon: 27.62,
@@ -85,15 +90,18 @@ const T = {
 export const S6_LINES: BannerLine[] = [
   { n: 1, drug: AMOXI, product: "Lactibiane Référence", image: "lactibiane-reference.jpg", challenge: true, chips: [{ kind: "stock", text: "12 en stock", at: T.stock }], at: T.line1 },
   { n: 2, drug: PARA, product: "Phytoxil Toux", image: "phytoxil-toux.jpg", shortDate: true, chips: [{ kind: "stock", text: "8 en stock", at: T.stock2 }], at: T.line2 },
+  { n: 3, drug: CURACNE, product: "Cicaplast Lèvres", image: "cicaplast-levres.jpg", challenge: true, chips: [{ kind: "stock", text: "12 en stock", at: T.stock2 + 0.08 }, { kind: "challenge", text: "Challenge", at: T.stock2 + 0.16 }], at: T.line3 },
+  { n: 4, drug: CURACNE, product: "Routine peau · 3 produits", routine: ["cleanance-gel.jpg", "effaclar-h.jpg", "anthelios-uvmune.jpg"], chips: [{ kind: "plain", text: "Nettoyer · Hydrater · Protéger", at: T.stock2 + 0.24 }], at: T.line4 },
 ];
 
 /**
  * La capsule dans le cadre (stage 1920 × 1080) : centre VISIBLE (elle grandit des deux côtés à chaque ligne), échelle.
  * BannerHead garde la hauteur finale de sa boîte et grandit vers le bas : on la recentre ici (même ressort que le kit).
  */
-const CAP = { x: 1240, y: 500, s: 1.2, w: 920, h: 18 * 2 + 140 * 2 } as const;
+const CAP = { x: 1240, y: 470, s: 1.02, w: 920, h: 18 * 2 + 140 * 2 } as const;
 const capHeight = (t: number, lines: BannerLine[]) => bannerHeadHeight(t, lines);
-const capTop = (t: number, lines: BannerLine[] = S6_LINES) => CAP.y - (capHeight(t, lines) / 2) * CAP.s;
+// Au-delà de deux lignes, la bannière grandit vers le bas : son haut reste là où la caméra l'attend.
+const capTop = (t: number, lines: BannerLine[] = S6_LINES) => CAP.y - (Math.min(capHeight(t, lines), CAP.h) / 2) * CAP.s;
 const capTL = (t: number) => ({ x: CAP.x - (CAP.w / 2) * CAP.s, y: capTop(t) });
 const inCap = (p: { x: number; y: number }, t: number) => ({ x: capTL(t).x + p.x * CAP.s, y: capTL(t).y + p.y * CAP.s });
 /** Le centre de la pastille de stock de la carte 1 (BannerHead : x 154 + ½ pastille, y 120), bannière ouverte. */
@@ -125,7 +133,7 @@ export function ComptoirStage({ t, capsuleAt, lines = S6_LINES, highlight, press
           pressed={pressed}
           width={CAP.w}
           x={CAP.x}
-          y={capTop(t, lines) + (CAP.h / 2) * CAP.s * Math.max(0, pop) + (1 - Math.max(0, pop)) * (capHeight(t, lines) / 2) * CAP.s}
+          y={capTop(t, lines) + (Math.max(CAP.h, capHeight(1e3, lines)) / 2) * CAP.s * Math.max(0, pop) + (1 - Math.max(0, pop)) * (capHeight(t, lines) / 2) * CAP.s}
           scale={CAP.s * Math.max(0, pop)}
           style={{ opacity: clamp01(pop * 3), filter: dim > 0 ? `blur(${dim * 6}px) brightness(${1 - dim * 0.25})` : undefined }}
         />
@@ -185,6 +193,7 @@ function camAt(t: number): Cam {
   for (const [at, amp, frames] of [
     [T.beam1 + 0.02, 5, 9],
     [T.beam2 + 0.02, 4, 8],
+    [T.beam3 + 0.02, 4, 8],
     [T.lock, 4, 8],
     [T.click, 5, 9],
   ] as const) {
@@ -204,20 +213,21 @@ const SCAN = { x: 400, y: 392, box: { x: 386, y: 690 } } as const;
 
 function Scanner({ t }: { t: number }) {
   const inK = prog(t, 26.22, 0.3, SNAP);
-  const outK = prog(t, 27.38, 0.34, EXIT);
+  const outK = prog(t, 27.3, 0.34, EXIT);
   if (inK <= 0 || outK >= 1) return null;
   // Petit coup de poignet à chaque bip.
   const kick = (b: number) => pulse(t, b - 0.04, 0.05, 0.04, 0.2);
   const x = SCAN.x + lerp(-420, 0, inK) + lerp(0, -380, outK) + wobble(t, 64, 3, 0.9);
-  const y = SCAN.y + lerp(-420, 0, inK) + lerp(0, -520, outK) - 10 * (kick(T.beam1) + kick(T.beam2)) + wobble(t, 65, 3, 0.8);
-  const angle = lerp(-38, -6, inK) + 6 * (kick(T.beam1) + kick(T.beam2)) + lerp(0, -30, outK);
-  return <Douchette t={t} x={x} y={y} angle={angle} size={1.4} beamAt={[T.beam1, T.beam2]} beamDur={0.34} beamLength={118} beamWidth={330} />;
+  const y = SCAN.y + lerp(-420, 0, inK) + lerp(0, -520, outK) - 10 * (kick(T.beam1) + kick(T.beam2) + kick(T.beam3)) + wobble(t, 65, 3, 0.8);
+  const angle = lerp(-38, -6, inK) + 6 * (kick(T.beam1) + kick(T.beam2) + kick(T.beam3)) + lerp(0, -30, outK);
+  return <Douchette t={t} x={x} y={y} angle={angle} size={1.4} beamAt={[T.beam1, T.beam2, T.beam3]} beamDur={0.34} beamLength={118} beamWidth={330} />;
 }
 
 /** Une boîte qui glisse sous la douchette, attend le bip, puis tombe (dans le sac, hors cadre). */
-function ScanBox({ t, kind, inAt, beam }: { t: number; kind: "amoxicilline" | "paracetamol"; inAt: number; beam: number }) {
+function ScanBox({ t, kind, inAt, beam }: { t: number; kind: "amoxicilline" | "paracetamol" | "curacne"; inAt: number; beam: number }) {
   const inK = prog(t, inAt, 0.3, SNAP);
-  const outAt = beam + 0.3;
+  // Chaque boîte laisse la place à la suivante (trois boîtes à la suite, 31 oct. 2026).
+  const outAt = beam + 0.14;
   const outK = prog(t, outAt, 0.32, EXIT);
   if (t < inAt || outK >= 1) return null;
   const settle = ressort(t, inAt + 0.16, { damping: 9, stiffness: 260, mass: 0.5 });
@@ -520,12 +530,15 @@ export function Scene({ t }: { t: number }) {
       <AbsoluteFill style={{ transformOrigin: "0 0", transform: worldTransform(c) }}>
         <ComptoirStage t={t} highlight={{ n: 1, at: T.bon }} pressed={{ n: 1, at: T.click }} dim={dim} />
         <ScanBox t={t} kind="amoxicilline" inAt={26.18} beam={T.beam1} />
-        <ScanBox t={t} kind="paracetamol" inAt={26.7} beam={T.beam2} />
+        <ScanBox t={t} kind="paracetamol" inAt={26.47} beam={T.beam2} />
+        <ScanBox t={t} kind="curacne" inAt={26.76} beam={T.beam3} />
         <Scanner t={t} />
         <Streak t={t} from={scanFrom1} to={rowHead(1, T.line1)} arrive={T.line1} />
         <Streak t={t} from={scanFrom1} to={rowHead(2, T.line2)} arrive={T.line2} />
+        <Streak t={t} from={scanFrom1} to={rowHead(3, T.line3)} arrive={T.line3} />
         <Hit t={t} at={T.line1} x={rowHead(1, t).x} y={rowHead(1, t).y} />
         <Hit t={t} at={T.line2} x={rowHead(2, t).x} y={rowHead(2, t).y} />
+        <Hit t={t} at={T.line3} x={rowHead(3, t).x} y={rowHead(3, t).y} />
         <Sparkle t={t} at={T.bon + 0.08} x={sp.x} y={sp.y} size={70} color={PB.citron} />
         <StockPanel t={t} />
         <StockArrow t={t} />
@@ -545,8 +558,10 @@ export const cues: Cue[] = [
   cue("ui-pop", T.line1, 0.5),
   cue("scanner-bip", T.beam2 + 0.04, 0.55, 1.06),
   cue("pop-leger", T.line2, 0.3, 1.08),
+  cue("scanner-bip", T.beam3 + 0.04, 0.5, 1.12),
+  cue("pop-leger", T.line3, 0.28, 1.14),
   cue("scintillement", T.bon, 0.45),
-  cue("swoosh", 27.38, 0.25),
+  cue("swoosh", 27.3, 0.25),
   cue("whoosh-pb", T.pris - 0.04, 0.3),
   cue("verrou-hud", T.lock, 0.55),
   cue("laser-ecrit", T.arrow, 0.25, 1.2, 0.4),

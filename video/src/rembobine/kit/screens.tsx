@@ -21,7 +21,7 @@ import { JAKARTA, MONO, PB, rgba } from "./brand";
  *        l'hélice d'ADN (images/adn-helice.jpg, ≤ 1920 px de large) qui dérive ; "night" = le noir vivant de la bannière
  *   <PBLogo t at? size=120 variant="full"|"icon"|"wordmark" tone="dark"|"light" boost? grad? />  le robot + « PharmaBoost »
  *        `at` : il CLAQUE (robot qui jaillit en tournant, mot en coup de poing, reflet à at+0,35) ; sinon déjà là, il cligne
- *   <LogoRobot t size=64 winkAt? seed? />   la tête du robot (logo-robot.svg) qui cligne, antenne et étoile vivantes
+ *   <LogoRobot t size=64 winkAt? seed? />   le robot en blouse (logo-robot.svg), qui respire et sautille au clin d'œil
  *
  * LA BANNIÈRE DU COMPTOIR (mix-island.tsx)
  *   <Chip t kind="stock"|"marge"|"challenge"|"date"|"plain" text at? size=24 onDark? />   POP à `at`, reflet à at+0,12
@@ -234,59 +234,20 @@ export function AdnBackdrop({
 
 // ---- Le robot, le logo -----------------------------------------------------------------------------------------------
 
-/** La tête du robot (public/rembobine/images/logo-robot.svg), vivante : clignement, antenne, étoile, clin d'œil. */
+/**
+ * Le robot de la marque (public/rembobine/images/logo-robot.svg) : le robot EN BLOUSE, tablette en main (fondateur, 31 oct.
+ * 2026 : « je ne veux plus voir l'ancien robot au casque »). Il respire doucement et sautille au clin d'œil (`winkAt`).
+ */
 export function LogoRobot({ t, size = 64, winkAt, seed = 0, style }: { t: number; size?: number; winkAt?: number; seed?: number; style?: CSSProperties }) {
-  const id = `lr${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
-  const ph = (((t + seed * 0.83) % 3.1) + 3.1) % 3.1;
-  const blink = ph < 0.14 ? Math.sin((ph / 0.14) * Math.PI) : 0;
-  const wink = winkAt === undefined ? 0 : pulse(t, winkAt, 0.07, 0.32, 0.12);
-  const ant = 0.5 + 0.5 * Math.sin((t * 2 * Math.PI) / 2.2);
-  const star = 0.82 + 0.22 * Math.sin((t * 2 * Math.PI) / 1.8 + seed);
-  const eye = (cx: number, closed: number) => (
-    <g>
-      <ellipse cx={cx} cy={42} rx={4.8} ry={6.4 * (1 - 0.88 * closed)} fill="#58F2D8" />
-      {closed < 0.4 && <circle cx={cx - 1.5} cy={39.4} r={1.7} fill="#fff" fillOpacity=".85" />}
-    </g>
-  );
+  const breath = 1 + 0.018 * Math.sin(((t + seed * 0.83) * 2 * Math.PI) / 2.6);
+  const hop = winkAt === undefined ? 0 : pulse(t, winkAt, 0.08, 0.3, 0.14);
   return (
-    <svg viewBox="-6 -15 112 112" width={size} height={size} style={{ display: "block", overflow: "visible", ...style }}>
-      <defs>
-        <linearGradient id={`${id}s`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#FFFFFF" />
-          <stop offset="1" stopColor="#C4E1EC" />
-        </linearGradient>
-        <linearGradient id={`${id}c`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#0A2234" />
-          <stop offset="1" stopColor="#0E3550" />
-        </linearGradient>
-        <linearGradient id={`${id}e`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#27C9B0" />
-          <stop offset="1" stopColor="#12968C" />
-        </linearGradient>
-        <linearGradient id={`${id}b`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#22C88F" />
-          <stop offset="1" stopColor="#14A06F" />
-        </linearGradient>
-      </defs>
-      <line x1="50" y1="17" x2="50" y2="8" stroke="#8FBCD0" strokeWidth="3" strokeLinecap="round" />
-      <circle cx="50" cy="6" r={6 + 3 * ant} fill="#58F2D8" fillOpacity={0.18 + 0.18 * ant} />
-      <circle cx="50" cy="6" r="3.8" fill="#58F2D8" />
-      <path d="M 9.90 36.72 A 41 35 0 0 1 90.10 36.72" fill="none" stroke="#27C9B0" strokeWidth="5" strokeLinecap="round" />
-      <rect x="3" y="36" width="15" height="28" rx="7" fill={`url(#${id}e)`} />
-      <rect x="82" y="36" width="15" height="28" rx="7" fill={`url(#${id}e)`} />
-      <rect x="14" y="16" width="72" height="58" rx="24" fill={`url(#${id}s)`} stroke="#8FBCD0" strokeWidth="1.6" />
-      <rect x="22" y="25" width="56" height="40" rx="17" fill={`url(#${id}c)`} />
-      {eye(38, blink)}
-      {eye(62, Math.max(blink, wink))}
-      <path d="M 41 52.5 A 9 7 0 0 0 59 52.5 Z" fill="#58F2D8" />
-      <circle cx="74" cy="69" r="15" fill="#fff" fillOpacity=".95" />
-      <circle cx="74" cy="69" r="13.5" fill={`url(#${id}b)`} />
-      <rect x="72.2" y="61" width="3.6" height="16" rx="1" fill="#fff" />
-      <rect x="66" y="67.2" width="16" height="3.6" rx="1" fill="#fff" />
-      <g transform={`translate(80 14) scale(${star}) rotate(${12 * Math.sin(t * 1.7)}) translate(-80 -14)`}>
-        <path d="M 80 7 L 82 12.5 L 87.5 14 L 82 15.5 L 80 21 L 78 15.5 L 72.5 14 L 78 12.5 Z" fill="#FFD65A" />
-      </g>
-    </svg>
+    <div style={{ width: size, height: size, display: "block", overflow: "visible", ...style }}>
+      <Img
+        src={staticFile("rembobine/images/logo-robot.svg")}
+        style={{ width: "100%", height: "100%", display: "block", transform: `translateY(${-size * 0.06 * hop}px) scale(${breath + 0.05 * hop}) rotate(${-4 * hop}deg)`, transformOrigin: "50% 90%" }}
+      />
+    </div>
   );
 }
 
@@ -449,7 +410,7 @@ export function Chip({ t, kind, text, at, size = 24, onDark = false, x, y, scale
 // La bannière d'aujourd'hui (fondateur, 30 oct. 2026 : « que ce soit la nouvelle bannière qui soit affichée ») :
 // src/components/island/scan-capsule.tsx (la petite bannière blanche, la croix verte) et mix-island.tsx (les cartes menthe).
 
-export type BannerLine = { n: number; drug: string; product: string; /** La vraie photo studio du produit (public/rembobine/images) ; absente : ses initiales. */ image?: string; chips?: ChipSpec[]; at: number; price?: string; challenge?: boolean; shortDate?: boolean };
+export type BannerLine = { n: number; drug: string; product: string; /** La vraie photo studio du produit (public/rembobine/images) ; absente : ses initiales. */ image?: string; /** Une ligne de routine : les photos de ses étapes, en petites vignettes qui se chevauchent. */ routine?: string[]; chips?: ChipSpec[]; at: number; price?: string; challenge?: boolean; shortDate?: boolean };
 
 const HEAD = { padX: 22, padY: 18, row: 140, idle: 100, top: 58 } as const;
 const headSpring = (t: number, at: number) => ressort(t, at, { damping: 13, stiffness: 190, mass: 0.7 });
@@ -544,21 +505,23 @@ function WhitePillContent({ t, lines, width }: { t: number; lines: BannerLine[];
   const first = lines[0]?.at ?? Infinity;
   const scanFrom = first - 0.5;
   const scanning = t >= scanFrom && t < first;
-  const found = lines.filter((l) => t >= l.at);
+  // La routine n'a pas de nom dans la petite bannière (comme la vraie : elle attend sous les cartes) ; à trois noms, ils rapetissent.
+  const found = lines.filter((l) => t >= l.at && !l.routine);
+  const small = lines.filter((l) => !l.routine).length >= 3;
   const lit = scanning ? Math.min(4, Math.floor((t - scanFrom) / 0.1) + 1) : 4;
   const heart = 0.6 + 0.4 * Math.cos((t * Math.PI * 2) / 1);
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 18, height: "100%", width, padding: "0 30px", boxSizing: "border-box" }}>
       <PillCross lit={lit} size={56} heart={scanning ? heart : 1} />
       {found.length > 0 ? (
-        <span style={{ display: "flex", alignItems: "center", gap: 22, whiteSpace: "nowrap" }}>
+        <span style={{ display: "flex", alignItems: "center", gap: small ? 12 : 22, whiteSpace: "nowrap" }}>
           {found.map((l, i) => {
             const k = prog(t, l.at, 0.26, SNAP);
             return (
               <span key={l.n} style={{ display: "inline-flex", alignItems: "center", gap: 10, opacity: k, transform: `translateY(${(1 - k) * 10}px) scale(${0.9 + 0.1 * k})` }}>
-                {i > 0 && <span style={{ width: 2, height: 30, marginRight: 12, background: rgba(MINT.green, 0.25) }} />}
+                {i > 0 && <span style={{ width: 2, height: 30, marginRight: small ? 6 : 12, background: rgba(MINT.green, 0.25) }} />}
                 {l.challenge ? <Star size={30} fill="#B8D400" color="#8AA000" strokeWidth={1.4} /> : l.shortDate ? <Hourglass size={28} color="#C23A2B" strokeWidth={2.4} /> : null}
-                <span style={{ fontFamily: JAKARTA, fontWeight: 700, fontSize: 30, color: MINT.ink }}>{shortName(l.product)}</span>
+                <span style={{ fontFamily: JAKARTA, fontWeight: 700, fontSize: small ? 24 : 30, color: MINT.ink }}>{shortName(l.product)}</span>
               </span>
             );
           })}
@@ -632,7 +595,17 @@ export function BannerHead({
                     </div>
                   )}
                   <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 22, height: "100%", padding: "0 18px 0 14px" }}>
-                    <ProductPic name={l.product} image={l.image} size={96} radius={24} />
+                    {l.routine ? (
+                      <span style={{ display: "inline-flex", flexShrink: 0, width: 96, alignItems: "center" }}>
+                        {l.routine.map((img, k) => (
+                          <span key={img} style={{ marginLeft: k ? -22 : 0, display: "inline-flex", width: 46, height: 46, borderRadius: 12, overflow: "hidden", background: "#FFFFFF", boxShadow: "0 0 0 3px #FFFFFF, inset 0 0 0 1.5px #E3EBE8", alignItems: "center", justifyContent: "center" }}>
+                            <Img src={staticFile(`rembobine/images/${img}`)} style={{ width: "86%", height: "86%", objectFit: "contain" }} />
+                          </span>
+                        ))}
+                      </span>
+                    ) : (
+                      <ProductPic name={l.product} image={l.image} size={96} radius={24} />
+                    )}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontFamily: JAKARTA, fontWeight: 700, fontSize: 35, letterSpacing: "-0.015em", color: MINT.ink, whiteSpace: "nowrap" }}>{l.product}</div>
                       <div style={{ fontFamily: JAKARTA, fontWeight: 600, fontSize: 22, color: MINT.muted, whiteSpace: "nowrap" }}>pour {l.drug}</div>
