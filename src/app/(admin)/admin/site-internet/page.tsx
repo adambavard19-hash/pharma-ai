@@ -28,12 +28,13 @@ export default async function SiteInternetPage() {
     { label: "Bulles affichées", value: store.shown, hint: `${NUMBER.format(store.closed)} fermées sans réponse` },
     { label: "Profils choisis", value: items.length, hint: store.shown ? `${Math.round((items.length / store.shown) * 100)} % des bulles affichées` : "—" },
     { label: "Coordonnées laissées", value: contacts, hint: items.length ? `${Math.round((contacts / items.length) * 100)} % des profils choisis` : "—" },
+    { label: "Scans de la lettre", value: store.letterScans, hint: "QR code de la lettre glissée sous la porte" },
   ];
 
   return (
     <>
       <AdminPageHeader parent={{ label: "Accueil", href: "/admin" }} title="Site internet" description="Les visiteurs du site, et ce que la bulle « Vous êtes plutôt… ? » a recueilli. Chaque réponse avec un message ou des coordonnées vous est aussi envoyée par e-mail." />
-      <div data-site-chiffres="" className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div data-site-chiffres="" className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-5">
         {cards.map((card) => {
           const body = (
             <>

@@ -16,7 +16,7 @@ import { chooseNudgeProfileAction, countNudgeAction, sendNudgeDetailsAction } fr
 const SECONDS_KEY = "pb-site-temps";
 const PAGES_KEY = "pb-site-pages";
 const DONE_KEY = "pb-bulle-v1";
-const SKIP = [/^\/decouvrir\/demo/, /^\/decouvrir\/abonnement/, /^\/abonnement/, /^\/decouvrir\/mentions-legales/, /^\/decouvrir\/confidentialite/];
+const SKIP = [/^\/decouvrir\/lettre/, /^\/decouvrir\/demo/, /^\/decouvrir\/abonnement/, /^\/abonnement/, /^\/decouvrir\/mentions-legales/, /^\/decouvrir\/confidentialite/];
 
 const CTA: Partial<Record<NudgeProfile, { href: string; label: string }>> = {
   PHARMACIEN: { href: "/decouvrir/demo", label: "Réserver une démo" },

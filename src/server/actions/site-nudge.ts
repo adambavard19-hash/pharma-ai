@@ -29,6 +29,13 @@ export async function countNudgeAction(kind: "shown" | "closed"): Promise<void> 
   await countNudge(kind).catch(() => undefined);
 }
 
+/** La page de la lettre ouverte depuis le QR code (`?source=courrier`) : un compteur, robots exclus, une fois par heure et par adresse. */
+export async function countLetterScanAction(): Promise<void> {
+  const v = await visitor();
+  if (v.bot || throttled(`${v.ip}:lettre`, 1)) return;
+  await countNudge("letterScans").catch(() => undefined);
+}
+
 /** « Vous êtes plutôt… ? » : le profil choisi d'un clic. */
 export async function chooseNudgeProfileAction(payload: unknown): Promise<ActionResult<{ id: string }>> {
   const parsed = nudgeChoiceSchema.safeParse(payload);

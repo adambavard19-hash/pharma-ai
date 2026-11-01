@@ -25,8 +25,8 @@ export async function loadNudgeStore(): Promise<NudgeStore> {
   return readNudgeStore(row?.value);
 }
 
-/** La bulle s'est ouverte, ou a été fermée sans réponse. */
-export async function countNudge(kind: "shown" | "closed"): Promise<void> {
+/** La bulle s'est ouverte, ou a été fermée sans réponse ; ou la page de la lettre a été ouverte depuis son QR code. */
+export async function countNudge(kind: "shown" | "closed" | "letterScans"): Promise<void> {
   await update((store) => ({ ...store, [kind]: store[kind] + 1 }));
 }
 

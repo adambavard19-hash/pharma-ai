@@ -74,7 +74,8 @@ export type NudgeItem = {
   status: "PROFIL" | "REPONSE" | "CONTACT";
 };
 
-export type NudgeStore = { shown: number; closed: number; items: NudgeItem[] };
+/** `letterScans` : les ouvertures de /decouvrir/lettre depuis le QR code de la lettre glissée sous la porte (31 oct. 2026). */
+export type NudgeStore = { shown: number; closed: number; letterScans: number; items: NudgeItem[] };
 
 /** Au plus 2 000 réponses gardées : les plus anciennes s'effacent (les compteurs, eux, continuent). */
 export const NUDGE_MAX_ITEMS = 2000;
@@ -82,7 +83,7 @@ export const NUDGE_MAX_ITEMS = 2000;
 export function readNudgeStore(value: unknown): NudgeStore {
   const raw = (value && typeof value === "object" ? value : {}) as Partial<NudgeStore>;
   const items = Array.isArray(raw.items) ? raw.items.filter((item): item is NudgeItem => Boolean(item && typeof item === "object" && typeof (item as NudgeItem).id === "string")) : [];
-  return { shown: Number(raw.shown) || 0, closed: Number(raw.closed) || 0, items };
+  return { shown: Number(raw.shown) || 0, closed: Number(raw.closed) || 0, letterScans: Number(raw.letterScans) || 0, items };
 }
 
 /** « 2 min 10 » : le temps passé sur le site. */

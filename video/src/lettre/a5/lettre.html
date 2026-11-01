@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>PharmaBoost — Lettre A5</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,500;0,600;0,700;0,800;1,600&display=block" rel="stylesheet">
+<style>
+  @page { size: 148mm 210mm; margin: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 148mm; height: 210mm; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: "Plus Jakarta Sans", Arial, sans-serif; color: #0F2B26; }
+  .page { position: relative; width: 148mm; height: 210mm; padding: 13mm 13mm 11mm; overflow: hidden;
+    background: radial-gradient(120% 60% at 100% 0%, #E4F6EE 0%, #FFFFFF 55%); }
+  .band { position: absolute; left: 0; right: 0; bottom: 0; height: 5mm; background: linear-gradient(90deg, #0E7C5A, #14A374, #8FDDBE); }
+  .head { display: flex; align-items: center; justify-content: space-between; }
+  .brand { display: flex; align-items: center; gap: 2.4mm; font-weight: 800; font-size: 12pt; letter-spacing: -.02em; }
+  .brand b { color: #0E8A7B; font-weight: 800; }
+  .to { font-size: 7.5pt; font-weight: 600; color: #5B6B66; text-transform: uppercase; letter-spacing: .12em; }
+  h1 { margin-top: 8mm; font-size: 24pt; line-height: 1.08; font-weight: 800; letter-spacing: -.03em; }
+  h1 span { color: #0E8A7B; }
+  .lead { margin-top: 6mm; font-size: 10.6pt; line-height: 1.6; color: #2E403B; }
+  .lead p + p { margin-top: 2.2mm; }
+  ul { margin-top: 4.5mm; list-style: none; display: grid; gap: 1.8mm; }
+  li { display: flex; gap: 2.6mm; align-items: flex-start; font-size: 8.6pt; line-height: 1.38; font-weight: 600; }
+  li i { flex: none; width: 4.6mm; height: 4.6mm; margin-top: .4mm; border-radius: 99px; background: #0E8A7B; color: #fff; font-style: normal; font-size: 7pt; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+  .mid { margin-top: 3.5mm; display: flex; gap: 5mm; align-items: center; }
+  .mid ul { margin-top: 0; flex: 1; }
+  li b { color: #0E8A7B; }
+  .ban { flex: none; width: 40mm; padding: 2.4mm; border-radius: 4mm; background: #fff; border: .3mm solid #DCEBE4; box-shadow: 0 2.5mm 7mm -3mm rgba(15,43,38,.3); transform: rotate(1.5deg); }
+  .ban .hd { display: flex; align-items: center; gap: 1.2mm; font-size: 5.6pt; font-weight: 800; letter-spacing: .14em; color: #0F2B26; }
+  .ban .hd em { margin-left: auto; font-style: normal; letter-spacing: 0; padding: .3mm 1.4mm; border-radius: 99px; background: #E4F6EE; color: #0E7C5A; }
+  .ban .rx { margin-top: 1.8mm; font-size: 6.4pt; font-weight: 700; color: #5B6B66; }
+  .ban .rx s { text-decoration: none; color: #0F2B26; }
+  .ban .card { margin-top: 1.4mm; display: flex; gap: 1.8mm; align-items: center; padding: 1.6mm; border-radius: 2.6mm; background: #F4F8F6; }
+  .ban .card img { width: 10mm; height: 10mm; border-radius: 1.8mm; object-fit: cover; background: #fff; }
+  .ban .nm { font-size: 6.6pt; font-weight: 800; line-height: 1.2; color: #0F2B26; }
+  .ban .chip { display: inline-block; margin-top: .8mm; padding: .3mm 1.4mm; border-radius: 99px; background: #EEFFC2; font-size: 5.4pt; font-weight: 800; color: #3B5A00; }
+  .ban .ft { margin-top: 1.6mm; display: flex; gap: 1.2mm; }
+  .ban .ft span { flex: 1; text-align: center; padding: .8mm 0; border-radius: 99px; font-size: 5.8pt; font-weight: 800; }
+  .ban .ok { background: #0E8A7B; color: #fff; } .ban .no { background: #EEF2F0; color: #5B6B66; }
+  .qr { position: relative; margin-top: 9mm; display: flex; align-items: center; gap: 6mm; padding: 5mm; border-radius: 6mm; overflow: hidden; color: #fff;
+    background: linear-gradient(135deg, #0F2B26 0%, #0E5C48 55%, #0E8A6B 100%); box-shadow: 0 3mm 8mm -4mm rgba(15,43,38,.45); }
+  .qr::after { content: ""; position: absolute; right: -14mm; top: -14mm; width: 42mm; height: 42mm; border-radius: 99px; background: radial-gradient(circle, rgba(143,221,190,.35), rgba(143,221,190,0) 70%); }
+  .qr .code { flex: none; padding: 2.6mm; border-radius: 4mm; background: #fff; box-shadow: 0 0 0 1mm rgba(255,255,255,.14); }
+  .qr svg { display: block; width: 34mm; height: 34mm; }
+  .qr .pill { display: inline-flex; align-items: center; gap: 1.4mm; padding: 1mm 2.6mm; border-radius: 99px; background: rgba(143,221,190,.18); color: #8FDDBE; font-size: 7pt; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+  .qr .t { margin-top: 2.4mm; font-size: 14pt; font-weight: 800; line-height: 1.12; letter-spacing: -.02em; }
+  .qr .t span { color: #8FDDBE; }
+  .qr .s { margin-top: 2mm; font-size: 8.4pt; line-height: 1.4; color: rgba(255,255,255,.82); }
+  .qr .u { margin-top: 2mm; font-size: 7pt; font-weight: 600; color: rgba(255,255,255,.6); }
+  .visio { margin-top: 7mm; font-size: 12pt; line-height: 1.25; letter-spacing: -.01em; font-weight: 700; }
+  .sign { margin-top: 6mm; font-size: 9.2pt; line-height: 1.45; color: #2E403B; }
+  .sign .duo { display: flex; gap: 12mm; margin-top: 1.5mm; }
+  .sign .n { margin-top: 1.5mm; font-size: 12pt; font-style: italic; font-weight: 600; color: #0F2B26; }
+  .foot { position: absolute; left: 13mm; right: 13mm; bottom: 8mm; display: flex; justify-content: space-between; font-size: 7.6pt; font-weight: 700; color: #0E7C5A; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="head">
+    <div class="brand">
+      <svg width="16" height="16" viewBox="0 0 40 40"><path d="M14 2h12v12h12v12H26v12H14V26H2V14h12z" fill="#0E8A7B"/></svg>
+      <span>Pharma<b>Boost</b></span>
+    </div>
+    <div class="to">Pour le pharmacien titulaire</div>
+  </div>
+
+  <h1>Bonjour !<br><span>Un petit mot pour votre pharmacie.</span></h1>
+
+  <div class="lead">
+    <p>Madame, Monsieur,</p>
+    <p>Plutôt que de passer vous voir en pleine journée, au milieu de vos patients, nous avons préféré vous écrire. Scannez le QR&nbsp;code ci&#8209;dessous quand vous avez deux minutes : vous allez tout comprendre.</p>
+  </div>
+
+  <div class="qr">
+    <div class="code">__QR__</div>
+    <div style="position:relative;z-index:1">
+      <div class="pill">▶ Vidéo · 2 min</div>
+      <div class="t">Scannez avec<br><span>votre téléphone.</span></div>
+      <div class="s">Un petit mot de notre part, puis PharmaBoost au comptoir, en une minute.</div>
+      <div class="u">pharmaboost.app/decouvrir/lettre</div>
+    </div>
+  </div>
+
+  <div class="visio">Testez-le dans votre pharmacie :<br><span style="color:#0E8A7B">vous ne pourrez plus vous en passer.</span></div>
+
+  <div class="sign">
+    Bien à vous,
+    <div class="duo"><div class="n">Adam Bavard</div><div class="n">Donna Benveniste</div></div>
+    Cofondateurs de PharmaBoost
+  </div>
+
+  <div class="foot"><span>contact@pharmaboost.app</span><span>pharmaboost.app</span></div>
+  <div class="band"></div>
+</div>
+</body>
+</html>

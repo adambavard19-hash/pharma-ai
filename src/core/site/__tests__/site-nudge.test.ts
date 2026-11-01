@@ -3,7 +3,8 @@ import { formatSeconds, nudgeChoiceSchema, nudgeDetailsSchema, readNudgeStore } 
 
 describe("la bulle du site", () => {
   it("relit un réglage vide ou abîmé sans planter", () => {
-    expect(readNudgeStore(null)).toEqual({ shown: 0, closed: 0, items: [] });
+    expect(readNudgeStore(null)).toEqual({ shown: 0, closed: 0, letterScans: 0, items: [] });
+    expect(readNudgeStore({ letterScans: 7 }).letterScans).toBe(7);
     expect(readNudgeStore({ shown: "3", items: [null, { id: "a" }] })).toMatchObject({ shown: 3, closed: 0, items: [{ id: "a" }] });
   });
 
