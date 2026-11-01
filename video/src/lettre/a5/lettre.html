@@ -9,16 +9,16 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { width: 148mm; height: 210mm; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body { font-family: "Plus Jakarta Sans", Arial, sans-serif; color: #0F2B26; }
-  .page { position: relative; width: 148mm; height: 210mm; padding: 11mm 13mm 11mm; overflow: hidden;
+  .page { position: relative; width: 148mm; height: 210mm; padding: 13mm 13mm 11mm; overflow: hidden;
     background: radial-gradient(120% 60% at 100% 0%, #E4F6EE 0%, #FFFFFF 55%); }
   .band { position: absolute; left: 0; right: 0; bottom: 0; height: 5mm; background: linear-gradient(90deg, #0E7C5A, #14A374, #8FDDBE); }
   .head { display: flex; align-items: center; justify-content: space-between; }
   .brand { display: flex; align-items: center; gap: 2.4mm; font-weight: 800; font-size: 12pt; letter-spacing: -.02em; }
   .brand b { color: #0E8A7B; font-weight: 800; }
   .to { font-size: 7.5pt; font-weight: 600; color: #5B6B66; text-transform: uppercase; letter-spacing: .12em; }
-  h1 { margin-top: 6.5mm; font-size: 21pt; line-height: 1.08; font-weight: 800; letter-spacing: -.03em; }
+  h1 { margin-top: 11mm; font-size: 24pt; line-height: 1.08; font-weight: 800; letter-spacing: -.03em; }
   h1 span { color: #0E8A7B; }
-  .lead { margin-top: 4mm; font-size: 9.6pt; line-height: 1.5; color: #2E403B; }
+  .lead { margin-top: 8mm; font-size: 10.6pt; line-height: 1.6; color: #2E403B; }
   .lead p + p { margin-top: 2.2mm; }
   ul { margin-top: 4.5mm; list-style: none; display: grid; gap: 1.8mm; }
   li { display: flex; gap: 2.6mm; align-items: flex-start; font-size: 8.6pt; line-height: 1.38; font-weight: 600; }
@@ -38,18 +38,18 @@
   .ban .ft { margin-top: 1.6mm; display: flex; gap: 1.2mm; }
   .ban .ft span { flex: 1; text-align: center; padding: .8mm 0; border-radius: 99px; font-size: 5.8pt; font-weight: 800; }
   .ban .ok { background: #0E8A7B; color: #fff; } .ban .no { background: #EEF2F0; color: #5B6B66; }
-  .qr { position: relative; margin-top: 4.5mm; display: flex; align-items: center; gap: 6mm; padding: 4mm; border-radius: 6mm; overflow: hidden; color: #fff;
+  .qr { position: relative; margin-top: 9mm; display: flex; align-items: center; gap: 6mm; padding: 5mm; border-radius: 6mm; overflow: hidden; color: #fff;
     background: linear-gradient(135deg, #0F2B26 0%, #0E5C48 55%, #0E8A6B 100%); box-shadow: 0 3mm 8mm -4mm rgba(15,43,38,.45); }
   .qr::after { content: ""; position: absolute; right: -14mm; top: -14mm; width: 42mm; height: 42mm; border-radius: 99px; background: radial-gradient(circle, rgba(143,221,190,.35), rgba(143,221,190,0) 70%); }
   .qr .code { flex: none; padding: 2.6mm; border-radius: 4mm; background: #fff; box-shadow: 0 0 0 1mm rgba(255,255,255,.14); }
-  .qr svg { display: block; width: 29mm; height: 29mm; }
+  .qr svg { display: block; width: 34mm; height: 34mm; }
   .qr .pill { display: inline-flex; align-items: center; gap: 1.4mm; padding: 1mm 2.6mm; border-radius: 99px; background: rgba(143,221,190,.18); color: #8FDDBE; font-size: 7pt; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
   .qr .t { margin-top: 2.4mm; font-size: 14pt; font-weight: 800; line-height: 1.12; letter-spacing: -.02em; }
   .qr .t span { color: #8FDDBE; }
   .qr .s { margin-top: 2mm; font-size: 8.4pt; line-height: 1.4; color: rgba(255,255,255,.82); }
   .qr .u { margin-top: 2mm; font-size: 7pt; font-weight: 600; color: rgba(255,255,255,.6); }
-  .visio { margin-top: 3.5mm; font-size: 9.6pt; font-weight: 700; }
-  .sign { margin-top: 2.5mm; font-size: 9.2pt; line-height: 1.45; color: #2E403B; }
+  .visio { margin-top: 7mm; font-size: 9.6pt; font-weight: 700; }
+  .sign { margin-top: 6mm; font-size: 9.2pt; line-height: 1.45; color: #2E403B; }
   .sign .duo { display: flex; gap: 12mm; margin-top: 1.5mm; }
   .sign .n { margin-top: 1.5mm; font-size: 12pt; font-style: italic; font-weight: 600; color: #0F2B26; }
   .foot { position: absolute; left: 13mm; right: 13mm; bottom: 8mm; display: flex; justify-content: space-between; font-size: 7.6pt; font-weight: 700; color: #0E7C5A; }
@@ -69,21 +69,7 @@
 
   <div class="lead">
     <p>Madame, Monsieur,</p>
-    <p>Plutôt que de passer vous voir en pleine journée, au milieu de vos patients, nous avons préféré vous écrire. Scannez le QR code ci-dessous quand vous avez deux minutes : vous allez tout comprendre.</p>
-  </div>
-
-  <div class="mid">
-  <ul>
-    <li><i>1</i><span><b>Rien à changer :</b> PharmaBoost s'installe à côté de votre LGO, sans toucher à vos habitudes.</span></li>
-    <li><i>2</i><span><b>Le bon conseil, au bon moment :</b> à chaque boîte scannée, votre équipe voit quoi proposer au patient, pris dans votre stock.</span></li>
-    <li><i>3</i><span><b>Plus de chiffre d'affaires :</b> il met en avant vos meilleures marges, vos challenges, vos dates courtes et vos laboratoires préférés.</span></li>
-  </ul>
-  <div class="ban">
-    <div class="hd"><svg width="8" height="8" viewBox="0 0 40 40"><path d="M14 2h12v12h12v12H26v12H14V26H2V14h12z" fill="#0E8A7B"/></svg>PHARMABOOST<em>1 conseil</em></div>
-    <div class="rx">Scanné : <s>Amoxicilline</s></div>
-    <div class="card"><img src="__LACTI__" alt=""><div><div class="nm">Lactibiane Référence</div><div class="chip">Flore intestinale</div></div></div>
-    <div class="ft"><span class="ok">Vendu</span><span class="no">Non</span></div>
-  </div>
+    <p>Plutôt que de passer vous voir en pleine journée, au milieu de vos patients, nous avons préféré vous écrire. Scannez le QR&nbsp;code ci&#8209;dessous quand vous avez deux minutes : vous allez tout comprendre.</p>
   </div>
 
   <div class="qr">
