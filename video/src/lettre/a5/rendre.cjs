@@ -10,7 +10,8 @@ const path = require("path");
 const URL_LETTRE = "https://pharmaboost.app/decouvrir/lettre?source=courrier";
 (async () => {
   const svg = await QRCode.toString(URL_LETTRE, { type: "svg", errorCorrectionLevel: "M", margin: 0, color: { dark: "#0F2B26", light: "#FFFFFF" } });
-  const html = fs.readFileSync(path.join(__dirname, "lettre.html"), "utf8").replace("__QR__", svg);
+  const html = fs.readFileSync(path.join(__dirname, "lettre.html"), "utf8").replace("__QR__", svg)
+    .replace("__LACTI__", "data:image/jpeg;base64," + fs.readFileSync(path.join(__dirname, "../../../public/rembobine/images/lactibiane-reference.jpg")).toString("base64"));
   const b = await chromium.launch({ channel: "chrome", headless: true });
   const p = await b.newPage({ viewport: { width: 560, height: 794 }, deviceScaleFactor: 3 });
   await p.setContent(html, { waitUntil: "networkidle" });
