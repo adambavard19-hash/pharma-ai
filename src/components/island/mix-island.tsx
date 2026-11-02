@@ -237,7 +237,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
 
   // Le haut de la bannière en essai : la croix et PHARMABOOST à gauche, les boutons pour réduire à droite, dans le cadre menthe.
   const reduceBar = reduce && reduce !== "b" && (
-    <div data-ile-reduire-barre="" className="flex h-7 items-center gap-1.5 px-1.5 pb-1">
+    <div data-ile-reduire-barre="" className="flex h-6 items-center gap-1.5 px-1.5 pb-0.5">
       <GreenCross lit={4} size={15} />
       <span className="text-[9.5px] font-bold tracking-[0.2em] text-[#0F2B26] uppercase">
         Pharma<span className="text-[#0E8A7B]">boost</span>
@@ -259,7 +259,9 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
   if (cards) {
     // Plus étroite sur l'écran du logiciel (fondateur, 30 oct. 2026 : « trop large, prend trop d'espace ») : même police, même
     // taille d'écriture, 310 px au lieu de 400 ; photo 48 px et marges plus fines (même jour, « toujours aussi grand »).
-    const cardsWidth = narrow ? 290 : 310;
+    // 2 nov. 2026 (« réduis encore, ça gêne les pharmaciens », et « on ne voit pas le texte au complet ») : 272 px, photo
+    // 40 px, écriture un cran plus petite, et les noms ENTIERS (produit et médicament), sur autant de lignes qu'il faut.
+    const cardsWidth = narrow ? 262 : 272;
     return (
       <>
         <style>{`${ROUTINE_CSS}\n${SCAN_CSS}\n${CARDS_CSS}`}</style>
@@ -296,18 +298,17 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                           if (active && onClose) onClose();
                           else show(head);
                         }}
-                        className={`flex w-full items-center gap-2.5 rounded-2xl px-1 py-1.5 text-left transition-colors ${active ? "bg-[#EAF6F0]" : "hover:bg-[#F3F7F5]"}`}
+                        className={`flex w-full items-center gap-2 rounded-2xl px-1 py-1 text-left transition-colors ${active ? "bg-[#EAF6F0]" : "hover:bg-[#F3F7F5]"}`}
                       >
                         <CardPhoto src={advice.image} name={advice.name} />
                         <span className="min-w-0 flex-1">
-                          {/* Le nom entier sur deux lignes au plus, jamais coupé à côté de la coche « Vendu » (fondateur, 29 oct. 2026). */}
-                          <span className="flex items-start gap-1.5 text-[15.5px] leading-[20px] font-bold">
-                            {/* Trois lignes au plus depuis la bannière plus étroite (30 oct. 2026) : le nom reste entier. */}
-                            <span className="line-clamp-3">{advice.name}</span>
+                          {/* Le nom ENTIER, jamais coupé de « … », à côté de la coche « Vendu » (fondateur, 29 oct. puis 2 nov. 2026). */}
+                          <span className="flex items-start gap-1.5 text-[13.5px] leading-[17px] font-bold">
+                            <span className="min-w-0 break-words">{advice.name}</span>
                             {sold(head) && <Check className="mt-0.5 size-3.5 shrink-0" strokeWidth={3} style={{ color: L.green }} aria-label="Vendu" />}
                           </span>
-                          {advice.drug && <span className="block truncate text-[11.5px]" style={{ color: L.muted }}>pour {advice.drug}</span>}
-                          <span data-ile-mix-repere="" className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] font-semibold">
+                          {advice.drug && <span className="block text-[11px] leading-[14px] break-words" style={{ color: L.muted }}>pour {advice.drug}</span>}
+                          <span data-ile-mix-repere="" className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] font-semibold">
                             {advice.overstock && <span className="rounded-full px-1.5" style={{ background: OVERSTOCK_BG, color: OVERSTOCK_FG }}>{OVERSTOCK_LABEL}</span>}
                             <span className="inline-flex items-center gap-1 rounded-full px-1.5" style={{ color: stockInk(advice), background: stockTint(advice) }}>
                               <span className="size-1.5 rounded-full" style={{ background: stockInk(advice) }} />
@@ -319,7 +320,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                         </span>
                         <span className="flex shrink-0 flex-col items-end gap-1 text-right">
                           {/* Le prix seulement avec un stock fiable (jamais un chiffre douteux) ; sinon rien, pas de tiret. */}
-                          {advice.price && advice.stock !== "UNKNOWN" && <span className="block text-[18px] font-bold tabular-nums" style={{ color: L.green }}>{advice.price}</span>}
+                          {advice.price && advice.stock !== "UNKNOWN" && <span className="block text-[16px] font-bold tabular-nums" style={{ color: L.green }}>{advice.price}</span>}
                           {/* « Marge » écrit en toutes lettres (poste du 29 oct. 2026 : « on voit ni le stock ni la marge »). */}
                           {advice.margin && <span className="inline-block rounded-md bg-[#FFE58A] px-1.5 py-0.5 text-[11px] font-bold whitespace-nowrap text-[#4A3500] tabular-nums">Marge {advice.margin}</span>}
                         </span>
@@ -930,11 +931,11 @@ const TELL_MAX = 2;
 /** La photo studio du conseil, sur sa tuile blanche ; sans photo studio, une tuile vide (jamais une photo inventée). */
 function CardPhoto({ src, name }: { src?: string; name: string }) {
   // Grandes photos (fondateur, 29 oct. 2026, variante A) : on lit de loin, depuis le comptoir.
-  if (!src) return <Monogram name={name} size={48} />;
+  if (!src) return <Monogram name={name} size={40} />;
   return (
-    <span className="inline-flex size-[48px] shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-white">
+    <span className="inline-flex size-[40px] shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-white">
       {/* eslint-disable-next-line @next/next/no-img-element -- image locale de l'agent ou du site, déjà dimensionnée */}
-      <img data-ile-mix-photo="" src={src} alt="" width={46} height={46} draggable={false} className="size-full object-contain p-0.5" />
+      <img data-ile-mix-photo="" src={src} alt="" width={38} height={38} draggable={false} className="size-full object-contain p-0.5" />
     </span>
   );
 }

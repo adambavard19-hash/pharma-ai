@@ -111,10 +111,11 @@ describe("le déclenchement : une ligne médicament qu'aucune règle n'a servie"
 });
 
 describe("la liste fermée, préparée côté serveur", () => {
-  it("seulement des produits de l'officine, en stock, sans prescription ; ni doublon (antiacide, magnésium), ni le médicament lui-même", () => {
+  it("seulement des produits de l'officine, en stock, sans prescription, dont un usage va avec la famille ; ni doublon (antiacide, magnésium), ni le médicament lui-même", () => {
     const candidates = selectRobotCandidates({ catalog: stock(), drug: maaloxDrug() });
-    expect(candidates.map((candidate) => candidate.productId)).toEqual(["p-probio", "p-tisane", "p-creme"]);
-    expect(candidates.map((candidate) => candidate.shortId)).toEqual(["P01", "P02", "P03"]);
+    // La crème (rayon soin, aucun usage digestif) n'a rien à faire derrière un antiacide.
+    expect(candidates.map((candidate) => candidate.productId)).toEqual(["p-probio", "p-tisane"]);
+    expect(candidates.map((candidate) => candidate.shortId)).toEqual(["P01", "P02"]);
     expect(candidates[0]).toMatchObject({ productKey: "ean:3401000000011", tags: ["probiotique", "flore intestinale"] });
   });
 
@@ -125,7 +126,7 @@ describe("la liste fermée, préparée côté serveur", () => {
 
   it("une référence remboursée n'est jamais proposée au modèle (ce peut être un médicament)", () => {
     const catalog = stock().map((entry) => (entry.id === "p-probio" ? { ...entry, reimbursed: true } : entry));
-    expect(selectRobotCandidates({ catalog, drug: maaloxDrug() }).map((candidate) => candidate.productId)).toEqual(["p-tisane", "p-creme"]);
+    expect(selectRobotCandidates({ catalog, drug: maaloxDrug() }).map((candidate) => candidate.productId)).toEqual(["p-tisane"]);
   });
 
   /** Un produit tel que catalog.ts le construit : jamais de substance ni de condition de délivrance, quoi qu'il soit. */
@@ -146,7 +147,8 @@ describe("la liste fermée, préparée côté serveur", () => {
     const ok = asPharmacyProduct({ id: "ok-tisane", name: "Tisane digestion", category: "PHYTOTHERAPIE", matchingTags: ["digestion"], ean: "3401000009004", vatRate: 5.5 });
     const okAutre = asPharmacyProduct({ id: "ok-autre", name: "Gourde isotherme", category: "AUTRE", matchingTags: ["hydratation"], ean: "3401000009005", vatRate: 20 });
     const candidates = selectRobotCandidates({ catalog: [...drugs, ok, okAutre], drug: maaloxDrug() });
-    expect(candidates.map((candidate) => candidate.productId).sort()).toEqual(["ok-autre", "ok-tisane"]);
+    // La gourde (usage « hydratation ») ne va pas avec un antiacide : seule la tisane digestion reste.
+    expect(candidates.map((candidate) => candidate.productId).sort()).toEqual(["ok-tisane"]);
     for (const entry of drugs) expect(mayBeDrug(entry)).toBe(true);
   });
 
@@ -162,8 +164,17 @@ describe("la liste fermée, préparée côté serveur", () => {
   });
 
   it(`au plus ${ROBOT_MAX_CANDIDATES} produits`, () => {
-    const catalog = Array.from({ length: 90 }, (_, index) => product({ id: `p${index}`, name: `Produit ${index}`, ean: `34010000${String(index).padStart(5, "0")}`, matchingTags: [] }));
+    const catalog = Array.from({ length: 90 }, (_, index) => product({ id: `p${index}`, name: `Produit ${index}`, ean: `34010000${String(index).padStart(5, "0")}`, matchingTags: ["digestion"] }));
     expect(selectRobotCandidates({ catalog, drug: maaloxDrug() })).toHaveLength(ROBOT_MAX_CANDIDATES);
+  });
+
+  it("un laxatif n'appelle jamais une cure de vitamines : Bion 3 Vitalité pour un Microlax (fondateur, 2 nov. 2026)", () => {
+    const bion = asPharmacyProduct({ id: "p-bion", name: "BION 3 VITALITE 50+ EX SENIOR CPR", category: "NUTRITION", matchingTags: ["vitamines", "fatigue"], ean: "3401000009010", vatRate: 5.5 });
+    const fibres = asPharmacyProduct({ id: "p-fibres", name: "Fibres transit", category: "NUTRITION", matchingTags: ["fibres"], ean: "3401000009011", vatRate: 5.5 });
+    const microlax = { ...maaloxDrug(), drugName: "MICROLAX SORBITOL CITRATE ET LAURILSULFOACETATE DE SODIUM, solution rectale", substances: ["SORBITOL", "CITRATE DE SODIUM"], atcCode: "A06AG11", therapeuticClass: "Laxatifs" };
+    expect(selectRobotCandidates({ catalog: [bion, fibres], drug: microlax }).map((candidate) => candidate.productId)).toEqual(["p-fibres"]);
+    // Une famille sans affinité connue : aucune suggestion du robot plutôt qu'un produit au hasard.
+    expect(selectRobotCandidates({ catalog: [bion, fibres], drug: { ...microlax, atcCode: "L01XE01", therapeuticClass: null } })).toEqual([]);
   });
 
   it("le texte envoyé : le médicament, sa substance, sa famille et la liste — rien d'autre", () => {

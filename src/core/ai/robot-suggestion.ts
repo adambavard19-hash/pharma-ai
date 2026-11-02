@@ -247,7 +247,7 @@ export function mayBeDrug(product: Pick<CatalogProduct, "reimbursed" | "ean" | "
 
 /**
  * La liste fermée proposée au modèle : des produits de l'officine (jamais un médicament du catalogue national), actifs,
- * en stock, qui ne peuvent pas être un médicament (`mayBeDrug` : ni remboursé, ni code CIP, ni TVA à 2,1 %, ni rayon
+ * en stock, dont au moins un usage va avec la famille du médicament (`AFFINITY`), qui ne peuvent pas être un médicament (`mayBeDrug` : ni remboursé, ni code CIP, ni TVA à 2,1 %, ni rayon
  * « AUTRE » sans usage), qui ne doublent pas le médicament et dont la proposition n'a pas été refusée par la pharmacienne
  * de PharmaBoost. Les plus plausibles pour la famille du médicament d'abord ; au plus `ROBOT_MAX_CANDIDATES`.
  */
@@ -275,6 +275,14 @@ export function selectRobotCandidates(params: {
     .map((product) => {
       const tags = [...new Set(product.matchingTags.map((tag) => tag.toLowerCase()).filter((tag) => vocabulary.has(tag)))];
       const tagHits = affinity ? tags.filter((tag) => affinity.tags.includes(tag)).length : 0;
+      return { product, tags, tagHits };
+    })
+    // Le rayon ne suffit plus : un produit n'est proposé au modèle que si l'un de ses usages va avec la famille du
+    // médicament. Une famille sans affinité connue n'a pas de suggestion du robot. Fondateur, 2 nov. 2026, après Bion 3
+    // Vitalité 50+ (rayon Nutrition, aucun usage « transit ») proposé pour un Microlax : « aucun rapport, notre crédibilité
+    // est mise à mal ». Rien vaut mieux qu'un produit sans rapport.
+    .filter(({ tagHits }) => tagHits > 0)
+    .map(({ product, tags, tagHits }) => {
       const score =
         (affinity?.categories.includes(product.category) ? 3 : 0) +
         2 * Math.min(3, tagHits) +
