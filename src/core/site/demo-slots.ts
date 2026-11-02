@@ -4,8 +4,10 @@ import { parisInputToDate, toParisInput } from "@/core/sales/board";
  * Les créneaux de démonstration que le site propose : un appel de vingt minutes,
  * à l'heure de Paris, du lundi au vendredi, le matin de 9 h à 12 h et l'après-midi
  * de 14 h à 19 h, toutes les demi-heures. Au plus tôt deux heures après la demande,
- * sur les dix prochains jours ouvrés. Un créneau déjà réservé par une autre
- * officine n'est plus proposé ; le serveur revérifie au moment de réserver.
+ * sur les dix prochains jours ouvrés. Un créneau déjà réservé par une autre officine, ou
+ * bloqué par l'équipe dans la console, reste affiché, grisé « Réservé » (fondateur,
+ * 2 nov. 2026 : « il va voir que celui de 12 h 30 est déjà réservé ») ; le serveur
+ * revérifie au moment de réserver.
  */
 
 export const DEMO_DURATION_MIN = 20;
@@ -13,7 +15,9 @@ export const DEMO_DAYS_AHEAD = 10;
 export const DEMO_LEAD_TIME_MS = 2 * 3600 * 1000;
 const TIMES = ["09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30"];
 
-export type DemoSlot = { at: string; time: string };
+export type DemoSlot = { at: string; time: string; taken?: true };
+/** Une plage où l'équipe n'est pas disponible (console → Agenda des démos). */
+export type DemoBlock = { start: string; end: string };
 export type DemoDay = { date: string; label: string; slots: DemoSlot[] };
 
 const DAY_LABEL = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", weekday: "long", day: "numeric", month: "long" });
@@ -32,8 +36,14 @@ export function formatDemoSlot(at: Date): string {
   return `${capitalize(DAY_LABEL.format(at))} à ${demoTimeLabel(toParisInput(at).slice(11))}`;
 }
 
-/** Les jours ouvrés à venir et leurs créneaux libres ; un jour sans créneau libre n'apparaît pas. */
-export function demoSlots(now: Date, taken: Date[] = []): DemoDay[] {
+/** Le créneau de vingt minutes qui commence à `at` touche-t-il une plage bloquée ? */
+function isBlocked(at: Date, blocks: DemoBlock[]): boolean {
+  const end = at.getTime() + DEMO_DURATION_MIN * 60 * 1000;
+  return blocks.some((block) => at.getTime() < new Date(block.end).getTime() && end > new Date(block.start).getTime());
+}
+
+/** Les jours ouvrés à venir et leurs créneaux, les pris marqués `taken` ; un jour sans aucun créneau n'apparaît pas. */
+export function demoSlots(now: Date, taken: Date[] = [], blocks: DemoBlock[] = []): DemoDay[] {
   const busy = new Set(taken.map((date) => date.getTime()));
   const days: DemoDay[] = [];
   let workingDays = 0;
@@ -45,8 +55,9 @@ export function demoSlots(now: Date, taken: Date[] = []): DemoDay[] {
     workingDays++;
     const slots = TIMES.flatMap((time) => {
       const at = parisInputToDate(`${date}T${time}`);
-      if (!at || at.getTime() < now.getTime() + DEMO_LEAD_TIME_MS || busy.has(at.getTime())) return [];
-      return [{ at: at.toISOString(), time: demoTimeLabel(time) }];
+      if (!at || at.getTime() < now.getTime() + DEMO_LEAD_TIME_MS) return [];
+      const slot: DemoSlot = { at: at.toISOString(), time: demoTimeLabel(time) };
+      return [busy.has(at.getTime()) || isBlocked(at, blocks) ? { ...slot, taken: true as const } : slot];
     });
     if (slots.length) days.push({ date, label: capitalize(DAY_LABEL.format(middle)), slots });
   }
@@ -54,8 +65,8 @@ export function demoSlots(now: Date, taken: Date[] = []): DemoDay[] {
 }
 
 /** Ce créneau est-il proposable maintenant (bonne grille, assez tôt, pas trop loin, libre) ? */
-export function isBookableDemoSlot(at: Date, now: Date, taken: Date[] = []): boolean {
-  return demoSlots(now, taken).some((day) => day.slots.some((slot) => slot.at === at.toISOString()));
+export function isBookableDemoSlot(at: Date, now: Date, taken: Date[] = [], blocks: DemoBlock[] = []): boolean {
+  return demoSlots(now, taken, blocks).some((day) => day.slots.some((slot) => slot.at === at.toISOString() && !slot.taken));
 }
 
 /** Lien « Ajouter à Google Agenda » pour l'appel de démonstration. */

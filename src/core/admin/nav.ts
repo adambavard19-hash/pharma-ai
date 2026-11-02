@@ -100,6 +100,7 @@ export const ADMIN_NAV: AdminNavSpace[] = [
         key: "site-internet",
         label: "Site internet",
         items: [
+          { href: "/admin/agenda", label: "Agenda des démos", description: "Les démos réservées par les pharmaciens sur le site, l'agenda à ajouter sur vos téléphones, les créneaux à bloquer." },
           { href: "/admin/site-internet", label: "Réponses des visiteurs", description: "Le compteur des visiteurs et ce que la bulle « Vous êtes plutôt… ? » a recueilli : profils, intérêts, coordonnées." },
           { href: "/admin/visiteurs", label: "Villes des visiteurs", description: "D'où viennent les visiteurs du site, ville par ville." },
         ],

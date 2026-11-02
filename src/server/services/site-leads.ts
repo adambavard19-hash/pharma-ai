@@ -8,7 +8,9 @@ import { buildSiteLeadAcknowledgement, buildSiteLeadAlert, type SiteLeadKind, ty
 import { resolveReferralCode } from "@/server/services/referral";
 import { reconcileNewProspect } from "@/server/services/referral-leads";
 import { withAdvisoryLock } from "@/server/db/advisory-lock";
-import { demoSlots, formatDemoSlot, isBookableDemoSlot, type DemoDay } from "@/core/site/demo-slots";
+import { DEMO_DURATION_MIN, demoSlots, formatDemoSlot, isBookableDemoSlot, type DemoDay } from "@/core/site/demo-slots";
+import { buildCalendar } from "@/core/site/demo-agenda";
+import { demoEvent, loadDemoBlocks } from "@/server/services/demo-agenda";
 
 export const DEFAULT_CONTACT_EMAIL = "contact@pharmaboost.app";
 
@@ -43,9 +45,9 @@ async function takenDemoSlots(now: Date): Promise<Date[]> {
   return rows.flatMap((row) => (row.demoAt ? [row.demoAt] : []));
 }
 
-/** Les créneaux libres proposés par la page « Réserver une démo ». */
+/** Les créneaux proposés par la page « Réserver une démo », les pris et les bloqués grisés. */
 export async function loadDemoSlots(now = new Date()): Promise<DemoDay[]> {
-  return demoSlots(now, await takenDemoSlots(now));
+  return demoSlots(now, await takenDemoSlots(now), await loadDemoBlocks(now));
 }
 
 /**
@@ -57,7 +59,7 @@ export async function receiveSiteLead(input: SiteLeadInput): Promise<{ prospectI
   if (!demoAt) return recordSiteLead({ ...input, demoAt: null });
   return withAdvisoryLock("site:demo-slot", async () => {
     const now = new Date();
-    if (!isBookableDemoSlot(demoAt, now, await takenDemoSlots(now))) throw new DemoSlotUnavailableError();
+    if (!isBookableDemoSlot(demoAt, now, await takenDemoSlots(now), await loadDemoBlocks(now))) throw new DemoSlotUnavailableError();
     return recordSiteLead({ ...input, demoAt });
   });
 }
@@ -128,16 +130,22 @@ async function recordSiteLead(input: SiteLeadInput & { demoAt: Date | null }): P
   const summary: SiteLeadSummary = { ...input, salesRepName: repName };
   const messaging = getMessagingProvider();
   const alert = buildSiteLeadAlert({ ...summary, adminUrl });
-  await messaging.sendEmail({ to: contactEmail, fromName: "PharmaBoost", subject: alert.subject, text: alert.text, html: alert.html }).catch(() => undefined);
+  // L'invitation d'agenda : un clic l'ajoute au téléphone, avec un rappel un quart d'heure avant (2 nov. 2026).
+  const teamEvent = input.demoAt ? demoEvent({ id: prospect.id, name: input.pharmacyName, ownerName: input.contactName, email: input.email, phone: input.phone, city: input.city, demoAt: input.demoAt, demoDoneAt: null }) : null;
+  const teamInvite = teamEvent ? [{ filename: "demo-pharmaboost.ics", content: Buffer.from(buildCalendar("PharmaBoost · Démos", [teamEvent]), "utf8"), contentType: "text/calendar; charset=utf-8; method=PUBLISH" }] : undefined;
+  const pharmacistInvite = input.demoAt
+    ? [{ filename: "demo-pharmaboost.ics", content: Buffer.from(buildCalendar("PharmaBoost", [{ uid: `demo-${prospect.id}-${input.demoAt.getTime()}-officine@pharmaboost.app`, start: input.demoAt, end: new Date(input.demoAt.getTime() + DEMO_DURATION_MIN * 60 * 1000), title: "Démonstration PharmaBoost", description: `Votre démonstration PharmaBoost, ${formatDemoSlot(input.demoAt)}. Nous vous appelons à l'heure dite.\nUne question : ${contactEmail}`, alarmMinutes: 15 }]), "utf8"), contentType: "text/calendar; charset=utf-8; method=PUBLISH" }]
+    : undefined;
+  await messaging.sendEmail({ to: contactEmail, fromName: "PharmaBoost", subject: alert.subject, text: alert.text, html: alert.html, attachments: teamInvite }).catch(() => undefined);
   // Chaque administrateur reçoit l'alerte détaillée par e-mail, démo ou non (fondateur, 17 puis 21 oct. 2026).
-  await notifyAdmins({ type: "SITE_LEAD", title: `${input.demoAt ? `Démo réservée ${formatDemoSlot(input.demoAt)}` : kindLabel} — ${input.pharmacyName}`, body: `${input.contactName} · ${input.email}${input.phone ? ` · ${input.phone}` : ""}${repName ? ` · apportée par ${repName}` : ""}`, linkUrl: `/admin/dossiers/${prospect.id}`, severity: "INFO", email: alert, alreadySentTo: [contactEmail] });
+  await notifyAdmins({ type: "SITE_LEAD", title: `${input.demoAt ? `Démo réservée ${formatDemoSlot(input.demoAt)}` : kindLabel} — ${input.pharmacyName}`, body: `${input.contactName} · ${input.email}${input.phone ? ` · ${input.phone}` : ""}${repName ? ` · apportée par ${repName}` : ""}`, linkUrl: `/admin/dossiers/${prospect.id}`, severity: "INFO", email: { ...alert, attachments: teamInvite }, alreadySentTo: [contactEmail] });
   // Le commercial qui a envoyé le lien est prévenu lui aussi, avec le lien vers le dossier dans son espace.
   if (rep?.email) {
     const repAlert = buildSiteLeadAlert({ ...summary, adminUrl: publicUrl(`/extranet/dossiers/${prospect.id}`) });
     await messaging.sendEmail({ to: rep.email, fromName: "PharmaBoost", subject: `Votre lien a fonctionné : ${repAlert.subject}`, text: repAlert.text, html: repAlert.html }).catch(() => undefined);
   }
   const ack = buildSiteLeadAcknowledgement({ ...summary, contactEmail });
-  const outcome = await messaging.sendEmail({ to: input.email, fromName: "PharmaBoost", subject: ack.subject, text: ack.text, html: ack.html });
+  const outcome = await messaging.sendEmail({ to: input.email, fromName: "PharmaBoost", subject: ack.subject, text: ack.text, html: ack.html, attachments: pharmacistInvite });
   // L'accusé au demandeur entre dans l'historique des communications, envoyé ou non (ne lève jamais).
   await traceDispatch({ kind: "SITE_LEAD_ACK", recipient: input.email, outcome, subject: ack.subject, trigger: "SYSTEM", prospectId: prospect.id });
   return { prospectId: prospect.id, acknowledged: outcome.status === "SENT" };

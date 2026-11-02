@@ -9,7 +9,7 @@ export async function notifySalesRep(params: { salesRepId: string; type: string;
   });
 }
 
-type AdminEmail = { subject: string; text: string; html: string };
+type AdminEmail = { subject: string; text: string; html: string; attachments?: { filename: string; content: Uint8Array; contentType: string }[] };
 
 /** Ces notifications ne partent pas par e-mail : une panne d'envoi qui écrirait un e-mail tournerait en boucle. */
 const NOT_EMAILED = new Set(["EMAIL_FAILED"]);
@@ -42,7 +42,7 @@ async function emailAdmins(params: { title: string; body: string; linkUrl?: stri
   const message = params.email ?? buildTeamNotificationEmail({ title: params.title, body: params.body, url: params.linkUrl ? publicUrl(params.linkUrl) : null });
   const messaging = getMessagingProvider();
   for (const to of recipients) {
-    const outcome = await messaging.sendEmail({ to, fromName: "PharmaBoost", subject: message.subject, text: message.text, html: message.html }).catch(() => null);
+    const outcome = await messaging.sendEmail({ to, fromName: "PharmaBoost", subject: message.subject, text: message.text, html: message.html, attachments: params.email?.attachments }).catch(() => null);
     if (outcome) await traceDispatch({ kind: "TEAM_ALERT", recipient: to, outcome, subject: message.subject, trigger: "SYSTEM" });
   }
 }
