@@ -1,9 +1,9 @@
 import { PATIENT_APP_LIVE } from "@/core/patient-app/offers";
 
 /**
- * La navigation de la console, en CINQ rubriques.
+ * La navigation de la console, en SIX rubriques.
  *
- * Accueil · Officines · Commercial · Finances · Gestion. Chaque rubrique se déplie en groupes (les onglets) et chaque groupe
+ * Accueil · Agenda · Officines · Commercial · Finances · Gestion. Chaque rubrique se déplie en groupes (les onglets) et chaque groupe
  * peut contenir quelques vues (les pastilles). Aucune adresse ne change : ce qui était un menu est devenu un onglet, et rien
  * n'a été supprimé — une page est toujours à l'adresse où elle était, et son onglet s'allume.
  */
@@ -28,7 +28,7 @@ export type AdminNavGroup = {
   ownViewSwitcher?: boolean;
 };
 
-export type AdminNavSpaceKey = "home" | "pharmacies" | "commercial" | "finance" | "management";
+export type AdminNavSpaceKey = "home" | "agenda" | "pharmacies" | "commercial" | "finance" | "management";
 
 export type AdminNavSpace = {
   key: AdminNavSpaceKey;
@@ -41,6 +41,13 @@ export type AdminNavSpace = {
 
 export const ADMIN_NAV: AdminNavSpace[] = [
   { key: "home", label: "Accueil", href: "/admin", matches: ["/admin/notifications", "/admin/carnet"], groups: [] },
+  // L'agenda des démos, en onglet direct (fondateur, 2 nov. 2026 : « ne le mets pas dans Commercial, crée un onglet Agenda »).
+  {
+    key: "agenda",
+    label: "Agenda",
+    href: "/admin/agenda",
+    groups: [{ key: "agenda", label: "Agenda des démos", items: [{ href: "/admin/agenda", label: "Agenda des démos", description: "Les démos réservées par les pharmaciens sur le site, l'agenda à ajouter sur vos téléphones, les créneaux à bloquer." }] }],
+  },
   {
     key: "pharmacies",
     label: "Officines",
@@ -100,7 +107,6 @@ export const ADMIN_NAV: AdminNavSpace[] = [
         key: "site-internet",
         label: "Site internet",
         items: [
-          { href: "/admin/agenda", label: "Agenda des démos", description: "Les démos réservées par les pharmaciens sur le site, l'agenda à ajouter sur vos téléphones, les créneaux à bloquer." },
           { href: "/admin/site-internet", label: "Réponses des visiteurs", description: "Le compteur des visiteurs et ce que la bulle « Vous êtes plutôt… ? » a recueilli : profils, intérêts, coordonnées." },
           { href: "/admin/visiteurs", label: "Villes des visiteurs", description: "D'où viennent les visiteurs du site, ville par ville." },
         ],

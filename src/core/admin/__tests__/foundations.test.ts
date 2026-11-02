@@ -396,9 +396,9 @@ describe("navigation de la console", () => {
     "/admin/journal": { space: "management", item: "Journal d'audit" },
   };
 
-  it("cinq rubriques, pas une de plus : Accueil, Officines, Commercial, Finances, Gestion", () => {
-    expect(ADMIN_NAV.map((space) => space.label)).toEqual(["Accueil", "Officines", "Commercial", "Finances", "Gestion"]);
-    expect(ADMIN_NAV.map((space) => space.href)).toEqual(["/admin", "/admin/pharmacies", "/admin/pipeline", "/admin/abonnements", "/admin/conseils"]);
+  it("six rubriques, pas une de plus : Accueil, Agenda, Officines, Commercial, Finances, Gestion", () => {
+    expect(ADMIN_NAV.map((space) => space.label)).toEqual(["Accueil", "Agenda", "Officines", "Commercial", "Finances", "Gestion"]);
+    expect(ADMIN_NAV.map((space) => space.href)).toEqual(["/admin", "/admin/agenda", "/admin/pharmacies", "/admin/pipeline", "/admin/abonnements", "/admin/conseils"]);
   });
 
   it("aucune adresse n'a disparu : chaque page d'avant retrouve sa rubrique et son onglet", () => {
