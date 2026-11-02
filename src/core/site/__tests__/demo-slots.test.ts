@@ -28,4 +28,17 @@ describe("créneaux de démonstration", () => {
     expect(isBookableDemoSlot(new Date("2026-10-19T07:10:00Z"), now)).toBe(false);
     expect(isBookableDemoSlot(new Date("2026-10-17T07:00:00Z"), now)).toBe(false);
   });
+
+  it("garde un créneau réservé à l'écran, grisé, et ferme les plages bloquées par l'équipe", () => {
+    const taken = new Date("2026-10-19T07:00:00Z");
+    const monday = demoSlots(now, [taken]).find((d) => d.date === "2026-10-19");
+    expect(monday?.slots[0]).toEqual({ at: taken.toISOString(), time: "9 h", taken: true });
+    expect(monday?.slots[1].taken).toBeUndefined();
+    // Lundi 19 octobre, 14 h 15 – 15 h 10 à Paris : 14 h, 14 h 30 et 15 h touchent la plage, 15 h 30 reste libre.
+    const blocks = [{ start: "2026-10-19T12:15:00Z", end: "2026-10-19T13:10:00Z" }];
+    const afternoon = demoSlots(now, [], blocks).find((d) => d.date === "2026-10-19")!.slots.filter((slot) => slot.taken).map((slot) => slot.time);
+    expect(afternoon).toEqual(["14 h", "14 h 30", "15 h"]);
+    expect(isBookableDemoSlot(new Date("2026-10-19T12:30:00Z"), now, [], blocks)).toBe(false);
+    expect(isBookableDemoSlot(new Date("2026-10-19T13:30:00Z"), now, [], blocks)).toBe(true);
+  });
 });

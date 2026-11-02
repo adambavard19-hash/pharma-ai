@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CircleHelp, ClipboardList, FileText, MessageCircleQuestion, PackageSearch, PanelTop, ScanLine, Trophy } from "lucide-react";
@@ -252,12 +252,21 @@ function DemoAside({ values }: { values: Values }) {
 }
 
 /**
- * Le jour puis l'heure : les jours ouvrés à venir qui ont encore un créneau libre, et leurs heures. Un créneau pris par
- * une autre officine n'apparaît pas ; s'il est pris entre-temps, l'envoi le dit et la personne en choisit un autre.
+ * Le jour puis l'heure : les jours ouvrés à venir et leurs heures. Un créneau pris par une autre officine (ou bloqué par
+ * l'équipe) reste affiché, grisé « Réservé » ; la page se relit toute seule, et s'il est pris entre-temps, l'envoi le dit
+ * et la personne en choisit un autre.
  */
 function DemoSlotPicker({ days, value, error, onPick, onCallMe }: { days: DemoDay[]; value: string; error?: string; onPick: (at: string) => void; onCallMe: () => void }) {
   const [dayIndex, setDayIndex] = useState(() => Math.max(0, days.findIndex((day) => day.slots.some((slot) => slot.at === value))));
   const day = days[dayIndex];
+  const router = useRouter();
+  // Le calendrier en direct : relu toutes les vingt secondes tant que la page est à l'écran (ce qui est déjà saisi reste).
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") router.refresh();
+    }, 20_000);
+    return () => window.clearInterval(timer);
+  }, [router]);
   return (
     <div className="space-y-5">
       {days.length > 0 ? (
@@ -285,21 +294,28 @@ function DemoSlotPicker({ days, value, error, onPick, onCallMe }: { days: DemoDa
           </div>
           {day && (
             <div role="radiogroup" aria-label={`Heure, ${day.label}`} className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-              {day.slots.map((slot) => (
-                <button
-                  key={slot.at}
-                  type="button"
-                  role="radio"
-                  aria-checked={value === slot.at}
-                  onClick={() => onPick(slot.at)}
-                  className={cn(
-                    "h-11 rounded-xl border text-[15px] font-semibold tabular-nums transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500",
-                    value === slot.at ? "border-brand-600 bg-brand-600 text-white" : "border-border-default bg-surface-card text-text-primary hover:border-brand-300",
-                  )}
-                >
-                  {slot.time}
-                </button>
-              ))}
+              {day.slots.map((slot) =>
+                slot.taken ? (
+                  <div key={slot.at} data-creneau-reserve="" aria-label={`${slot.time}, déjà réservé`} className="flex h-11 flex-col items-center justify-center rounded-xl border border-dashed border-border-default bg-surface-subtle text-text-tertiary">
+                    <span className="text-[14px] leading-4 font-semibold tabular-nums line-through">{slot.time}</span>
+                    <span className="text-[10.5px] leading-3 font-medium">Réservé</span>
+                  </div>
+                ) : (
+                  <button
+                    key={slot.at}
+                    type="button"
+                    role="radio"
+                    aria-checked={value === slot.at}
+                    onClick={() => onPick(slot.at)}
+                    className={cn(
+                      "h-11 rounded-xl border text-[15px] font-semibold tabular-nums transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500",
+                      value === slot.at ? "border-brand-600 bg-brand-600 text-white" : "border-border-default bg-surface-card text-text-primary hover:border-brand-300",
+                    )}
+                  >
+                    {slot.time}
+                  </button>
+                ),
+              )}
             </div>
           )}
           {value && value !== CALL_ME && <p className="text-[14.5px] font-medium text-brand-800">Votre démo : {slotLabel(value)}.</p>}
