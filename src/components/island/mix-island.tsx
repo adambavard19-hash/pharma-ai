@@ -180,13 +180,15 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
     if (open && onClose) onClose();
     setReduced(to);
   };
-  // D : la bannière se réduit seule 8 secondes après que la souris l'a quittée, et se rouvre au survol.
+  // D : la bannière se réduit seule 8 secondes après que la souris l'a quittée (ou sans jamais avoir été survolée), et se
+  // rouvre au survol. Retenue pour le poste le 2 nov. 2026, avec le bouton « – Réduire » gardé. Un conseil ou une routine
+  // ouverts d'un clic restent ouverts : le pharmacien est en train de les lire.
   useEffect(() => {
-    if (reduce !== "d" || reduced || over) return;
+    if (reduce !== "d" || reduced || over || open || routineOpen) return;
     const id = setTimeout(() => reduceTo("pill"), 8000);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reduceTo ne dépend que de l'état courant
-  }, [reduce, reduced, over]);
+  }, [reduce, reduced, over, open, routineOpen]);
 
   if (cards && reduce && reduced) {
     const count = heads.length + (routine ? 1 : 0);
@@ -242,7 +244,6 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
       <span className="text-[9.5px] font-bold tracking-[0.2em] text-[#0F2B26] uppercase">
         Pharma<span className="text-[#0E8A7B]">boost</span>
       </span>
-      {reduce === "d" && <span className="ml-1 text-[10px] font-medium text-[#0F2B26]/55">se réduit seule</span>}
       <span className="flex-1" />
       <button type="button" data-ile-reduire="" onClick={() => reduceTo(reduce === "e" ? "dot" : "pill")} title="Réduire la bannière" aria-label="Réduire la bannière" className="inline-flex h-6 items-center gap-1 rounded-full bg-white/85 px-2 text-[10.5px] font-bold text-[#0E7A4E] shadow-sm ring-1 ring-[#0E8A7B]/25 hover:bg-white">
         <Minus className="size-3.5" strokeWidth={3} />
@@ -261,7 +262,8 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
     // taille d'écriture, 310 px au lieu de 400 ; photo 48 px et marges plus fines (même jour, « toujours aussi grand »).
     // 2 nov. 2026 (« réduis encore, ça gêne les pharmaciens », et « on ne voit pas le texte au complet ») : 272 px, photo
     // 40 px, écriture un cran plus petite, et les noms ENTIERS (produit et médicament), sur autant de lignes qu'il faut.
-    const cardsWidth = narrow ? 262 : 272;
+    // Même jour, encore un cran : 256 px, photo 36 px.
+    const cardsWidth = narrow ? 248 : 256;
     return (
       <>
         <style>{`${ROUTINE_CSS}\n${SCAN_CSS}\n${CARDS_CSS}`}</style>
@@ -303,12 +305,16 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                         <CardPhoto src={advice.image} name={advice.name} />
                         <span className="min-w-0 flex-1">
                           {/* Le nom ENTIER, jamais coupé de « … », à côté de la coche « Vendu » (fondateur, 29 oct. puis 2 nov. 2026). */}
-                          <span className="flex items-start gap-1.5 text-[13.5px] leading-[17px] font-bold">
+                          <span className="flex items-start gap-1.5 text-[13px] leading-[16px] font-bold">
                             <span className="min-w-0 break-words">{advice.name}</span>
                             {sold(head) && <Check className="mt-0.5 size-3.5 shrink-0" strokeWidth={3} style={{ color: L.green }} aria-label="Vendu" />}
                           </span>
                           {advice.drug && <span className="block text-[11px] leading-[14px] break-words" style={{ color: L.muted }}>pour {advice.drug}</span>}
                           <span data-ile-mix-repere="" className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] font-semibold">
+                            {/* Le prix et la marge sous le nom (2 nov. 2026) : le nom prend toute la largeur, la bannière reste basse. Le
+                                prix seulement avec un stock fiable (jamais un chiffre douteux) ; « Marge » en toutes lettres. */}
+                            {advice.price && advice.stock !== "UNKNOWN" && <span className="text-[13px] font-bold tabular-nums" style={{ color: L.green }}>{advice.price}</span>}
+                            {advice.margin && <span className="inline-block rounded-md bg-[#FFE58A] px-1.5 text-[11px] font-bold whitespace-nowrap text-[#4A3500] tabular-nums">Marge {advice.margin}</span>}
                             {advice.overstock && <span className="rounded-full px-1.5" style={{ background: OVERSTOCK_BG, color: OVERSTOCK_FG }}>{OVERSTOCK_LABEL}</span>}
                             <span className="inline-flex items-center gap-1 rounded-full px-1.5" style={{ color: stockInk(advice), background: stockTint(advice) }}>
                               <span className="size-1.5 rounded-full" style={{ background: stockInk(advice) }} />
@@ -317,12 +323,6 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                             {advice.challenge && <span className="inline-flex items-center gap-1 rounded-full bg-[#EEFFC2] px-1.5 text-[#3F5A00]"><Star className="size-3 fill-current" aria-hidden="true" />{T.challenge}</span>}
                             {advice.shortDate && <span className="inline-flex items-center gap-1 text-[#C23A2B]"><Hourglass className="size-3" aria-hidden="true" />{advice.shortDate}</span>}
                           </span>
-                        </span>
-                        <span className="flex shrink-0 flex-col items-end gap-1 text-right">
-                          {/* Le prix seulement avec un stock fiable (jamais un chiffre douteux) ; sinon rien, pas de tiret. */}
-                          {advice.price && advice.stock !== "UNKNOWN" && <span className="block text-[16px] font-bold tabular-nums" style={{ color: L.green }}>{advice.price}</span>}
-                          {/* « Marge » écrit en toutes lettres (poste du 29 oct. 2026 : « on voit ni le stock ni la marge »). */}
-                          {advice.margin && <span className="inline-block rounded-md bg-[#FFE58A] px-1.5 py-0.5 text-[11px] font-bold whitespace-nowrap text-[#4A3500] tabular-nums">Marge {advice.margin}</span>}
                         </span>
                       </button>
                     </div>
@@ -444,11 +444,11 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                       </span>
                     )}
                     {/* Jamais « 1 bipé · +3,28 € à la validation » (fondateur, 22 oct. 2026 : « je ne veux pas voir ça ») : le nom du conseil. */}
-                    <span className="truncate">{advice.name}</span>
+                    <span className="break-words">{advice.name}</span>
                     {row === 0 && routineBeside}
                     {sold(head) && <Check className="size-3.5 shrink-0" strokeWidth={3} style={{ color: L.green }} aria-label="Vendu" />}
                   </span>
-                  {heads.length > 1 && advice.drug && <span className="truncate text-[10.5px] leading-[14px] font-semibold text-[#3F5E57]">pour {advice.drug}</span>}
+                  {heads.length > 1 && advice.drug && <span className="break-words text-[10.5px] leading-[14px] font-semibold text-[#3F5E57]">pour {advice.drug}</span>}
                   {/* Sous le nom, avant tout clic (fondateur, 22 oct. 2026), en couleurs : stock vert (orange s'il est faible, rouge en
                       rupture), marge jaune, challenge vert citron, date courte rouge. */}
                   <span data-ile-mix-repere="" className="mt-0.5 flex flex-wrap items-center gap-1">
@@ -499,7 +499,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
         {open && (
           <div className="px-2 pb-2">
             <div className="flex items-center gap-2 px-1 pb-1">
-              <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-[#3F5E57]">
+              <span className="min-w-0 flex-1 break-words text-[11px] font-semibold text-[#3F5E57]">
                 {position === 0 ? "À proposer en premier" : `Conseil ${position + 1} sur ${order.length}`}
                 {item.drug ? ` · pour ${item.drug}` : ""}
               </span>
@@ -592,14 +592,14 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
                           <div className="mt-1 space-y-1">
                             {(item.sheet?.alternatives ?? []).map((other) => (
                               <div key={other.name} className="flex items-center gap-2 rounded-xl border px-2.5 py-1.5" style={{ borderColor: "#E3EBE8" }}>
-                                <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold">{other.name}</span>
+                                <span className="min-w-0 flex-1 break-words text-[12.5px] font-semibold">{other.name}</span>
                                 {other.price && <span className="shrink-0 text-[12.5px] font-bold tabular-nums" style={{ color: L.green }}>{other.price}</span>}
                                 {other.margin && <span className="shrink-0 rounded-md border px-1.5 py-0.5 text-[9.5px] font-bold tabular-nums" style={{ borderColor: "#BDE5CF", background: "#EAF8F0", color: "#0E7A4E" }}>MARGE {other.margin}</span>}
                               </div>
                             ))}
                             {alternatives.slice(0, 2).map(({ i, pos }) => (
                               <button key={i} type="button" onClick={() => go(pos)} className="flex w-full items-center gap-2 rounded-xl border px-2.5 py-1.5 text-left hover:bg-[#F6F9F8]" style={{ borderColor: "#E3EBE8" }}>
-                                <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold">{items[i].name}</span>
+                                <span className="min-w-0 flex-1 break-words text-[12.5px] font-semibold">{items[i].name}</span>
                                 {items[i].price && items[i].stock !== "UNKNOWN" && <span className="shrink-0 text-[12.5px] font-bold tabular-nums" style={{ color: L.green }}>{items[i].price}</span>}
                                 <ChevronRight className="size-3.5 shrink-0" style={{ color: L.muted }} aria-hidden="true" />
                               </button>
@@ -791,7 +791,7 @@ function Ask({ item }: { item: IslandAdvice }) {
                 <p>→ {chosen.say}</p>
                 {chosen.product && (
                   <p data-pitch-product="" className="mt-1 flex flex-wrap items-center gap-x-2 font-semibold">
-                    <span className="min-w-0 flex-1 truncate">{chosen.product.name}</span>
+                    <span className="min-w-0 flex-1 break-words">{chosen.product.name}</span>
                     {chosen.product.price && <span className="tabular-nums" style={{ color: L.green }}>{chosen.product.price}</span>}
                     {chosen.product.margin && <span className="rounded px-1 text-[10px] font-bold tabular-nums" style={{ background: "#FFF5D6", color: "#9A6400" }}>Marge {chosen.product.margin}</span>}
                   </p>
@@ -931,11 +931,11 @@ const TELL_MAX = 2;
 /** La photo studio du conseil, sur sa tuile blanche ; sans photo studio, une tuile vide (jamais une photo inventée). */
 function CardPhoto({ src, name }: { src?: string; name: string }) {
   // Grandes photos (fondateur, 29 oct. 2026, variante A) : on lit de loin, depuis le comptoir.
-  if (!src) return <Monogram name={name} size={40} />;
+  if (!src) return <Monogram name={name} size={36} />;
   return (
-    <span className="inline-flex size-[40px] shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-white">
+    <span className="inline-flex size-[36px] shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-white">
       {/* eslint-disable-next-line @next/next/no-img-element -- image locale de l'agent ou du site, déjà dimensionnée */}
-      <img data-ile-mix-photo="" src={src} alt="" width={38} height={38} draggable={false} className="size-full object-contain p-0.5" />
+      <img data-ile-mix-photo="" src={src} alt="" width={34} height={34} draggable={false} className="size-full object-contain p-0.5" />
     </span>
   );
 }
@@ -1027,14 +1027,14 @@ function AdviceIsland({ item, width, sold, onClose, onCancelSold, alternatives, 
                 <div className="mt-1 space-y-1">
                   {others.map((other) => (
                     <div key={other.name} className="flex items-center gap-2 rounded-xl border px-2.5 py-1.5" style={{ borderColor: "#E3EBE8" }}>
-                      <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold">{other.name}</span>
+                      <span className="min-w-0 flex-1 break-words text-[12.5px] font-semibold">{other.name}</span>
                       {other.price && <span className="shrink-0 text-[12.5px] font-bold tabular-nums" style={{ color: L.green }}>{other.price}</span>}
                       {other.margin && <span className="shrink-0 rounded-md border px-1.5 py-0.5 text-[9.5px] font-bold tabular-nums" style={{ borderColor: "#BDE5CF", background: "#EAF8F0", color: "#0E7A4E" }}>MARGE {other.margin}</span>}
                     </div>
                   ))}
                   {alternatives.map(({ item: other, go }) => (
                     <button key={other.name} type="button" onClick={go} className="flex w-full items-center gap-2 rounded-xl border px-2.5 py-1.5 text-left hover:bg-[#F6F9F8]" style={{ borderColor: "#E3EBE8" }}>
-                      <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold">{other.name}</span>
+                      <span className="min-w-0 flex-1 break-words text-[12.5px] font-semibold">{other.name}</span>
                       {other.price && other.stock !== "UNKNOWN" && <span className="shrink-0 text-[12.5px] font-bold tabular-nums" style={{ color: L.green }}>{other.price}</span>}
                       <ChevronRight className="size-3.5 shrink-0" style={{ color: L.muted }} aria-hidden="true" />
                     </button>

@@ -46,8 +46,8 @@ function Pill(props: ScanCapsuleProps) {
         {phase === "found" && count > 0 && <span className="scn-pill-count scn-pop">{count}</span>}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[14px] font-bold text-white">{phase === "found" && count > 0 ? `${plural(count)} pour ce patient` : drug || "Lecture de la boîte"}</p>
-        <p className="truncate text-[12px] text-[#9FCBBB]">{subtitle(props)}</p>
+        <p className="break-words text-[14px] font-bold text-white">{phase === "found" && count > 0 ? `${plural(count)} pour ce patient` : drug || "Lecture de la boîte"}</p>
+        <p className="break-words text-[12px] text-[#9FCBBB]">{subtitle(props)}</p>
       </div>
     </div>
   );
@@ -72,8 +72,8 @@ function Cross(props: ScanCapsuleProps) {
         <rect x="14" y="14" width="12" height="12" rx="2.5" fill="#3DDC84" className="scn-heart" />
       </svg>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[14px] font-bold text-white">{phase === "found" ? (count > 0 ? "C'est prêt" : "Rien à ajouter") : drug || "Lecture de la boîte"}</p>
-        <p className="truncate text-[12px] text-[#9FCBBB]">{phase === "found" && count > 0 ? `${plural(count)}${props.margin ? ` · jusqu'à ${props.margin}` : ""}` : subtitle(props)}</p>
+        <p className="break-words text-[14px] font-bold text-white">{phase === "found" ? (count > 0 ? "C'est prêt" : "Rien à ajouter") : drug || "Lecture de la boîte"}</p>
+        <p className="break-words text-[12px] text-[#9FCBBB]">{phase === "found" && count > 0 ? `${plural(count)}${props.margin ? ` · jusqu'à ${props.margin}` : ""}` : subtitle(props)}</p>
       </div>
       {phase === "found" && count > 0 && <span className="scn-pop rounded-full bg-[#3DDC84] px-2.5 py-1 text-[12px] font-bold text-[#04261A]">{count}</span>}
     </div>
@@ -171,12 +171,12 @@ export function WhitePill({ phase, done = 0, drug = "", found = [], open = false
               ) : item.shortDate ? (
                 <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="#C23A2B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-label="Date courte"><path d="M5 22h14M5 2h14M17 22v-4.2a2 2 0 0 0-.6-1.4L12 12l-4.4 4.4a2 2 0 0 0-.6 1.4V22M7 2v4.2a2 2 0 0 0 .6 1.4L12 12l4.4-4.4a2 2 0 0 0 .6-1.4V2" /></svg>
               ) : null}
-              <span className="max-w-[150px] truncate text-[12px] font-bold text-[#0F2B26]">{item.name}</span>
+              <span className="max-w-[150px] break-words text-[12px] font-bold text-[#0F2B26]">{item.name}</span>
             </span>
           ))}
         </span>
       ) : (
-        <span className="truncate text-[11px] font-bold tracking-[0.14em] whitespace-nowrap text-[#0F2B26] uppercase">{phase === "found" ? "Rien à ajouter" : drug || "Lecture de la boîte"}</span>
+        <span className="break-words text-[11px] font-bold tracking-[0.14em] text-[#0F2B26] uppercase">{phase === "found" ? "Rien à ajouter" : drug || "Lecture de la boîte"}</span>
       )}
     </div>
   );

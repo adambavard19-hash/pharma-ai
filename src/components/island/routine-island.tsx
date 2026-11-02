@@ -91,7 +91,7 @@ export function RoutineLine({ routine, open, onToggle }: { routine: IslandRoutin
     >
       <Layers className="size-3.5 shrink-0" style={{ color: ROUTINE_LIGHT }} aria-hidden="true" />
       <span className="shrink-0 text-[11.5px] font-bold" style={{ color: ROUTINE_LIGHT }}>Routine</span>
-      <span className="min-w-0 flex-1 truncate text-[11.5px] font-semibold" style={{ color: ON_DARK }}>
+      <span className="min-w-0 flex-1 break-words text-[11.5px] font-semibold" style={{ color: ON_DARK }}>
         {routine.steps.map((step) => step.label).join(" › ")}
       </span>
       {total.price && <span className="shrink-0 text-[11.5px] font-bold tabular-nums" style={{ color: "#9FF0C8" }}>{total.price}</span>}
@@ -162,8 +162,8 @@ export function RoutineMiniIsland({ routine, open, onToggle, width }: { routine:
           <Layers className="size-3.5" aria-hidden="true" />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[12.5px] font-bold" style={{ color: ON_DARK }}>Routine · {routine.steps.length} étapes</span>
-          <span className="block truncate text-[10.5px] font-semibold" style={{ color: ROUTINE_LIGHT }}>{routine.steps.map((step) => step.label).join(" › ")}</span>
+          <span className="block break-words text-[12.5px] font-bold" style={{ color: ON_DARK }}>Routine · {routine.steps.length} étapes</span>
+          <span className="block break-words text-[10.5px] font-semibold" style={{ color: ROUTINE_LIGHT }}>{routine.steps.map((step) => step.label).join(" › ")}</span>
         </span>
         {total.price && <span className="shrink-0 text-[12.5px] font-bold tabular-nums" style={{ color: "#9FF0C8" }}>{total.price}</span>}
         <ChevronRight className="size-4 shrink-0" style={{ color: ROUTINE_LIGHT }} aria-hidden="true" />
@@ -207,7 +207,7 @@ export function RoutineIsland({ routine, width, cards = false, onClose, onPointe
                     <StepNumber n={index + 1} />
                     <Photo step={step} size={44} />
                     <p className="mt-1 text-[9.5px] font-bold tracking-[0.1em] uppercase" style={{ color: ROUTINE_DOT }}>{step.label}</p>
-                    <p className="line-clamp-2 text-[11px] leading-[14px] font-semibold">{step.name}</p>
+                    <p className="break-words text-[11px] leading-[14px] font-semibold">{step.name}</p>
                     <p className="mt-0.5 text-[11.5px] font-bold tabular-nums" style={{ color: GREEN }}>{step.sold ? "✓ Vendu" : (step.price ?? "—")}</p>
                   </div>
                 ))}
@@ -220,8 +220,8 @@ export function RoutineIsland({ routine, width, cards = false, onClose, onPointe
                     <Photo step={step} size={36} />
                     <span className="min-w-0 flex-1">
                       <span className="block text-[9.5px] font-bold tracking-[0.1em] uppercase" style={{ color: ROUTINE_DOT }}>{step.label}</span>
-                      <span className="block truncate text-[12.5px] font-semibold">{step.name}</span>
-                      {step.benefit && <span className="block truncate text-[10.5px]" style={{ color: MUTED }}>{step.benefit}</span>}
+                      <span className="block break-words text-[12.5px] font-semibold">{step.name}</span>
+                      {step.benefit && <span className="block break-words text-[10.5px]" style={{ color: MUTED }}>{step.benefit}</span>}
                     </span>
                     <span className="flex shrink-0 flex-col items-end gap-0.5">
                       <span className="text-[12.5px] font-bold tabular-nums" style={{ color: GREEN }}>{step.price ?? "—"}</span>
