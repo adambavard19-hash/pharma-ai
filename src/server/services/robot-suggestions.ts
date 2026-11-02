@@ -13,6 +13,7 @@ import {
   ROBOT_RETRY_AFTER_FAILURE_MS,
   ROBOT_WAIT_MS,
   applyRobotSuggestions,
+  ROBOT_SUGGESTIONS_ENABLED,
   parseRobotItems,
   robotCacheDecision,
   robotSlots,
@@ -94,6 +95,9 @@ export async function withRobotSuggestions(
 ): Promise<RobotHook> {
   const unchanged: RobotHook = { result: params.result, settle: () => null };
   try {
+    // Coupée sur décision du fondateur (2 nov. 2026) : seules les règles du centre de gestion proposent. Les essais qui
+    // fournissent leur propre fournisseur la font encore tourner.
+    if (!ROBOT_SUGGESTIONS_ENABLED && deps.suggester === undefined) return unchanged;
     if (params.isDemo || params.scope.isDemo) return unchanged;
     if (params.input.stock?.configured !== true) return unchanged;
     if (robotSlots(params.result, params.input.maxRecommendations) === 0) return unchanged;

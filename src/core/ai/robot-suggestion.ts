@@ -30,6 +30,13 @@ import type { CustomRuleDefinition } from "./central-advice";
  * Module pur : aucune base, aucun réseau, aucune horloge (l'heure est passée en paramètre).
  */
 
+/**
+ * La suggestion du robot est COUPÉE (fondateur, 2 nov. 2026, après Bion 3 Vitalité proposé pour un Microlax) : « tu ne proposes
+ * que ce qui est validé par Adam ou Donna dans le centre de gestion, ou alors rien ». Sans règle pour un médicament, le
+ * comptoir ne propose rien. Le code reste, éteint, pour le jour où ils voudraient la rallumer.
+ */
+export const ROBOT_SUGGESTIONS_ENABLED = false;
+
 export const ROBOT_LABEL = "Suggestion du robot — à confirmer par la pharmacienne";
 /** Les produits proposés au modèle, au plus. Au-delà, la réponse s'allonge sans gain et le coût monte. */
 export const ROBOT_MAX_CANDIDATES = 60;
