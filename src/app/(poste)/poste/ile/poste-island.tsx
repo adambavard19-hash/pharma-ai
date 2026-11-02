@@ -555,13 +555,14 @@ export function PosteIsland() {
     const value = params.get("variante");
     return params.has("essai") && value && /^[a-f]$/.test(value) ? value : null;
   }, () => null);
-  // Réduire la bannière à tout moment (fondateur, 29 oct. 2026) : le bouton « – Réduire » (A) retenu et mis en ligne ; les autres
-  // façons restent en essai (`?essai=1&reduire=b…e`, /robot-apercu/reduire).
+  // Réduire la bannière à tout moment (fondateur, 29 oct. 2026) : le bouton « – Réduire » (A) ; depuis le 2 nov. 2026, la façon D
+  // sur le poste : le même bouton, et la bannière se réduit seule au bout de 8 secondes sans survol, puis se rouvre au survol.
+  // Les autres façons restent en essai (`?essai=1&reduire=a…e`, /robot-apercu/reduire).
   const reduce = useSyncExternalStore(noSubscribe, () => {
     const params = new URLSearchParams(window.location.search);
     const value = params.get("reduire");
-    return params.has("essai") && value && /^[a-e]$/.test(value) ? (value as ReduceStyle) : "a";
-  }, () => "a" as const);
+    return params.has("essai") && value && /^[a-e]$/.test(value) ? (value as ReduceStyle) : "d";
+  }, () => "d" as const);
   const everyAdvice = useSyncExternalStore(noSubscribe, () => new URLSearchParams(window.location.search).has("tous-les-conseils"), () => false);
 
   // « C'est un autre client ? » : la dernière boîte est arrivée plus de 30 secondes après la précédente (le serveur la marque).
