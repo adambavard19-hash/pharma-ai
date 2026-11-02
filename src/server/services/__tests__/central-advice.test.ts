@@ -44,18 +44,25 @@ beforeEach(() => {
 });
 
 describe("ce que l'analyse lit", () => {
-  it("sans aucune décision : rien n'est supprimé, rien n'est ajouté — les règles du code parlent partout", async () => {
-    expect(await loadCentralAdvice()).toEqual({ removed: [], custom: [] });
+  it("sans aucune décision : aucune règle du code ne parle — rien en ligne sans la validation d'Adam ou de Donna (2 nov. 2026)", async () => {
+    const central = await loadCentralAdvice();
+    expect([...central.removed].sort()).toEqual(ADVICE_RULES.map((rule) => rule.key).sort());
+    expect(central.custom).toEqual([]);
   });
 
-  it("les règles supprimées et les conseils ajoutés en ligne, pour toutes les officines", async () => {
+  it("seules les règles validées parlent : une supprimée, une à relire ou un conseil ajouté non validé restent hors ligne", async () => {
+    const other = ADVICE_RULES[1];
     mocks.prisma.centralAdviceRule.findMany.mockResolvedValue([
       { ruleKey: RULE.key, source: "BUILT_IN", status: "REMOVED", ruleVersion: RULE.version, definition: null, decidedAt: new Date(), decidedByName: "Donna" },
+      { ruleKey: other.key, source: "BUILT_IN", status: "VALIDATED", ruleVersion: other.version, definition: null, decidedAt: new Date(), decidedByName: "Donna" },
       { ruleKey: "custom-1", source: "CUSTOM", status: "ACTIVE", ruleVersion: null, definition, decidedAt: null, decidedByName: null },
+      { ruleKey: "custom-2", source: "CUSTOM", status: "VALIDATED", ruleVersion: null, definition, decidedAt: new Date(), decidedByName: "Adam" },
     ]);
     const central = await loadCentralAdvice();
-    expect(central.removed).toEqual([RULE.key]);
-    expect(central.custom.map((rule) => rule.key)).toEqual(["custom-1"]);
+    expect(central.removed).toContain(RULE.key);
+    expect(central.removed).not.toContain(other.key);
+    expect(central.removed).toHaveLength(ADVICE_RULES.length - 1);
+    expect(central.custom.map((rule) => rule.key)).toEqual(["custom-2"]);
   });
 });
 

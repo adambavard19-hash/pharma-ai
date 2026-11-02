@@ -6,7 +6,8 @@
 export type CentralStatus = "ACTIVE" | "VALIDATED" | "REMOVED";
 
 export const CENTRAL_STATUS_LABELS: Record<CentralStatus, string> = {
-  ACTIVE: "En ligne · à relire",
+  // Depuis le 2 nov. 2026, un conseil non validé ne parle plus au comptoir : il attend la validation d'Adam ou de Donna.
+  ACTIVE: "À valider · hors ligne",
   VALIDATED: "Validé",
   REMOVED: "Supprimé",
 };

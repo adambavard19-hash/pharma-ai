@@ -107,8 +107,9 @@ export async function resolveLineTriggers(
  * association dont le produit conseillé n'est pas dans le stock de l'officine ne s'applique simplement pas chez elle.
  */
 async function loadCentralRules(pharmacyId: string): Promise<{ rules: AssociationInput["rules"]; triggerProductIds: string[]; families: FamilyDefinition[] }> {
+  // Seules les associations VALIDÉES par Adam ou Donna (2 nov. 2026 : « rien en ligne sans notre validation »).
   const central = await prisma.centralAssociation.findMany({
-    where: { status: { not: "REMOVED" } },
+    where: { status: "VALIDATED" },
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }, { id: "asc" }],
     select: { id: true, triggerKind: true, triggerKey: true, adviceEan: true, sentence: true, sortOrder: true },
   });

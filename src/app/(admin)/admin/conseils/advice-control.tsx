@@ -414,7 +414,7 @@ export function NewRuleForm({ categories, tags, onDone, initialAtc = [], initial
           Annuler
         </Button>
         <Button onClick={submit} loading={pending} leadingIcon={<Plus className="size-4" />}>
-          Mettre en ligne
+          Ajouter
         </Button>
       </div>
     </div>
@@ -569,10 +569,10 @@ export function NewAssociationForm({ onDone, families = [], initialFamilyId = nu
       if (failed.length > 0) {
         // Ceux qui sont passés restent en ligne ; on ne garde dans la liste que ceux à corriger.
         setAdvices((list) => list.filter((advice) => failed.some((line) => line.startsWith(`${advice.name} :`))));
-        setError(`${created > 0 ? `${created} association(s) mise(s) en ligne. ` : ""}Non ajouté : ${failed.join(" · ")}`);
+        setError(`${created > 0 ? `${created} association(s) ajoutée(s), à valider. ` : ""}Non ajouté : ${failed.join(" · ")}`);
         return;
       }
-      push({ tone: "success", title: created > 1 ? `${created} associations en ligne dans toutes les pharmacies qui ont le produit en stock. Elles restent « à relire » jusqu'à votre validation.` : "Association en ligne dans toutes les pharmacies qui ont le produit conseillé en stock. Elle reste « à relire » jusqu'à votre validation." });
+      push({ tone: "success", title: created > 1 ? `${created} associations ajoutées. Elles passeront au comptoir dès que vous les aurez validées.` : "Association ajoutée. Elle passera au comptoir dès que vous l'aurez validée." });
       onDone();
     });
   };
@@ -724,7 +724,7 @@ export function NewAssociationForm({ onDone, families = [], initialFamilyId = nu
           Annuler
         </Button>
         <Button onClick={submit} loading={pending} leadingIcon={<Plus className="size-4" />}>
-          {total > 1 ? `Mettre en ligne (${total})` : "Mettre en ligne"}
+          {total > 1 ? `Ajouter (${total})` : "Ajouter"}
         </Button>
       </div>
     </div>

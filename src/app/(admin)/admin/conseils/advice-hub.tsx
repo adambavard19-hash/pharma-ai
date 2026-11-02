@@ -102,7 +102,7 @@ export function AdviceHub({
         <CardContent className="space-y-1.5 py-4">
           <p className="text-[15px] font-semibold text-text-primary">Un conseil, c&apos;est ce que PharmaBoost propose au comptoir quand un médicament ou un produit est scanné.</p>
           <p className="text-[13px] leading-5 text-text-secondary">
-            Tout est déjà en ligne dans toutes les pharmacies. Ici, vous <strong>validez</strong> ce que vous cautionnez, vous <strong>modifiez</strong> ce qui doit l&apos;être, vous <strong>supprimez</strong> ce qui ne va pas (on peut le
+            Seuls les conseils <strong>validés</strong> par Adam ou Donna passent au comptoir, dans toutes les pharmacies ; les autres attendent, hors ligne. Ici, vous <strong>validez</strong> ce que vous cautionnez, vous <strong>modifiez</strong> ce qui doit l&apos;être, vous <strong>supprimez</strong> ce qui ne va pas (on peut le
             rétablir) et vous <strong>ajoutez</strong> les vôtres. Un conseil décrit un besoin : chaque pharmacie le remplit avec un produit de son propre stock.
           </p>
         </CardContent>

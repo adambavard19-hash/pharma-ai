@@ -57,15 +57,16 @@ export async function loadCentralRuleRows(): Promise<StoredRuleRow[]> {
  */
 export async function loadCentralAdvice(): Promise<{ removed: string[]; custom: AdviceRule[] }> {
   const rows = await loadCentralRuleRows();
-  return { removed: removedRuleKeys(rows), custom: [...customRulesFrom(rows), ...overriddenRulesFrom(rows)] };
+  // Seuls les conseils VALIDÉS par Adam ou Donna parlent au comptoir (fondatrice, 2 nov. 2026 : « aucun conseil ne doit être en
+  // ligne sans ma validation ou celle d'Adam »). Une règle du code encore à relire (ou validée sur une version plus ancienne)
+  // sort du moteur comme une règle supprimée ; un conseil ajouté ou une règle modifiée non validés ne s'ajoutent pas.
+  const validated = validatedKeysFrom(rows);
+  const unvalidated = ADVICE_RULES.filter((rule) => !validated.has(rule.key)).map((rule) => rule.key);
+  const custom = [...customRulesFrom(rows), ...overriddenRulesFrom(rows)].filter((rule) => validated.has(rule.key));
+  return { removed: [...new Set([...removedRuleKeys(rows), ...unvalidated])], custom };
 }
 
-/**
- * Les règles relues et validées par le pharmacien de PharmaBoost (version courante pour celles du code). Seules leurs phrases
- * « patient » peuvent partir dans un e-mail à un patient : une règle encore à relire ne parle pas en son nom.
- */
-export async function validatedRuleKeys(): Promise<Set<string>> {
-  const rows = await loadCentralRuleRows();
+function validatedKeysFrom(rows: CentralRuleRow[]): Set<string> {
   const byKey = rowsByKey(rows);
   const keys = new Set<string>();
   for (const rule of ADVICE_RULES) {
@@ -74,6 +75,14 @@ export async function validatedRuleKeys(): Promise<Set<string>> {
   }
   for (const row of rows) if (row.source === "CUSTOM" && row.status === "VALIDATED") keys.add(row.ruleKey);
   return keys;
+}
+
+/**
+ * Les règles relues et validées par le pharmacien de PharmaBoost (version courante pour celles du code). Seules leurs phrases
+ * « patient » peuvent partir dans un e-mail à un patient : une règle encore à relire ne parle pas en son nom.
+ */
+export async function validatedRuleKeys(): Promise<Set<string>> {
+  return validatedKeysFrom(await loadCentralRuleRows());
 }
 
 // ---------------------------------------------------------------------------------------------------------------
