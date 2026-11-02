@@ -171,7 +171,7 @@ function NewRoutineForm({ themes, types, onDone }: { themes: string[]; types: st
         setError(result.error);
         return;
       }
-      push({ tone: "success", title: `« ${title} » est en ligne dans toutes les pharmacies.` });
+      push({ tone: "success", title: `« ${title} » est ajoutée. Elle passera au comptoir dès que vous l'aurez validée.` });
       router.refresh();
       onDone();
     });
@@ -321,7 +321,7 @@ function NewRoutineForm({ themes, types, onDone }: { themes: string[]; types: st
           Annuler
         </Button>
         <Button onClick={submit} loading={pending} leadingIcon={<Plus className="size-4" />}>
-          Mettre en ligne
+          Ajouter
         </Button>
       </div>
     </div>

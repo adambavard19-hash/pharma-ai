@@ -57,9 +57,15 @@ describe("modifier une règle du code", () => {
 
   it("puis le moteur la lit : loadCentralAdvice renvoie la règle modifiée, même clé, qui remplace celle du code", async () => {
     const edit = { ...editValuesOf(THROAT), title: "Gorge sèche (modifié)" };
+    // Non validée (2 nov. 2026 : rien en ligne sans la validation d'Adam ou de Donna) : elle ne parle pas.
     mocks.prisma.centralAdviceRule.findMany.mockResolvedValue([{ ruleKey: THROAT.key, source: "BUILT_IN", status: "ACTIVE", ruleVersion: null, definition: null, decidedAt: null, decidedByName: null, override: { edit }, overrideRevision: 1 }]);
-    const central = await loadCentralAdvice();
-    expect(central.removed).toEqual([]);
+    let central = await loadCentralAdvice();
+    expect(central.removed).toContain(THROAT.key);
+    expect(central.custom.find((rule) => rule.key === THROAT.key)).toBeUndefined();
+    // Validée dans sa version modifiée : elle remplace celle du code.
+    mocks.prisma.centralAdviceRule.findMany.mockResolvedValue([{ ruleKey: THROAT.key, source: "BUILT_IN", status: "VALIDATED", ruleVersion: `${THROAT.version}-modif1`, definition: null, decidedAt: new Date(), decidedByName: "Donna", override: { edit }, overrideRevision: 1 }]);
+    central = await loadCentralAdvice();
+    expect(central.removed).not.toContain(THROAT.key);
     expect(central.custom.find((rule) => rule.key === THROAT.key)?.title).toBe("Gorge sèche (modifié)");
   });
 
