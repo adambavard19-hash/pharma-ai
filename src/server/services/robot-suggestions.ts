@@ -175,7 +175,9 @@ async function prepareJob(scope: TenantScope, drug: RobotDrug, input: PipelineIn
   const decision = robotCacheDecision(row, ids, now);
   const flightKey = `${scope.pharmacyId}|${drug.drugKey}`;
   if (decision === "USE") {
-    job.items = parseRobotItems(row?.items);
+    // Une réponse gardée en mémoire ne sert que pour les produits encore dans la liste d'aujourd'hui : un produit écarté
+    // depuis (règle resserrée, refus, rupture) ne revient pas par le cache.
+    job.items = inList(parseRobotItems(row?.items), candidates);
     return job;
   }
   const running = inflight.get(flightKey);
