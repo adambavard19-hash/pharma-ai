@@ -1,26 +1,30 @@
-// La vidéo complète de la lettre : la partie d'excuse (out/lettre/excuse.mp4, rendue par Remotion, UN onglet) puis, en fondu de
-// 0,6 s, le film de présentation du site — son niveau ramené à −16 LUFS ; puis l'encodage web (≈ 3 Mb/s, deux passes), l'affiche,
-// et la copie sur le Bureau.   node src/lettre/tools/assembler.mjs   (depuis video/)
-import { execFileSync } from "node:child_process";
+// La vidéo de la lettre (2 nov. 2026 : la présentation ENTIÈRE, sans le film à la suite). Depuis video/ :
+//   npx remotion render src/lettre/index.ts Lettre out/lettre/rendu-4k.mp4 --scale=2 --crf=16
+//   node src/lettre/tools/assembler.mjs
+// Le son ramené à −16 LUFS (deux passes) ; la copie 4K sur le Bureau ; la version du site en 1080p (≈ 3 Mb/s, deux passes)
+// et son affiche.
+import { execFileSync, spawnSync } from "node:child_process";
 import { copyFileSync, rmSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
 const ROOT = join(process.cwd(), "..");
-const FILM = join(ROOT, "public/video/pharmaboost-presentation.mp4");
+const RAW = "out/lettre/rendu-4k.mp4";
+const MASTER = "out/lettre/master-4k.mp4";
 const OUT = join(ROOT, "public/video/pharmaboost-lettre.mp4");
 const ff = (...args) => execFileSync("ffmpeg", ["-v", "error", "-y", ...args], { stdio: "inherit" });
-const dur = Number(execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", "out/lettre/excuse.mp4"]).toString());
-const offset = (dur - 0.6).toFixed(3);
 
-ff("-i", "out/lettre/excuse.mp4", "-i", FILM, "-filter_complex",
-  `[0:v]fps=60,format=yuv420p,setsar=1[v0];[1:v]fps=60,format=yuv420p,setsar=1[v1];[v0][v1]xfade=transition=fade:duration=0.6:offset=${offset}[v];[0:a]loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000[a0];[1:a]aresample=48000[a1];[a0][a1]acrossfade=d=0.6[a]`,
-  "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-crf", "16", "-preset", "slow", "-c:a", "aac", "-b:a", "320k", "out/lettre/master.mp4");
+const first = spawnSync("ffmpeg", ["-hide_banner", "-nostats", "-i", RAW, "-af", "loudnorm=I=-16:TP=-1.5:LRA=11:print_format=json", "-f", "null", "-"], { encoding: "utf8" }).stderr;
+const m = JSON.parse(first.slice(first.lastIndexOf("{"), first.lastIndexOf("}") + 1));
+const norm = `loudnorm=I=-16:TP=-1.5:LRA=11:measured_I=${m.input_i}:measured_TP=${m.input_tp}:measured_LRA=${m.input_lra}:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true`;
+ff("-i", RAW, "-c:v", "copy", "-af", norm, "-ar", "48000", "-c:a", "aac", "-b:a", "320k", "-movflags", "+faststart", MASTER);
+copyFileSync(MASTER, join(homedir(), "Desktop", "PharmaBoost-Lettre-video-4K.mp4"));
+
 const log = join("out", "lettre", "2passes");
-const v = ["-c:v", "libx264", "-b:v", "3M", "-maxrate", "4.5M", "-bufsize", "9M", "-preset", "slow", "-passlogfile", log];
-ff("-i", "out/lettre/master.mp4", ...v, "-pass", "1", "-an", "-f", "mp4", "/dev/null");
-ff("-i", "out/lettre/master.mp4", ...v, "-pass", "2", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", OUT);
-ff("-ss", "2.6", "-i", "out/lettre/master.mp4", "-frames:v", "1", "-q:v", "3", OUT.replace(/\.mp4$/, ".jpg"));
+const v = ["-vf", "scale=1920:1080:flags=lanczos", "-c:v", "libx264", "-b:v", "3M", "-maxrate", "4.5M", "-bufsize", "9M", "-preset", "slow", "-pix_fmt", "yuv420p", "-passlogfile", log];
+ff("-i", MASTER, ...v, "-pass", "1", "-an", "-f", "mp4", "/dev/null");
+ff("-i", MASTER, ...v, "-pass", "2", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", OUT);
+ff("-ss", "3.2", "-i", MASTER, "-frames:v", "1", "-vf", "scale=1920:1080", "-q:v", "3", OUT.replace(/\.mp4$/, ".jpg"));
 copyFileSync(OUT, join(homedir(), "Desktop", "PharmaBoost-Lettre-video.mp4"));
 for (const f of [`${log}-0.log`, `${log}-0.log.mbtree`]) rmSync(f, { force: true });
-console.log(`✓ ${OUT} (${(dur + 69 - 0.6).toFixed(0)} s environ) + affiche + copie sur le Bureau`);
+console.log(`✓ ${OUT} + affiche + Bureau (4K et 1080p)`);

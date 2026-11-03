@@ -89,7 +89,7 @@ import { A1, JAKARTA, PB, rgba } from "./brand";
  * ======================================================================== */
 
 export type Mood = "act1" | "pb";
-export type MedKind = "amoxicilline" | "paracetamol" | "curacne" | "probiotique" | "pastilles";
+export type MedKind = "amoxicilline" | "paracetamol" | "curacne" | "probiotique" | "pastilles" | "cetirizine";
 export type Expression = "lasse" | "neutre" | "sourire";
 type Pt = { x: number; y: number };
 type Win = [number, number];
@@ -265,6 +265,7 @@ export const MED: Record<MedKind, { name: string; sub: string; form: string; col
   curacne: { name: "Curacné", sub: "20 mg", form: "capsules", color: "#D0485F" },
   probiotique: { name: "Probiotique", sub: "", form: "gélules", color: "#109C7C" },
   pastilles: { name: "Pastilles", sub: "gorge", form: "à sucer", color: "#238DD0" },
+  cetirizine: { name: "Cétirizine", sub: "10 mg", form: "comprimés", color: "#2C9AB7" },
 };
 
 const XR = "#8FE9FF";
