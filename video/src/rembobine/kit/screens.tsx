@@ -1,6 +1,6 @@
 import { useId, type CSSProperties, type ReactNode } from "react";
 import { Img, staticFile } from "remotion";
-import { ArrowUp, BellRing, CalendarCheck, Check, ChevronDown, ChevronLeft, ChevronRight, Clock, Home, Hourglass, Mail, Pill, Quote, ScanLine, Search, Star, Store, Trophy, User, Users } from "lucide-react";
+import { Candy, Droplets, Eye, ArrowUp, BellRing, CalendarCheck, Check, ChevronDown, ChevronLeft, ChevronRight, Clock, Home, Hourglass, Mail, Pill, Quote, ScanLine, Search, Star, Store, Trophy, User, Users } from "lucide-react";
 import { EXIT, F, IN_OUT, LINEAR, POP, SNAP, WHIP, clamp01, keys, lerp, prog, pulse, ressort, squash, wobble } from "../../presentation/motion/kit/ease";
 import { Odometer } from "../../presentation/motion/kit/odometer";
 import { Sparkle } from "./fx";
@@ -477,8 +477,25 @@ function MintHeader({ size = 1, close = false }: { size?: number; close?: boolea
 }
 
 /** La photo studio du produit, comme la vraie bannière (fondateur, 31 oct. 2026 : « la vraie photo, pas les initiales ») ; sinon ses initiales. */
+/** Les produits SANS marque du film de la lettre (3 nov. 2026) : « kind:nez », « kind:yeux », « kind:gorge » → une tuile
+ * colorée et son pictogramme, à la place d'une photo de marque. */
+const GENERIC: Record<string, { Icon: typeof Eye; from: string; to: string }> = {
+  nez: { Icon: Droplets, from: "#3BA7E0", to: "#1C6FB0" },
+  yeux: { Icon: Eye, from: "#8B6FE0", to: "#5B3FB8" },
+  gorge: { Icon: Candy, from: "#F2A23A", to: "#D9772A" },
+};
+export function GenericPic({ kind, size, radius }: { kind: string; size: number; radius: number }) {
+  const g = GENERIC[kind] ?? GENERIC.nez;
+  return (
+    <span style={{ display: "inline-flex", flexShrink: 0, width: size, height: size, borderRadius: radius, background: `linear-gradient(145deg, ${g.from}, ${g.to})`, boxShadow: `inset 0 0 0 2px rgba(255,255,255,.25), 0 8px 18px -10px ${g.to}`, alignItems: "center", justifyContent: "center" }}>
+      <g.Icon size={size * 0.52} color="#FFFFFF" strokeWidth={2.2} />
+    </span>
+  );
+}
+
 export function ProductPic({ name, image, size, radius }: { name: string; image?: string; size: number; radius: number }) {
   if (!image) return <Monogram name={name} size={size} radius={radius} />;
+  if (image.startsWith("kind:")) return <GenericPic kind={image.slice(5)} size={size} radius={radius} />;
   return (
     <span style={{ display: "inline-flex", flexShrink: 0, width: size, height: size, borderRadius: radius, overflow: "hidden", background: "#FFFFFF", boxShadow: "inset 0 0 0 2px #E3EBE8", alignItems: "center", justifyContent: "center" }}>
       <Img src={staticFile(`rembobine/images/${image}`)} style={{ width: "88%", height: "88%", objectFit: "contain" }} />
@@ -598,9 +615,15 @@ export function BannerHead({
                     {l.routine ? (
                       <span style={{ display: "inline-flex", flexShrink: 0, width: 96, alignItems: "center" }}>
                         {l.routine.map((img, k) => (
+                          img.startsWith("kind:") ? (
+                            <span key={img} style={{ marginLeft: k ? -22 : 0, display: "inline-flex", borderRadius: 12, boxShadow: "0 0 0 3px #FFFFFF" }}>
+                              <GenericPic kind={img.slice(5)} size={46} radius={12} />
+                            </span>
+                          ) : (
                           <span key={img} style={{ marginLeft: k ? -22 : 0, display: "inline-flex", width: 46, height: 46, borderRadius: 12, overflow: "hidden", background: "#FFFFFF", boxShadow: "0 0 0 3px #FFFFFF, inset 0 0 0 1.5px #E3EBE8", alignItems: "center", justifyContent: "center" }}>
                             <Img src={staticFile(`rembobine/images/${img}`)} style={{ width: "86%", height: "86%", objectFit: "contain" }} />
                           </span>
+                          )
                         ))}
                       </span>
                     ) : (
@@ -1510,9 +1533,10 @@ export function AppOffer({ t, at = 0 }: { t: number; at?: number }) {
 
 // ---- L'e-mail du bilan, la notification, le calendrier ----------------------------------------------------------------
 
-export function MailBilan({ t, at = 0, pharmacy = "Pharmacie du Centre", product = "Probiotique" }: { t: number; at?: number; pharmacy?: string; product?: string }) {
+export type BilanPoint = { Icon: typeof Clock; title: string; text: string };
+export function MailBilan({ t, at = 0, pharmacy = "Pharmacie du Centre", product = "Probiotique", why, points: customPoints, kind }: { t: number; at?: number; pharmacy?: string; product?: string; why?: string; points?: BilanPoint[]; kind?: string }) {
   const DARK = "#0B3B47";
-  const points = [
+  const points = customPoints ?? [
     { Icon: Clock, title: "Pendant", text: "toute la durée de l'antibiotique" },
     { Icon: Pill, title: "À distance", text: "de la prise de l'antibiotique" },
     { Icon: CalendarCheck, title: "Chaque jour", text: "jusqu'à la fin de la cure" },
@@ -1539,7 +1563,7 @@ export function MailBilan({ t, at = 0, pharmacy = "Pharmacie du Centre", product
         <div style={{ marginTop: 12, borderRadius: 18, background: "#FFF", border: "1px solid #E4ECE9", padding: 14, ...stag(t, at, 3, 0.1) }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ width: 64, height: 64, borderRadius: 14, background: "#F4F8F7", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <MiniBox name={product} w={46} />
+              {kind ? <GenericPic kind={kind} size={50} radius={12} /> : <MiniBox name={product} w={46} />}
             </div>
             <div style={{ flex: 1 }}>
               <div style={appText(18, 800, "#101828")}>{product}</div>
@@ -1548,7 +1572,7 @@ export function MailBilan({ t, at = 0, pharmacy = "Pharmacie du Centre", product
           </div>
           <div style={{ marginTop: 12, borderRadius: 10, background: "#EAF5EF", borderLeft: "4px solid #1D8174", padding: "10px 12px", ...stag(t, at, 5, 0.1) }}>
             <div style={{ ...appText(10.5, 800, "#0B6B4F"), letterSpacing: "0.05em", textTransform: "uppercase" }}>Pourquoi avec votre traitement</div>
-            <div style={{ marginTop: 4, lineHeight: 1.35, ...appText(13.5, 600, "#101828") }}>Avec un antibiotique, la flore intestinale peut être perturbée.</div>
+            <div style={{ marginTop: 4, lineHeight: 1.35, ...appText(13.5, 600, "#101828") }}>{why ?? "Avec un antibiotique, la flore intestinale peut être perturbée."}</div>
           </div>
           <div style={{ marginTop: 10, ...appText(10.5, 800, DARK), letterSpacing: "0.05em", textTransform: "uppercase", ...stag(t, at, 6, 0.1) }}>3 points clés</div>
           <div style={{ marginTop: 6, display: "flex", gap: 6 }}>

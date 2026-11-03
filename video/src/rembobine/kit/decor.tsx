@@ -1,4 +1,4 @@
-import { useId, type CSSProperties, type ReactNode } from "react";
+import { createContext, useContext, useId, type CSSProperties, type ReactNode } from "react";
 import { AbsoluteFill, useCurrentFrame } from "remotion";
 import { clamp01, lerp, prog, ressort, wobble, EXIT, IN_OUT, POP, SNAP } from "../../presentation/motion/kit/ease";
 import { hash, rnd } from "../../presentation/motion/kit/random";
@@ -89,7 +89,7 @@ import { A1, JAKARTA, PB, rgba } from "./brand";
  * ======================================================================== */
 
 export type Mood = "act1" | "pb";
-export type MedKind = "amoxicilline" | "paracetamol" | "curacne" | "probiotique" | "pastilles" | "cetirizine";
+export type MedKind = "amoxicilline" | "paracetamol" | "curacne" | "probiotique" | "pastilles" | "cetirizine" | "eaudemer" | "collyre";
 export type Expression = "lasse" | "neutre" | "sourire";
 type Pt = { x: number; y: number };
 type Win = [number, number];
@@ -266,6 +266,8 @@ export const MED: Record<MedKind, { name: string; sub: string; form: string; col
   probiotique: { name: "Probiotique", sub: "", form: "gélules", color: "#109C7C" },
   pastilles: { name: "Pastilles", sub: "gorge", form: "à sucer", color: "#238DD0" },
   cetirizine: { name: "Cétirizine", sub: "10 mg", form: "comprimés", color: "#2C9AB7" },
+  eaudemer: { name: "Eau de mer", sub: "nez allergique", form: "spray nasal", color: "#1E88C8" },
+  collyre: { name: "Collyre", sub: "anti-allergique", form: "unidoses", color: "#7A5BD0" },
 };
 
 const XR = "#8FE9FF";
@@ -292,6 +294,8 @@ function MedIcon({ kind, color }: { kind: MedKind; color: string }) {
         <path d="M-8.5,-7.5 L0,-7.5 L0,7.5 L-8.5,7.5 A7.5,7.5 0 0 1 -8.5,-7.5 Z" fill={color} transform="translate(-7.5 0)" />
       </g>
     );
+  if (kind === "eaudemer" || kind === "collyre")
+    return <path d="M0,-14 C6,-5 11,1 11,6 A11,11 0 0 1 -11,6 C-11,1 -6,-5 0,-14 Z" fill={color} />;
   return <rect x={-10} y={-10} width={20} height={20} rx={5} fill={color} transform="rotate(45)" />;
 }
 
@@ -624,8 +628,11 @@ function BagGlyph({ w, kinds, peek = true, xray = 0, mood }: { w: number; kinds:
   );
 }
 
-const kindsOf = (boxes: number | MedKind[] | undefined): MedKind[] =>
-  Array.isArray(boxes) ? boxes : boxes === 2 ? ["amoxicilline", "probiotique"] : boxes === 0 ? [] : ["amoxicilline"];
+/** Les boîtes « 1 » et « 2 » du sac : l'antibiotique et le probiotique de « Rembobinons » ; le film de la lettre (3 nov.
+ * 2026) les remplace par la cétirizine et le collyre anti-allergique. */
+export const BagDrugs = createContext<[MedKind, MedKind]>(["amoxicilline", "probiotique"]);
+const kindsOf = (boxes: number | MedKind[] | undefined, [a, b]: [MedKind, MedKind]): MedKind[] =>
+  Array.isArray(boxes) ? boxes : boxes === 2 ? [a, b] : boxes === 0 ? [] : [a];
 
 export function PharmacyBag({
   w = 150,
@@ -655,6 +662,7 @@ export function PharmacyBag({
   const H = hT + w * 1.1;
   const pad = w * 0.3;
   const oy = anchor === "base" ? -H : 0;
+  const drugs = useContext(BagDrugs);
   const abs = x !== undefined && y !== undefined;
   const Wd = w + pad * 2;
   const Ht = H + pad * 2;
@@ -675,7 +683,7 @@ export function PharmacyBag({
       }}
     >
       <svg key={relayout} width={Wd} height={Ht} viewBox={`${-Wd / 2} ${-pad} ${Wd} ${Ht}`} style={{ position: "absolute", inset: 0, overflow: "visible" }}>
-        <BagGlyph w={w} kinds={kindsOf(boxes)} peek={peek} xray={xray === true ? 1 : xray === false ? 0 : xray} mood={mood} />
+        <BagGlyph w={w} kinds={kindsOf(boxes, drugs)} peek={peek} xray={xray === true ? 1 : xray === false ? 0 : xray} mood={mood} />
       </svg>
     </div>
   );
@@ -1322,6 +1330,7 @@ export function Patient({
   y?: number;
   scale?: number;
 }) {
+  const drugs = useContext(BagDrugs);
   const uid = useUid();
   const c = tones(MAN, mood);
   const pose = patientPose(leave, x, y);
@@ -1376,7 +1385,7 @@ export function Patient({
   const FA = 124;
   const shF = { x: -94, y: -556 + br * 1.4 };
   const shN = { x: 104, y: -556 + br * 1.4 };
-  const kinds = bagKinds ?? kindsOf(boxesInBag);
+  const kinds = bagKinds ?? kindsOf(boxesInBag, drugs);
   const bagW = 130;
   const bagH = bagW * 1.4;
   const holdF: Pt = { x: -124 + Math.sin(ph) * 10 * pose.walk, y: -322 };

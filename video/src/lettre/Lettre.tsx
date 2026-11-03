@@ -1,194 +1,163 @@
 import type { CSSProperties, ReactNode } from "react";
 import { AbsoluteFill, Audio, Sequence, staticFile, useCurrentFrame } from "remotion";
-import { Bell, CalendarCheck, Clock, Eye, Heart, Mail, Phone as PhoneIcon, Printer, QrCode, ShieldCheck, Sparkles, Store, TrendingUp, Wind } from "lucide-react";
+import { Bell, CalendarCheck, Candy, Droplets, Eye, Mail, Megaphone, Play, Repeat, Smartphone, Store, Timer, TrendingUp } from "lucide-react";
 import {
   AdnBackdrop,
-  BannerCard,
-  BannerHead,
-  Bubble,
-  Burst,
-  Chip,
+  BagDrugs,
   Confetti,
   Cues,
-  Douchette,
   Flash,
+  GenericPic,
   JAKARTA,
-  LightLeak,
   MailBilan,
   MedBox,
-  Monogram,
   Notification,
   Ordonnance,
   PB,
   PBLogo,
   Phone,
   Ring,
-  Sparks,
+  Sparkle,
   cue,
   rgba,
-  type BannerLine,
   type Cue,
 } from "../rembobine/kit";
-import { SCENE_COMPONENTS } from "../rembobine/scenes";
-import type { SceneId } from "../rembobine/timeline";
+import { ALLERGIE } from "../rembobine/allergie";
 import { FilmClock } from "../presentation/motion/kit/clock";
 import { Grain, Vignette } from "../presentation/motion/kit/grain";
 import { IN_OUT, SNAP, prog, ressort, wobble } from "../presentation/motion/kit/ease";
+import { LINES } from "./script";
 import MOTS from "./mots.json";
 
 /**
- * « Lettre sous la porte » — la vidéo que le pharmacien voit en scannant le QR code de la lettre A5.
- * 31 oct. 2026 : la première version (excuse de 36 s, puis le film de présentation).
- * 2 nov. 2026 (fondateur : « la vidéo envoyée à tous les pharmaciens de France, envoie du lourd ») : la vidéo ENTIÈRE, sur le
- * texte complet du fondateur dit par Yann (tools/voix.mjs) — environ 2 min 10, sans le film à la suite.
+ * LE FILM DE LA LETTRE — version 3 (fondateur, 3 nov. 2026 : « reprends celle de base, améliore-la, plus pro ; un vrai
+ * conseil de Donna, un peu niche ; fond blanc ; e-mail et appli ; la comparaison des deux pharmacies ; les 3 vidéos en 1 »).
  *
- * Chaque tableau suit la voix : les temps sont pris sur les MOTS (mots.json, horodatage ElevenLabs) avec `w("mot")`, jamais
- * tapés à la main. Les plus belles scènes du film « Rembobinons » sont reprises (comptoir, scan, décision, application) en
- * rejouant leur propre temps (`Reprise`), le reste est dessiné ici.
+ *   1. La lettre (la base du 31 oct.) : « Bonjour, Docteur… »
+ *   2. « Rembobinons », rejoué sur la VRAIE routine allergie de la console (cétirizine → yeux, nez, gorge) :
+ *      src/rembobine/allergie, mêmes scènes, temps d'histoire recalés sur la nouvelle voix (`ACT`).
+ *   3. La preuve : le conseil parfait, le chiffre d'affaires des pharmacies tests (sans chiffre inventé).
+ *   4. Le patient revient : bilan par e-mail et dans l'appli, notification de fin de cure, campagne d'un laboratoire.
+ *   5. Deux pharmacies, même rue : c'est un cercle. À côté : « Non merci. »
+ *   6. La signature.
+ * Les temps viennent des MOTS (mots.json, horodatage ElevenLabs par phrase), jamais tapés à la main.
  */
 export const FPS = 60;
-/** La voix commence à 0,8 s. */
-export const VOICE_AT = 0.8;
 
 type Word = { w: string; at: number; end: number };
-const WORDS = MOTS as Word[];
-const VOICE_END = WORDS[WORDS.length - 1].end + VOICE_AT;
-/** Le dernier accord de la musique tombe ici : le logo final claque dessus. */
-const FINAL_HIT = 126;
-export const TOTAL = 131;
+type Said = { who: string; dur: number; words: Word[] };
+const M = MOTS as Record<string, Said>;
+
+// ---- Où tombe chaque phrase (temps du film) ------------------------------------------------------------------------
+const VAT: Record<string, number> = {};
+const end = (id: string) => VAT[id] + M[id].words[M[id].words.length - 1].end;
+VAT.Y1 = 0.9;
+VAT.Y2 = end("Y1") + 0.45;
+/** Le comptoir (S1, temps d'histoire 0) commence ici ; l'acte 1 garde le rythme du film d'origine jusqu'à « Il repart ». */
+const A = end("Y2") + 0.5;
+VAT.D1 = A + 1.4;
+VAT.D2 = A + 4.3;
+VAT.Y3 = A + 6.0 - M.Y3.words[0].at;
+VAT.Y4 = end("Y3") + 0.45;
+VAT.Y5 = end("Y4") + 0.45;
+const DROP = end("Y5") + 0.32;
+VAT.Y6 = DROP + 0.45;
+VAT.Y7 = end("Y6") + 0.4;
+VAT.Y8 = end("Y7") + 0.35;
+const JUMP = end("Y8") + 0.45;
+VAT.C1 = JUMP + 0.45;
+VAT.D4 = end("C1") + 0.35;
+VAT.Y9 = end("D4") + 0.3;
+const ACT_END = end("Y9") + 0.9;
+VAT.Y9b = ACT_END + 0.35;
+const P0 = end("Y9b") + 0.5;
+VAT.Y10 = P0 + 0.35;
+VAT.Y11 = end("Y10") + 0.3;
+VAT.Y12 = end("Y11") + 0.45;
+VAT.Y13 = end("Y12") + 0.45;
+const R0 = end("Y13") + 0.5;
+VAT.Y14 = R0 + 0.5;
+VAT.Y15 = end("Y14") + 0.4;
+VAT.Y16 = end("Y15") + 0.5;
+const B = end("Y16") + 0.35; // à côté : le comptoir de S1, rejoué
+VAT.D1b = B + 1.4;
+VAT.D2b = B + 4.3;
+const F0 = end("D2b") + 0.7;
+VAT.Y17 = F0 + 0.45;
+VAT.Y18 = end("Y17") + 0.5;
+export const FINAL_HIT = end("Y18") + 0.9;
+export const TOTAL = Math.ceil(FINAL_HIT + 4.2);
 export const TOTAL_FRAMES = TOTAL * FPS;
 
 const norm = (s: string) => s.toLowerCase().replace(/[.,:;?!…«»"]/g, "").replace(/’/g, "'");
-/** Le temps VIDÉO où Yann dit ce mot (le premier après `after`, en temps vidéo). */
-function w(word: string, after = 0): number {
-  const hit = WORDS.find((x) => x.at + VOICE_AT >= after - 0.01 && norm(x.w) === norm(word));
-  if (!hit) throw new Error(`Mot introuvable dans la voix : « ${word} » après ${after}`);
-  return hit.at + VOICE_AT;
-}
-/** La fin du mot (temps vidéo). */
-function wEnd(word: string, after = 0): number {
-  const hit = WORDS.find((x) => x.at + VOICE_AT >= after - 0.01 && norm(x.w) === norm(word))!;
-  return hit.end + VOICE_AT;
+/** Le temps du film où commence le n-ième mot `word` de la phrase `id`. */
+function w(id: string, word: string, nth = 0): number {
+  const hits = M[id].words.filter((x) => norm(x.w) === norm(word));
+  if (!hits[nth]) throw new Error(`Mot introuvable : ${id} « ${word} »`);
+  return VAT[id] + hits[nth].at;
 }
 
-const MINT = { bg: "#EAF6F0", deep: "#0E7C5A", green: "#0E8A7B", ring: "#3DBF8E", ink: "#0F2B26", soft: "#5B6B66", paper: "#F4F8F6", night: "#06231E" };
+// ---- L'acte du comptoir : temps du film → temps d'histoire de « Rembobinons » -------------------------------------
+/** Les paliers [temps du film, temps d'histoire] ; entre deux paliers, le temps est interpolé. Un saut (S7 → S8) est
+ * un palier de 0,01 s. */
+const ACT: [number, number][] = [
+  [A, 0],
+  [VAT.Y3, 6.0],
+  [w("Y3", "l'allergie…"), 8.02],
+  [w("Y3", "et"), 9.286],
+  [w("Y3", "rien"), 9.727],
+  [w("Y3", "nez,"), 10.2],
+  [w("Y3", "yeux,"), 10.667],
+  [w("Y3", "gorge."), 11.074],
+  [end("Y3"), 12.38],
+  [w("Y4", "cette"), 12.748],
+  [w("Y4", "chaque"), 14.002],
+  [w("Y4", "france"), 15.535],
+  [end("Y4"), 16.342],
+  [w("Y5", "alors…"), 16.825],
+  [w("Y5", "rembobinons"), 17.8],
+  [DROP, 20.0],
+  [w("Y6", "même"), 20.45],
+  [w("Y6", "même", 1), 21.529],
+  [w("Y6", "ordonnance"), 21.947],
+  [w("Y6", "mais"), 22.853],
+  [w("Y6", "pharmaboost"), 23.758],
+  [w("Y6", "comptoir"), 24.885],
+  [end("Y6"), 25.593],
+  [w("Y7", "à"), 26.0],
+  [w("Y7", "boîte"), 26.453],
+  [w("Y7", "routine"), 27.219],
+  [w("Y7", "s'affiche,"), 27.869],
+  [w("Y7", "prise"), 28.403],
+  [w("Y7", "stock"), 29.216],
+  [end("Y7"), 29.757],
+  [w("Y8", "les"), 30.15],
+  [w("Y8", "questions"), 30.359],
+  [w("Y8", "poser"), 30.847],
+  [w("Y8", "les", 1), 31.299],
+  [w("Y8", "mots"), 31.462],
+  [w("Y8", "dire"), 31.729],
+  [JUMP, 32.3],
+  [JUMP + 0.01, 35.0],
+  [VAT.C1, 35.49],
+  [w("C1", "conseille"), 37.058],
+  [w("C1", "collyre"), 37.603],
+  [end("C1"), 38.36],
+  [VAT.D4, 38.791],
+  [end("D4"), 40.01],
+  [w("Y9", "le"), 40.55],
+  [w("Y9", "décide"), 41.363],
+  [w("Y9", "patient"), 42.524],
+  [w("Y9", "complète"), 43.813],
+  [end("Y9"), 44.529],
+  [ACT_END, 45.3],
+];
+/** « À côté » : le comptoir de S1, rejoué au même rythme. */
+const COTE: [number, number][] = [
+  [B, 0],
+  [B + 6.2, 6.2],
+];
 
-// ---- Les repères de la voix (temps vidéo) ----------------------------------------------------------------------------
-const T = {
-  bonjour: w("bonjour"),
-  lettre: w("lettre"),
-  deranger: w("déranger"),
-  chargee: w("chargée"),
-  creePB: w("créé"),
-  lgo: w("lgo"),
-  gener: w("gêner"),
-  comptoir: w("comptoir"),
-  patients: w("patients"),
-  produits: w("produits"),
-  mais: w("mais"),
-  ordonnances: w("ordonnances"),
-  questions: w("questions"),
-  interruptions: w("interruptions…"),
-  comment: w("comment"),
-  avecPB: w("avec", 26),
-  scan: w("scan"),
-  occasion: w("occasion"),
-  scannez: w("scannez"),
-  banniere: w("bannière"),
-  choisis: w("choisis"),
-  lesQuestions: w("questions", 41),
-  interet: w("l'intérêt"),
-  precautions: w("précautions"),
-  bonne: w("bonne"),
-  decidez: w("décidez"),
-  exemple: w("exemple"),
-  cetirizine: w("cétirizine"),
-  conseillee: w("conseillée"),
-  prescrite: w("prescrite"),
-  routine: w("routine"),
-  nez: w("nez"),
-  yeux: w("yeux"),
-  gorge: w("gorge"),
-  selon: w("selon"),
-  utilisation: w("d'utilisation"),
-  fond: w("fond"),
-  logique: w("logique"),
-  peau: w("peau"),
-  antibio: w("antibiotiques"),
-  autres: w("d'autres"),
-  memePatient: w("même", 72),
-  memeOrdo: w("ordonnance", 72),
-  plusComplet: w("complet"),
-  gammes: w("gammes", 75),
-  stock: w("stock", 75),
-  priorites: w("priorités"),
-  dates: w("dates"),
-  labos: w("laboratoires"),
-  challenges: w("challenges"),
-  surstock: w("surstock"),
-  dort: w("dort"),
-  paye: w("payé"),
-  lancez: w("lancez"),
-  remet: w("remet"),
-  titulaire: w("titulaire"),
-  exploitees: w("exploitées"),
-  avance: w("avance"),
-  pourPatient: w("patient", 101),
-  recap: w("récapitulatif"),
-  imprime: w("imprimé"),
-  email: w("e-mail"),
-  qr: w("qr"),
-  bientot: w("bientôt"),
-  application: w("l'application"),
-  telephone: w("téléphone"),
-  pbFinal: w("pharmaboost", 114),
-  expertise: w("expertise"),
-  reservez: w("réservez"),
-};
-
-// ---- Les fenêtres des tableaux (temps vidéo) -------------------------------------------------------------------------
-const CUTS = {
-  ouverture: [0, T.creePB - 0.3],
-  lgo: [T.creePB - 0.3, T.comptoir - 0.25],
-  comptoir: [T.comptoir - 0.25, T.mais - 0.2],
-  rush: [T.mais - 0.2, T.avecPB - 0.35],
-  occasion: [T.avecPB - 0.35, T.scannez - 0.25],
-  scan: [T.scannez - 0.25, T.lesQuestions - 0.3],
-  fiche: [T.lesQuestions - 0.3, w("et", T.bonne + 0.5) - 0.15],
-  decide: [w("et", T.bonne + 0.5) - 0.15, T.exemple - 0.2],
-  exemple: [T.exemple - 0.2, T.routine - 0.3],
-  routineBanniere: [T.routine - 0.3, T.nez - 0.35],
-  routine: [T.nez - 0.35, T.logique - 0.45],
-  themes: [T.logique - 0.45, T.memePatient - 0.25],
-  meme: [T.memePatient - 0.25, w("pharmaboost", 75) - 0.2],
-  gammes: [w("pharmaboost", 75) - 0.2, w("un", T.challenges) - 0.25],
-  surstock: [w("un", T.challenges) - 0.25, w("pour", T.remet) - 0.2],
-  titulaire: [w("pour", T.remet) - 0.2, T.pourPatient - 0.45],
-  patient: [T.pourPatient - 0.45, T.bientot - 0.4],
-  appli: [T.bientot - 0.4, T.pbFinal - 0.25],
-  fin: [T.pbFinal - 0.25, TOTAL + 1],
-} as const;
-
-// ---- Les briques ------------------------------------------------------------------------------------------------------
-function Abs({ x, y, children, style }: { x: number; y: number; children: ReactNode; style?: CSSProperties }) {
-  return <div style={{ position: "absolute", left: x, top: y, transform: "translate(-50%, -50%)", ...style }}>{children}</div>;
-}
-
-/** Un tableau : il entre en douceur à `from` et s'efface à `to` (chevauchement de 0,4 s avec le suivant). */
-function Scene({ t, win, children, still = false }: { t: number; win: readonly [number, number]; children: ReactNode; still?: boolean }) {
-  const [from, to] = win;
-  if (t < from - 0.05 || t > to + 0.45) return null;
-  const k = from <= 0.01 ? 1 : prog(t, from, 0.42, SNAP);
-  const out = prog(t, to, 0.4, IN_OUT);
-  const s = still ? 1 : 0.985 + 0.015 * k + 0.02 * out;
-  return <AbsoluteFill style={{ opacity: k * (1 - out), transform: `scale(${s})`, filter: out > 0 ? `blur(${out * 8}px)` : undefined }}>{children}</AbsoluteFill>;
-}
-
-/**
- * Une scène du film « Rembobinons », rejouée : son temps d'histoire = s0 + (t − début) × vitesse (`rate`, ou une suite de
- * paliers [temps vidéo, temps d'histoire] interpolés). Ses bruitages suivent, quand ils tombent dans la fenêtre.
- */
-type Remap = { id: SceneId; win: readonly [number, number]; keys: [number, number][] };
 function storyAt(keys: [number, number][], t: number) {
   if (t <= keys[0][0]) return keys[0][1] + (t - keys[0][0]);
   for (let i = 1; i < keys.length; i++) {
@@ -199,48 +168,72 @@ function storyAt(keys: [number, number][], t: number) {
   const [a, sa] = keys[keys.length - 1];
   return sa + (t - a);
 }
-function videoAt(keys: [number, number][], s: number) {
+/** Le temps du film d'un temps d'histoire ; null s'il tombe dans un saut. */
+function filmAt(keys: [number, number][], s: number) {
   for (let i = 1; i < keys.length; i++) {
     const [a, sa] = keys[i - 1];
     const [b, sb] = keys[i];
-    if (s >= sa && s <= sb && sb > sa) return a + ((s - sa) / (sb - sa)) * (b - a);
+    if (s >= sa && s <= sb && sb > sa) return (sb - sa) / (b - a) > 8 ? null : a + ((s - sa) / (sb - sa)) * (b - a);
   }
   return null;
 }
-function Reprise({ t, r }: { t: number; r: Remap }) {
-  const Comp = SCENE_COMPONENTS[r.id].Scene;
-  const st = storyAt(r.keys, t);
+
+/** Les scènes de l'acte, chacune dans sa fenêtre d'histoire ; la scène qui SORT est au-dessus (comme le film d'origine). */
+function Act({ t, keys, only }: { t: number; keys: [number, number][]; only?: string[] }) {
+  const st = storyAt(keys, t);
+  const list = ALLERGIE.filter((s) => (!only || only.includes(s.id)) && st >= s.start && st < s.end);
   return (
-    <FilmClock offset={Math.round((st - t) * FPS)}>
-      <Comp t={st} />
-    </FilmClock>
+    <BagDrugs.Provider value={["cetirizine", "collyre"]}>
+      <FilmClock offset={Math.round((st - t) * FPS)}>
+        {[...list].reverse().map((s) => (
+          <AbsoluteFill key={s.id}>
+            <s.mod.Scene t={st} />
+          </AbsoluteFill>
+        ))}
+      </FilmClock>
+    </BagDrugs.Provider>
   );
 }
-function repriseCues(r: Remap): Cue[] {
+function actCues(keys: [number, number][], only?: string[], until = Infinity): Cue[] {
   const out: Cue[] = [];
-  for (const c of SCENE_COMPONENTS[r.id].cues) {
-    const at = videoAt(r.keys, c.at);
-    if (at !== null && at >= r.win[0] && at <= r.win[1]) out.push({ ...c, at });
+  for (const s of ALLERGIE) {
+    if (only && !only.includes(s.id)) continue;
+    for (const c of s.mod.cues) {
+      if (c.at < s.start - 0.5 || c.at > s.end || c.at > until) continue;
+      const at = filmAt(keys, c.at);
+      if (at !== null) out.push({ ...c, at });
+    }
   }
   return out;
 }
 
-const Accent = ({ children, color = MINT.green }: { children: ReactNode; color?: string }) => <span style={{ color }}>{children}</span>;
+// ---- Les pièces du décor blanc ---------------------------------------------------------------------------------------
+const MINT = { bg: "#EAF6F0", deep: "#0E7C5A", green: "#0E8A7B", ink: "#0F2B26", soft: "#5B6B66", paper: "#F4F8F6", line: "#DCE7E2" };
 
-/** Un titre dont les mots montent de leur ligne, un à un ; *entre étoiles* = couleur d'accent. */
-function Rise({ t, at, text, size = 70, color = MINT.ink, accent = MINT.green, stagger = 0.07, align = "center", style }: { t: number; at: number; text: string; size?: number; color?: string; accent?: string; stagger?: number; align?: "center" | "left"; style?: CSSProperties }) {
+function Abs({ x, y, children, style }: { x: number; y: number; children: ReactNode; style?: CSSProperties }) {
+  return <div style={{ position: "absolute", left: x, top: y, transform: "translate(-50%, -50%)", ...style }}>{children}</div>;
+}
+
+/** Un tableau du décor blanc : il entre en douceur à `from` et s'efface à `to`. */
+function Scene({ t, from, to, children }: { t: number; from: number; to: number; children: ReactNode }) {
+  if (t < from - 0.05 || t > to + 0.45) return null;
+  const k = from <= 0.01 ? 1 : prog(t, from, 0.42, SNAP);
+  const out = prog(t, to, 0.4, IN_OUT);
+  return <AbsoluteFill style={{ opacity: k * (1 - out), transform: `scale(${0.985 + 0.015 * k + 0.02 * out})`, filter: out > 0 ? `blur(${out * 8}px)` : undefined }}>{children}</AbsoluteFill>;
+}
+
+/** Un titre dont les mots montent un à un ; *entre étoiles* = couleur d'accent. */
+function Rise({ t, at, text, size = 70, color = MINT.ink, accent = MINT.green, stagger = 0.07, style }: { t: number; at: number; text: string; size?: number; color?: string; accent?: string; stagger?: number; style?: CSSProperties }) {
   let on = false;
   const words = text.split(/\s+/).map((raw) => {
     const startOn = on;
-    const starts = raw.startsWith("*");
-    const ends = raw.endsWith("*") && raw.length > 1;
-    if (starts) on = true;
+    if (raw.startsWith("*")) on = true;
     const isAccent = on || startOn;
-    if (ends) on = false;
+    if (raw.endsWith("*") && raw.length > 1) on = false;
     return { w: raw.replace(/\*/g, ""), accent: isAccent };
   });
   return (
-    <div style={{ fontFamily: JAKARTA, fontWeight: 800, fontSize: size, letterSpacing: "-0.035em", lineHeight: 1.08, color, textAlign: align, ...style }}>
+    <div style={{ fontFamily: JAKARTA, fontWeight: 800, fontSize: size, letterSpacing: "-0.035em", lineHeight: 1.08, color, textAlign: "center", ...style }}>
       {words.map((wd, i) => {
         const k = prog(t, at + i * stagger, 0.42, SNAP);
         return (
@@ -254,187 +247,124 @@ function Rise({ t, at, text, size = 70, color = MINT.ink, accent = MINT.green, s
   );
 }
 
-/** La petite étiquette au-dessus d'un titre (« EXEMPLE », « POUR LE TITULAIRE »). */
-function Tag({ t, at, children, dark = false }: { t: number; at: number; children: ReactNode; dark?: boolean }) {
-  const k = ressort(t, at, { damping: 12, stiffness: 240, mass: 0.6 });
-  if (t < at) return null;
+/** Un titre qui laisse la place au suivant (il monte et s'efface à `out`). */
+function Title({ t, at, out, text, y = 150, size = 66 }: { t: number; at: number; out?: number; text: string; y?: number; size?: number }) {
+  if (t < at - 0.05) return null;
+  const o = out === undefined ? 0 : prog(t, out, 0.35, IN_OUT);
+  if (o >= 1) return null;
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "8px 18px", borderRadius: 999, background: dark ? PB.citron : MINT.green, color: dark ? MINT.ink : "#FFFFFF", fontFamily: JAKARTA, fontWeight: 800, fontSize: 22, letterSpacing: "0.16em", textTransform: "uppercase", transform: `scale(${k})`, transformOrigin: "0 50%" }}>
+    <Abs x={960} y={y} style={{ opacity: 1 - o, transform: `translate(-50%, ${-50 - o * 40}%)`, filter: o > 0 ? `blur(${o * 6}px)` : undefined }}>
+      <Rise t={t} at={at} text={text} size={size} style={{ width: 1700 }} />
+    </Abs>
+  );
+}
+
+function Card({ children, style }: { children: ReactNode; style?: CSSProperties }) {
+  return <div style={{ borderRadius: 28, background: "#FFFFFF", boxShadow: "0 40px 80px -40px rgba(15,43,38,.45), 0 0 0 1px rgba(15,43,38,.05)", ...style }}>{children}</div>;
+}
+const pop = (t: number, at: number) => (t < at ? 0 : ressort(t, at, { damping: 12, stiffness: 230, mass: 0.6 }));
+function Pill({ t, at, children, color = MINT.green, size = 30 }: { t: number; at: number; children: ReactNode; color?: string; size?: number }) {
+  const k = pop(t, at);
+  if (k <= 0) return null;
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 12, padding: `${size * 0.4}px ${size * 0.8}px`, borderRadius: 999, background: "#FFFFFF", boxShadow: `0 16px 34px -18px rgba(15,43,38,.5), 0 0 0 2px ${rgba(color, 0.25)}`, fontFamily: JAKARTA, fontWeight: 800, fontSize: size, color: MINT.ink, transform: `scale(${k})`, whiteSpace: "nowrap" }}>
       {children}
     </span>
   );
 }
-
-/** Une carte blanche douce. */
-function Card({ children, style }: { children: ReactNode; style?: CSSProperties }) {
-  return <div style={{ borderRadius: 28, background: "#FFFFFF", boxShadow: "0 40px 80px -40px rgba(15,43,38,.45), 0 0 0 1px rgba(15,43,38,.05)", ...style }}>{children}</div>;
-}
-
-const pop = (t: number, at: number) => (t < at ? 0 : ressort(t, at, { damping: 12, stiffness: 230, mass: 0.6 }));
-const Cross = ({ size = 40, color = MINT.green }: { size?: number; color?: string }) => (
-  <svg viewBox="0 0 40 40" width={size} height={size}>
+const Cross = ({ size = 40, color = MINT.green, glow = 0 }: { size?: number; color?: string; glow?: number }) => (
+  <svg viewBox="0 0 40 40" width={size} height={size} style={{ filter: glow > 0 ? `drop-shadow(0 0 ${12 * glow}px ${rgba(color, 0.8)})` : undefined }}>
     <path d="M14 2h12v12h12v12H26v12H14V26H2V14h12z" fill={color} />
   </svg>
 );
 
-/** Un faux QR code (motif fixe, il n'est là que pour l'image). */
-function QrArt({ size = 120, color = MINT.ink }: { size?: number; color?: string }) {
-  const n = 21;
-  const cells: ReactNode[] = [];
-  for (let y = 0; y < n; y++)
-    for (let x = 0; x < n; x++) {
-      const finder = (x < 7 && y < 7) || (x > 13 && y < 7) || (x < 7 && y > 13);
-      if (finder) continue;
-      if ((x * 7 + y * 13 + x * y) % 3 === 0) cells.push(<rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill={color} />);
-    }
-  const finderAt = (fx: number, fy: number) => (
-    <g key={`${fx}${fy}`}>
-      <rect x={fx} y={fy} width={7} height={7} fill={color} />
-      <rect x={fx + 1} y={fy + 1} width={5} height={5} fill="#FFFFFF" />
-      <rect x={fx + 2} y={fy + 2} width={3} height={3} fill={color} />
-    </g>
-  );
+// =====================================================================================================================
+// 1. La lettre
+// =====================================================================================================================
+function Lettre1({ t }: { t: number }) {
+  const slide = prog(t, w("Y1", "lettre,") - 0.6, 1.3, SNAP);
   return (
-    <svg viewBox={`0 0 ${n} ${n}`} width={size} height={size} shapeRendering="crispEdges">
-      {cells}
-      {finderAt(0, 0)}
-      {finderAt(14, 0)}
-      {finderAt(0, 14)}
-    </svg>
+    <>
+      <Title t={t} at={w("Y1", "bonjour,")} text="Bonjour, *Docteur.*" y={150} size={78} />
+      <Abs x={960} y={600} style={{ transform: "translate(-50%, -50%) scale(0.86)" }}>
+        <div style={{ position: "relative", width: 620, height: 640 }}>
+          <div style={{ position: "absolute", left: 250, top: -10 }}>
+            <Cross size={120} glow={0.5 + 0.5 * Math.sin(t * 2.4)} />
+          </div>
+          <div style={{ position: "absolute", left: 60, top: 130, width: 500, height: 470, borderRadius: "18px 18px 0 0", background: "linear-gradient(180deg,#DCEFE7,#C7E6DA)", border: `10px solid ${MINT.ink}`, borderBottom: "none", boxShadow: "0 30px 60px -30px rgba(15,43,38,.5)" }}>
+            <div style={{ position: "absolute", inset: 24, borderRadius: 8, background: "linear-gradient(135deg,rgba(255,255,255,.75),rgba(255,255,255,.15))" }} />
+            <div style={{ position: "absolute", right: 34, top: 230, width: 16, height: 70, borderRadius: 8, background: MINT.ink }} />
+            <div style={{ position: "absolute", left: 0, right: 0, top: 70, textAlign: "center", fontFamily: JAKARTA, fontWeight: 800, fontSize: 30, letterSpacing: "0.2em", color: MINT.deep }}>PHARMACIE</div>
+          </div>
+          <div style={{ position: "absolute", left: 20, top: 600, width: 580, height: 14, borderRadius: 7, background: MINT.ink }} />
+          <div style={{ position: "absolute", left: 160 + (1 - slide) * 520, top: 560 + slide * 6, width: 300, height: 120, borderRadius: 10, background: "#FFFFFF", boxShadow: "0 16px 30px -14px rgba(15,43,38,.45)", transform: `rotate(${-6 + 6 * slide}deg) perspective(600px) rotateX(${55 - 25 * slide}deg)`, display: "flex", alignItems: "center", justifyContent: "center", gap: 14 }}>
+            <Mail size={42} color={MINT.green} />
+            <span style={{ fontFamily: JAKARTA, fontWeight: 700, fontSize: 20, color: MINT.ink, lineHeight: 1.15 }}>
+              À l&apos;attention
+              <br />
+              du pharmacien
+            </span>
+          </div>
+        </div>
+      </Abs>
+    </>
   );
 }
 
-// =====================================================================================================================
-// 1. Bonjour, Docteur — la lettre sort de l'enveloppe ; la journée chargée tourne autour
-// =====================================================================================================================
-function Ouverture({ t }: { t: number }) {
-  const env = prog(t, 0.15, 0.9, SNAP);
-  const flap = prog(t, T.lettre - 0.25, 0.5, IN_OUT);
-  const out = prog(t, T.lettre + 0.15, 0.95, SNAP);
-  const busy = prog(t, T.deranger - 0.2, 0.6, SNAP);
-  const shake = t > T.chargee - 0.1 && t < T.chargee + 0.7 ? Math.sin((t - T.chargee) * 70) * 6 * (1 - (t - T.chargee) / 0.8) : 0;
-  const lift = -230 * out;
+/** « …plutôt que de vous déranger en pleine journée » : la file au comptoir, l'horloge, le téléphone qui sonne. */
+function Journee({ t }: { t: number }) {
+  const a = w("Y1", "plutôt");
+  const ring = w("Y1", "déranger");
+  const u = t - ring;
+  const shake = u > 0 && u < 1.2 ? Math.sin(u * 60) * 5 * Math.exp(-u * 2) : 0;
   return (
     <>
-      <Abs x={960} y={150}>
-        {t < T.lettre - 0.1 ? (
-          <Rise t={t} at={T.bonjour} text="Bonjour, *Docteur.*" size={92} />
-        ) : t < T.deranger + 0.4 ? (
-          <Rise t={t} at={T.lettre - 0.1} text="Une *lettre*, plutôt qu'une visite." size={72} />
-        ) : (
-          <Rise t={t} at={T.deranger + 0.4} text="Votre journée est *déjà bien remplie.*" size={72} />
-        )}
-      </Abs>
-      {/* L'enveloppe C5, et la lettre A5 qui en sort. */}
-      <Abs x={960} y={700 + (1 - env) * 300} style={{ opacity: env, transform: `translate(-50%, -50%) rotate(${-2 + 2 * env}deg)` }}>
-        <div style={{ position: "relative", width: 640, height: 430 }}>
-          {/* La lettre */}
-          <div style={{ position: "absolute", left: 90, top: 20 + lift, width: 460, height: 560, borderRadius: 12, background: "#FFFFFF", boxShadow: "0 30px 60px -30px rgba(15,43,38,.45)", padding: "26px 30px", overflow: "hidden", zIndex: out > 0.35 ? 3 : 1, backgroundImage: "radial-gradient(120% 60% at 100% 0%, #E4F6EE 0%, #FFFFFF 55%)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: JAKARTA, fontWeight: 800, fontSize: 20, color: MINT.ink }}>
-              <Cross size={18} /> Pharma<span style={{ color: MINT.green, marginLeft: -8 }}>Boost</span>
+      <Title t={t} at={a} text="Plutôt que de vous déranger *en pleine journée.*" y={150} size={64} />
+      <Abs x={960} y={620}>
+        <div style={{ position: "relative", width: 1300, height: 560 }}>
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} style={{ position: "absolute", left: 120 + i * 150, top: 160, opacity: prog(t, a + 0.2 + i * 0.12, 0.4), transform: `translateY(${wobble(t, i + 3, 4, 0.8)}px)` }}>
+              <div style={{ width: 90, height: 90, borderRadius: 99, background: ["#C9D8D2", "#D9CFC4", "#C6D3DE", "#D7CCD9"][i], margin: "0 auto" }} />
+              <div style={{ width: 130, height: 210, borderRadius: "60px 60px 18px 18px", background: ["#DCE7E2", "#E8DFD4", "#D8E2EC", "#E6DDE8"][i], marginTop: 10 }} />
             </div>
-            <div style={{ marginTop: 22, fontFamily: JAKARTA, fontWeight: 800, fontSize: 34, lineHeight: 1.05, letterSpacing: "-0.03em", color: MINT.ink }}>
-              Bonjour !<br />
-              <span style={{ color: MINT.green }}>Un petit mot pour votre pharmacie.</span>
-            </div>
-            {[0, 1, 2].map((i) => (
-              <div key={i} style={{ marginTop: i === 0 ? 18 : 9, height: 9, width: `${[96, 88, 70][i]}%`, borderRadius: 5, background: "#DCE7E2" }} />
-            ))}
-            <div style={{ marginTop: 22, display: "flex", gap: 16, alignItems: "center", padding: 16, borderRadius: 18, background: "linear-gradient(135deg,#0F2B26,#0E5C48 55%,#0E8A6B)" }}>
-              <div style={{ padding: 8, borderRadius: 12, background: "#FFFFFF" }}>
-                <QrArt size={92} />
-              </div>
-              <div style={{ fontFamily: JAKARTA, fontWeight: 800, fontSize: 21, lineHeight: 1.12, color: "#FFFFFF" }}>
-                <div style={{ fontSize: 12, letterSpacing: "0.14em", color: "#8FDDBE", marginBottom: 6 }}>▶ VIDÉO · 2 MIN</div>
-                Scannez avec <span style={{ color: "#8FDDBE" }}>votre téléphone.</span>
-              </div>
-            </div>
-          </div>
-          {/* Le dos de l'enveloppe et son rabat */}
-          <div style={{ position: "absolute", left: 0, top: 150, width: 640, height: 280, zIndex: 2, borderRadius: "0 0 18px 18px", background: "linear-gradient(180deg,#F7F2E8,#EFE7D7)", boxShadow: "0 40px 70px -35px rgba(15,43,38,.55)" }}>
-            <svg width={640} height={280} style={{ position: "absolute", inset: 0 }}>
-              <path d="M0 0 L320 170 L640 0 L640 280 L0 280 Z" fill="#F3ECDF" />
-              <path d="M0 280 L280 140 M640 280 L360 140" stroke="#E2D6C0" strokeWidth={2} />
+          ))}
+          <div style={{ position: "absolute", left: 120, top: 500, fontFamily: JAKARTA, fontWeight: 700, fontSize: 28, color: MINT.soft, opacity: prog(t, a + 0.7, 0.4) }}>Quatre patients attendent…</div>
+          <div style={{ position: "absolute", left: 830, top: 60, opacity: prog(t, a + 0.3, 0.4) }}>
+            <svg width={200} height={200} viewBox="-100 -100 200 200">
+              <circle r={90} fill="#FFFFFF" stroke={MINT.ink} strokeWidth={10} />
+              <line x1={0} y1={0} x2={0} y2={-58} stroke={MINT.ink} strokeWidth={9} strokeLinecap="round" transform={`rotate(${(t - a) * 30})`} />
+              <line x1={0} y1={0} x2={0} y2={-76} stroke={MINT.green} strokeWidth={6} strokeLinecap="round" transform={`rotate(${(t - a) * 360})`} />
+              <circle r={8} fill={MINT.ink} />
             </svg>
-            <div style={{ position: "absolute", left: 40, bottom: 30, fontFamily: JAKARTA, fontWeight: 700, fontSize: 20, color: "#8C7F67" }}>À l&apos;attention du pharmacien titulaire</div>
           </div>
-          <svg width={640} height={200} style={{ position: "absolute", left: 0, top: 150 - 200 * (1 - flap) + 0, zIndex: flap < 0.5 ? 2 : 0, transformOrigin: "50% 100%", transform: `scaleY(${1 - 2 * flap})` }}>
-            <path d="M0 200 L320 30 L640 200 Z" fill="#EADFCB" />
+          <div style={{ position: "absolute", left: 1000, top: 300, transform: `rotate(${shake}deg) scale(${pop(t, ring - 0.2)})` }}>
+            <Card style={{ width: 240, height: 140, display: "flex", alignItems: "center", justifyContent: "center", gap: 16 }}>
+              <Bell size={54} color="#E0884A" />
+              <span style={{ fontFamily: JAKARTA, fontWeight: 800, fontSize: 30, color: MINT.ink }}>Driiing</span>
+            </Card>
+          </div>
+        </div>
+      </Abs>
+    </>
+  );
+}
+
+/** « Laissez-nous vous montrer, en deux minutes, ce qui change au comptoir. » */
+function DeuxMinutes({ t }: { t: number }) {
+  const ring = prog(t, w("Y2", "deux") - 0.1, 2.2, IN_OUT);
+  const p = pop(t, w("Y2", "deux") - 0.2);
+  return (
+    <>
+      <Title t={t} at={w("Y2", "change")} text="Ce qui change *au comptoir.*" y={170} size={74} />
+      <Abs x={960} y={600}>
+        <div style={{ position: "relative", width: 400, height: 400, transform: `scale(${p})` }}>
+          <svg width={400} height={400} viewBox="0 0 400 400" style={{ position: "absolute", inset: 0 }}>
+            <circle cx={200} cy={200} r={180} fill="none" stroke={rgba(MINT.green, 0.15)} strokeWidth={22} />
+            <circle cx={200} cy={200} r={180} fill="none" stroke={MINT.green} strokeWidth={22} strokeLinecap="round" pathLength={1} strokeDasharray={1} strokeDashoffset={1 - ring} transform="rotate(-90 200 200)" />
           </svg>
-        </div>
-      </Abs>
-      {/* La journée : ordonnances, téléphone, file d'attente, horloge */}
-      <div style={{ position: "absolute", inset: 0, transform: `translateX(${shake}px)` }}>
-        <Abs x={330} y={560} style={{ opacity: busy, transform: `translate(-50%, -50%) rotate(${-8 + wobble(t, 3, 2, 0.6)}deg) scale(${0.6 + 0.4 * busy})` }}>
-          <Ordonnance w={230} />
-        </Abs>
-        <Abs x={1600} y={470} style={{ opacity: pop(t, T.deranger + 0.25) > 0 ? 1 : 0, transform: `translate(-50%, -50%) scale(${pop(t, T.deranger + 0.25)})` }}>
-          <Card style={{ padding: "22px 28px", display: "flex", alignItems: "center", gap: 16 }}>
-            <span style={{ width: 58, height: 58, borderRadius: 18, background: "#E3F6EC", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <PhoneIcon size={30} color={MINT.green} style={{ transform: `rotate(${t > T.chargee - 0.3 ? Math.sin(t * 60) * 12 : 0}deg)` }} />
-            </span>
-            <div style={{ fontFamily: JAKARTA, fontWeight: 800, fontSize: 26, color: MINT.ink }}>
-              Appel entrant
-              <div style={{ fontWeight: 600, fontSize: 20, color: MINT.soft }}>Grossiste · livraison</div>
-            </div>
-          </Card>
-        </Abs>
-        <Abs x={1560} y={760} style={{ transform: `translate(-50%, -50%) scale(${pop(t, T.deranger + 0.7)})` }}>
-          <Card style={{ padding: "20px 30px", fontFamily: JAKARTA, fontWeight: 800, fontSize: 24, color: MINT.soft, textAlign: "center" }}>
-            Patient suivant
-            <div style={{ fontSize: 64, color: MINT.ink, letterSpacing: "-0.04em", lineHeight: 1 }}>N° {t < T.chargee ? 46 : 47}</div>
-          </Card>
-        </Abs>
-        <Abs x={360} y={850} style={{ transform: `translate(-50%, -50%) scale(${pop(t, T.deranger + 1.1)})` }}>
-          <Card style={{ padding: 22, borderRadius: 999, display: "flex" }}>
-            <Clock size={64} color={MINT.green} style={{ transform: `rotate(${(t - T.deranger) * 220}deg)` }} />
-          </Card>
-        </Abs>
-      </div>
-    </>
-  );
-}
-
-// =====================================================================================================================
-// 2. PharmaBoost, à côté de votre LGO, sans jamais le gêner
-// =====================================================================================================================
-function ACoteDuLgo({ t }: { t: number }) {
-  const a = CUTS.lgo[0];
-  const screen = prog(t, a + 0.5, 0.6, SNAP);
-  const pill = pop(t, T.lgo - 0.3);
-  const check = pop(t, T.gener - 0.1);
-  return (
-    <>
-      <Abs x={960} y={150}>
-        <PBLogo t={t} at={a + 0.35} size={86} tone="light" grad />
-      </Abs>
-      <Abs x={960} y={600} style={{ opacity: screen, transform: `translate(-50%, -50%) translateY(${(1 - screen) * 60}px)` }}>
-        <div style={{ position: "relative", width: 1180, height: 560 }}>
-          <div style={{ position: "absolute", inset: 0, borderRadius: 26, background: "#E7ECF1", border: "12px solid #1E2A33", boxShadow: "0 40px 80px -40px rgba(15,43,38,.6)", overflow: "hidden" }}>
-            <div style={{ height: 46, background: "#FFFFFF", borderBottom: "1px solid #D4DCE4", display: "flex", alignItems: "center", gap: 18, padding: "0 22px", fontFamily: JAKARTA, fontWeight: 800, fontSize: 19, color: "#2E6DA4" }}>
-              Votre LGO <span style={{ fontWeight: 600, color: "#7A8A99" }}>Facturation</span>
-              <span style={{ fontWeight: 600, color: "#7A8A99" }}>Stock</span>
-              <span style={{ fontWeight: 600, color: "#7A8A99" }}>Patients</span>
-            </div>
-            <div style={{ margin: 22, height: 110, borderRadius: 10, background: "#C3CFDC" }} />
-            <div style={{ margin: "0 22px", borderRadius: 10, background: "#FFFFFF", overflow: "hidden" }}>
-              <div style={{ height: 38, background: "#3B5B7E" }} />
-              {["CÉTIRIZINE 10 mg", "PARACÉTAMOL 1 g", "AMOXICILLINE 1 g", ""].map((row, i) => (
-                <div key={i} style={{ height: 46, borderTop: "1px solid #E3E8EE", display: "flex", alignItems: "center", padding: "0 18px", fontFamily: JAKARTA, fontWeight: 600, fontSize: 19, color: "#3F4E5C", background: i === 0 ? "#F6E6A6" : undefined }}>
-                  {row}
-                </div>
-              ))}
-            </div>
-          </div>
-          {/* La petite bannière PharmaBoost, posée par-dessus, dans le coin */}
-          <div style={{ position: "absolute", right: 60, top: 70, transform: `scale(${pill})`, transformOrigin: "100% 0", height: 74, padding: "0 30px", borderRadius: 999, background: "#FFFFFF", boxShadow: `0 20px 40px -18px rgba(15,43,38,.55), 0 0 0 2px ${rgba(MINT.green, 0.3)}`, display: "flex", alignItems: "center", gap: 14 }}>
-            <Cross size={34} />
-            <span style={{ fontFamily: JAKARTA, fontWeight: 800, fontSize: 21, letterSpacing: "0.22em", color: MINT.ink }}>
-              PHARMA<span style={{ color: MINT.green }}>BOOST</span>
-            </span>
-          </div>
-          <div style={{ position: "absolute", right: 60, top: 170, display: "flex", alignItems: "center", gap: 12, transform: `scale(${check})`, transformOrigin: "100% 0", padding: "12px 22px", borderRadius: 999, background: MINT.ink, color: "#FFFFFF", fontFamily: JAKARTA, fontWeight: 800, fontSize: 24 }}>
-            <ShieldCheck size={28} color={PB.citron} /> Votre LGO reste intact
+          <div style={{ position: "absolute", inset: 64, borderRadius: 999, background: "#FFFFFF", boxShadow: "0 30px 60px -30px rgba(15,43,38,.5)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6 }}>
+            <Play size={72} fill={MINT.green} color={MINT.green} style={{ marginLeft: 10 }} />
+            <span style={{ fontFamily: JAKARTA, fontWeight: 800, fontSize: 42, color: MINT.ink }}>2 minutes</span>
           </div>
         </div>
       </Abs>
@@ -443,833 +373,652 @@ function ACoteDuLgo({ t }: { t: number }) {
 }
 
 // =====================================================================================================================
-// 3. Au comptoir : vos patients, vos produits (scène « je veux bien » de Rembobinons, au ralenti) — titres par-dessus
+// 3. La preuve : le conseil parfait, le chiffre d'affaires des pharmacies tests (sans chiffre)
 // =====================================================================================================================
-const R_COMPTOIR: Remap = { id: "S8", win: CUTS.comptoir, keys: [[CUTS.comptoir[0], 35.6], [CUTS.comptoir[1] + 0.5, 35.98]] };
-function Comptoir({ t }: { t: number }) {
+const ROUTINE = [
+  { k: "yeux", text: "Collyre anti-allergique" },
+  { k: "nez", text: "Eau de mer · nez allergique" },
+  { k: "gorge", text: "Pastilles adoucissantes" },
+];
+function Preuve({ t }: { t: number }) {
+  const parfait = w("Y9b", "parfait,");
+  const seconde = w("Y9b", "seconde");
+  const prouve = w("Y9b", "prouvé");
+  const tests = w("Y9b", "tests,");
+  const ca = w("Y9b", "chiffre");
+  const left = 1 - prog(t, prouve - 0.3, 0.45, IN_OUT);
+  const go = Math.min(tests - 0.3, prouve + 0.35);
+  const grow = prog(t, go + 0.2, 2.2, SNAP);
+  const bars = [0.42, 0.5, 0.47, 0.6, 0.7, 0.82, 0.95];
   return (
     <>
-      <Reprise t={t} r={R_COMPTOIR} />
-      <Abs x={520} y={150}>
-        <Card style={{ padding: "22px 34px", background: "rgba(255,255,255,.92)" }}>
-          <Rise t={t} at={T.patients - 0.15} text="Vos *patients.*" size={62} align="left" />
-          <Rise t={t} at={T.produits - 0.15} text="Vos *produits.*" size={62} align="left" />
-        </Card>
-      </Abs>
-    </>
-  );
-}
-
-// =====================================================================================================================
-// 4. Les ordonnances, les questions, les interruptions… comment penser à chaque conseil ?
-// =====================================================================================================================
-function Rush({ t }: { t: number }) {
-  const dim = prog(t, T.comment - 0.1, 0.5, IN_OUT);
-  const shake = t > T.interruptions && t < T.interruptions + 0.6 ? Math.sin((t - T.interruptions) * 80) * 7 * (1 - (t - T.interruptions) / 0.6) : 0;
-  const ord = (i: number) => pop(t, T.ordonnances - 0.15 + i * 0.12);
-  return (
-    <>
-      <div style={{ position: "absolute", inset: 0, transform: `translateX(${shake}px) scale(${1 - 0.06 * dim})`, filter: `blur(${dim * 7}px)`, opacity: 1 - 0.65 * dim }}>
-        {[0, 1, 2].map((i) => (
-          <Abs key={i} x={360 + i * 70} y={560 + i * 30} style={{ transform: `translate(-50%, -50%) rotate(${-14 + i * 9}deg) scale(${ord(i)})` }}>
-            <Ordonnance w={250} />
-          </Abs>
-        ))}
-        <Bubble t={t} at={T.questions - 0.1} text="Et pour ma toux ?" mood="pb" x={1000} y={330} size={46} side="left" />
-        <Bubble t={t} at={T.questions + 0.35} text="C'est remboursé ?" mood="pb" x={1130} y={520} size={40} side="right" />
-        <Notification t={t} at={T.interruptions - 0.25} icon="bell" app="Téléphone" title="Appel entrant" body="Le laboratoire, ligne 2" x={1560} y={300} scale={1.25} />
-        <Notification t={t} at={T.interruptions + 0.15} icon="calendar" app="Livraison" title="Le grossiste est arrivé" body="12 caisses à ranger" x={1560} y={470} scale={1.25} />
-        <Notification t={t} at={T.interruptions + 0.5} icon="mail" app="Mail" title="Rupture de stock" body="3 références indisponibles" x={1560} y={640} scale={1.25} />
-        <Abs x={960} y={150}>
-          <Rise t={t} at={T.mais} text="Mais entre tout *ça…*" size={68} />
-        </Abs>
-      </div>
-      {t > T.comment - 0.2 && (
-        <Abs x={960} y={500}>
-          <Rise t={t} at={T.comment - 0.05} text="Comment penser à *chaque conseil,* à chaque délivrance ?" size={92} stagger={0.09} style={{ width: 1500 }} />
-        </Abs>
-      )}
-    </>
-  );
-}
-
-// =====================================================================================================================
-// 5. Avec PharmaBoost, chaque scan devient une occasion — sur fond nuit
-// =====================================================================================================================
-function Occasion({ t }: { t: number }) {
-  const a = CUTS.occasion[0];
-  const sweep = prog(t, T.scan - 0.1, 0.7, IN_OUT);
-  return (
-    <AbsoluteFill style={{ background: MINT.night }}>
-      <AdnBackdrop t={t} tone="night" width={1920} focus={[0.5, 0.5]} />
-      <LightLeak t={t} at={a + 0.1} dur={1.6} color={PB.citron} x={0.8} y={0.2} />
-      <Flash t={t} at={a + 0.05} dur={0.3} max={0.5} />
-      <Abs x={960} y={330}>
-        <PBLogo t={t} at={T.avecPB + 0.2} size={110} tone="dark" />
-      </Abs>
-      <Ring t={t} at={T.avecPB + 0.3} x={960} y={330} max={900} color={PB.citron} />
-      <Burst t={t} at={T.avecPB + 0.3} x={960} y={330} radius={420} />
-      <Abs x={960} y={640}>
-        <Rise t={t} at={w("chaque", a)} text="Chaque scan devient une *occasion.*" size={96} color="#FFFFFF" accent={PB.citron} />
-      </Abs>
-      {/* Le faisceau du scanner balaie l'écran */}
-      <div style={{ position: "absolute", left: 0, right: 0, top: 120 + sweep * 840, height: 4, background: `linear-gradient(90deg, transparent, ${rgba("#FF4D4D", 0.9)}, transparent)`, boxShadow: "0 0 30px rgba(255,77,77,.8)", opacity: sweep > 0 && sweep < 1 ? 1 : 0 }} />
-      <Sparks t={t} at={T.occasion + 0.1} x={960} y={640} count={30} color={PB.citron} />
-      <Abs x={960} y={790}>
-        <div style={{ opacity: prog(t, T.occasion + 0.3, 0.5), fontFamily: JAKARTA, fontWeight: 700, fontSize: 34, color: rgba("#FFFFFF", 0.8) }}>…de mieux accompagner votre patient.</div>
-      </Abs>
-    </AbsoluteFill>
-  );
-}
-
-// =====================================================================================================================
-// 6. Vous scannez comme d'habitude, la bannière propose, pris dans votre officine (scène « le bon conseil »)
-// =====================================================================================================================
-const R_SCAN: Remap = { id: "S6", win: CUTS.scan, keys: [[CUTS.scan[0], 26.2], [T.choisis, 29.3], [CUTS.scan[1] + 0.5, 29.95]] };
-function Scan({ t }: { t: number }) {
-  return (
-    <>
-      <Reprise t={t} r={R_SCAN} />
-      <Abs x={960} y={70}>
-        <span style={{ whiteSpace: "nowrap", opacity: prog(t, T.scannez, 0.4) * (1 - prog(t, T.banniere - 0.2, 0.3)), fontFamily: JAKARTA, fontWeight: 800, fontSize: 30, padding: "10px 22px", borderRadius: 999, background: MINT.ink, color: "#FFFFFF" }}>Vous scannez, comme d&apos;habitude</span>
-      </Abs>
-      <Abs x={960} y={70}>
-        <span style={{ whiteSpace: "nowrap", opacity: prog(t, T.choisis, 0.4), fontFamily: JAKARTA, fontWeight: 800, fontSize: 30, padding: "10px 22px", borderRadius: 999, background: MINT.green, color: "#FFFFFF" }}>Parmi les produits de votre officine</span>
-      </Abs>
-    </>
-  );
-}
-
-// =====================================================================================================================
-// 7. Les questions à poser, l'intérêt du produit, les précautions — la fiche de la bannière
-// =====================================================================================================================
-function Fiche({ t }: { t: number }) {
-  const a = CUTS.fiche[0];
-  const tab = (tt: number) => (tt < T.interet - 0.1 ? "questions" : tt < T.precautions - 0.1 ? "discours" : "fiche");
-  const items = [
-    { Icon: Sparkles, text: "Les questions à poser", at: T.lesQuestions },
-    { Icon: Heart, text: "L'intérêt du produit", at: T.interet },
-    { Icon: ShieldCheck, text: "Les précautions à vérifier", at: T.precautions },
-  ];
-  return (
-    <>
-      <BannerCard t={t} at={a + 0.1} tab={tab} product="Probiotique" for="Amoxicilline 1 g" chips={[{ kind: "stock", text: "12 en stock" }]} x={600} y={500} scale={0.86} fiche={{ reason: "Avec un antibiotique, la flore intestinale peut être perturbée.", posology: "1 gélule par jour, à distance de l'antibiotique.", tell: ["Pendant toute la durée du traitement"] }} />
-      <Abs x={1440} y={150}>
-        <Tag t={t} at={a + 0.2}>Des repères pour l&apos;équipe</Tag>
-      </Abs>
-      {items.map((it, i) => {
-        const k = pop(t, it.at - 0.1);
-        const active = t >= it.at - 0.1 && (i === 2 || t < items[i + 1].at - 0.1);
-        return (
-          <Abs key={it.text} x={1440} y={330 + i * 150}>
-            <div style={{ width: 680, display: "flex", alignItems: "center", gap: 22, padding: "22px 28px", borderRadius: 24, background: active ? MINT.ink : "#FFFFFF", color: active ? "#FFFFFF" : MINT.ink, boxShadow: "0 30px 60px -36px rgba(15,43,38,.5)", transform: `scale(${k}) translateX(${active ? 0 : 0}px)`, transformOrigin: "0 50%", fontFamily: JAKARTA, fontWeight: 800, fontSize: 38, letterSpacing: "-0.02em" }}>
-              <span style={{ width: 62, height: 62, borderRadius: 18, background: active ? PB.citron : MINT.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <it.Icon size={32} color={active ? MINT.ink : MINT.green} />
-              </span>
-              {it.text}
-            </div>
-          </Abs>
-        );
-      })}
-      <Abs x={1440} y={800}>
-        <Rise t={t} at={T.bonne - 0.05} text="La bonne information, *au bon moment.*" size={44} />
-      </Abs>
-    </>
-  );
-}
-
-// =====================================================================================================================
-// 8. Et c'est toujours vous qui décidez (scène « le pharmacien décide »)
-// =====================================================================================================================
-const R_DECIDE: Remap = { id: "S8", win: CUTS.decide, keys: [[CUTS.decide[0], 40.55], [CUTS.decide[1] + 0.5, 42.6]] };
-const Decide = ({ t }: { t: number }) => <Reprise t={t} r={R_DECIDE} />;
-
-// =====================================================================================================================
-// 9. L'exemple : la cétirizine — scan, conseillée ou prescrite
-// =====================================================================================================================
-function Exemple({ t }: { t: number }) {
-  const a = CUTS.exemple[0];
-  const boxIn = prog(t, a + 0.4, 0.5, SNAP);
-  return (
-    <>
-      <Abs x={960} y={110}>
-        <Tag t={t} at={T.exemple}>Exemple · l&apos;allergie</Tag>
-      </Abs>
-      <Abs x={960} y={220}>
-        <Rise t={t} at={T.exemple + 0.5} text="Un patient vient chercher sa *cétirizine.*" size={74} />
-      </Abs>
-      <div style={{ position: "absolute", left: 560, top: 600, opacity: boxIn, transform: `translateY(${(1 - boxIn) * 50}px)` }}>
-        <MedBox kind="cetirizine" w={380} t={t} />
-      </div>
-      <Douchette t={t} x={750} y={610} angle={14} size={1.15} beamAt={T.cetirizine} beamDur={0.6} />
-      <Abs x={1370} y={560}>
-        <div style={{ display: "flex", gap: 26, alignItems: "center" }}>
-          <div style={{ transform: `scale(${pop(t, T.conseillee)})` }}>
-            <Card style={{ padding: "26px 34px", fontFamily: JAKARTA, fontWeight: 800, fontSize: 40, color: MINT.ink, display: "flex", gap: 14, alignItems: "center" }}>
-              <Store size={40} color={MINT.green} /> Conseillée
-            </Card>
-          </div>
-          <div style={{ opacity: pop(t, T.prescrite - 0.2) > 0 ? 1 : 0, fontFamily: JAKARTA, fontWeight: 800, fontSize: 34, color: MINT.soft }}>ou</div>
-          <div style={{ transform: `scale(${pop(t, T.prescrite)})` }}>
-            <Card style={{ padding: "26px 34px", fontFamily: JAKARTA, fontWeight: 800, fontSize: 40, color: MINT.ink, display: "flex", gap: 14, alignItems: "center" }}>
-              <Ordonnance w={44} /> Prescrite
-            </Card>
-          </div>
-        </div>
-      </Abs>
-    </>
-  );
-}
-
-// =====================================================================================================================
-// 10. La bannière propose la routine allergie
-// =====================================================================================================================
-function RoutineBanniere({ t }: { t: number }) {
-  const a = CUTS.routineBanniere[0];
-  const lines: BannerLine[] = [
-    { n: 1, drug: "CÉTIRIZINE 10 mg", product: "Routine allergie · nez, yeux, gorge", at: a + 0.3, chips: [{ kind: "plain", text: "Routine · 3 étapes" }] },
-    { n: 2, drug: "CÉTIRIZINE 10 mg", product: "Lavage du nez à l'eau de mer", at: a + 0.55, chips: [{ kind: "stock", text: "En stock" }] },
-  ];
-  return (
-    <>
-      <Abs x={960} y={170}>
-        <Rise t={t} at={T.routine - 0.1} text="Une *routine allergie* complète." size={80} />
-      </Abs>
-      <BannerHead t={t} lines={lines} x={960} y={560} scale={1.05} highlight={{ n: 1, at: a + 1.4 }} />
-    </>
-  );
-}
-
-// =====================================================================================================================
-// 11. Le nez, les yeux, la gorge, selon ses symptômes ; les conseils d'utilisation ; un traitement de fond si possible
-// =====================================================================================================================
-function Visage({ t, lit }: { t: number; lit: { nez: number; yeux: number; gorge: number } }) {
-  const glow = (k: number) => `drop-shadow(0 0 ${18 * k}px ${rgba(PB.citron, 0.9 * k)})`;
-  return (
-    <svg width={520} height={640} viewBox="0 0 520 640">
-      {/* La tête et les épaules, en aplat menthe */}
-      <path d="M60 640 C 70 520, 150 470, 260 470 C 370 470, 450 520, 460 640 Z" fill="#1F5FA8" />
-      <path d="M215 470 L260 560 L305 470 Z" fill="#F4EFE6" /><rect x={215} y={400} width={90} height={100} rx={30} fill="#E8B48E" />
-      <ellipse cx={95} cy={265} rx={24} ry={38} fill="#E2A985" /><ellipse cx={425} cy={265} rx={24} ry={38} fill="#E2A985" /><ellipse cx={260} cy={250} rx={165} ry={200} fill="#F1C3A0" />
-      <path d="M88 250 C 70 -30, 450 -30, 432 250 C 415 125, 105 125, 88 250 Z" fill="#3B2A20" /><path d="M150 205 C 175 190, 215 190, 235 200 M285 200 C 305 190, 345 190, 370 205" stroke="#3B2A20" strokeWidth={9} fill="none" strokeLinecap="round" />
-      {/* Les yeux */}
-      <g style={{ filter: glow(lit.yeux) }}>
-        <ellipse cx={195} cy={250} rx={30} ry={18} fill="#FFFFFF" stroke={lit.yeux > 0.05 ? PB.citron : "#9FB3AC"} strokeWidth={4} />
-        <ellipse cx={325} cy={250} rx={30} ry={18} fill="#FFFFFF" stroke={lit.yeux > 0.05 ? PB.citron : "#9FB3AC"} strokeWidth={4} />
-        <circle cx={195} cy={250} r={10} fill={MINT.ink} />
-        <circle cx={325} cy={250} r={10} fill={MINT.ink} />
-      </g>
-      {/* Le nez */}
-      <path d="M260 270 C 250 320, 240 335, 262 342 C 280 345, 285 335, 278 330" fill="none" stroke={lit.nez > 0.05 ? "#E0572E" : "#C98B66"} strokeWidth={6} strokeLinecap="round" style={{ filter: glow(lit.nez) }} />
-      <path d="M215 380 C 240 398, 280 398, 305 380" fill="none" stroke="#B5654A" strokeWidth={6} strokeLinecap="round" />
-      {/* La gorge */}
-      <ellipse cx={260} cy={455} rx={34} ry={22} fill={lit.gorge > 0.05 ? rgba(PB.citron, 0.7) : "rgba(159,179,172,.35)"} style={{ filter: glow(lit.gorge) }} />
-      {/* Les narines qui piquent : quelques pollens qui flottent */}
-      {[0, 1, 2, 3, 4, 5].map((i) => (
-        <circle key={i} cx={80 + i * 75 + wobble(t, 3 + i, 14, 0.4)} cy={60 + (i % 3) * 40 + wobble(t, 9 + i, 10, 0.5)} r={5 + (i % 2) * 3} fill="#F2C94C" opacity={0.7} />
-      ))}
-    </svg>
-  );
-}
-
-function Routine({ t }: { t: number }) {
-  const lit = { nez: prog(t, T.nez - 0.1, 0.3), yeux: prog(t, T.yeux - 0.1, 0.3), gorge: prog(t, T.gorge - 0.1, 0.3) };
-  const steps = [
-    { at: T.nez, Icon: Wind, zone: "Nez", product: "Lavage du nez à l'eau de mer", y: 250, from: [600, 455] as const },
-    { at: T.yeux, Icon: Eye, zone: "Yeux", product: "Collyre anti-allergique", y: 430, from: [640, 400] as const },
-    { at: T.gorge, Icon: Sparkles, zone: "Gorge", product: "Pastilles adoucissantes", y: 610, from: [600, 600] as const },
-  ];
-  return (
-    <>
-      <Abs x={470} y={560} style={{ transform: `translate(-50%, -50%) scale(${0.92 + 0.08 * prog(t, CUTS.routine[0], 0.6, SNAP)})` }}>
-        <Visage t={t} lit={lit} />
-      </Abs>
-      <Abs x={470} y={150}>
-        <span style={{ opacity: prog(t, T.selon - 0.1, 0.4) }}>
-          <Chip t={t} kind="plain" text="Selon ses symptômes" at={T.selon - 0.1} size={30} />
-        </span>
-      </Abs>
-      {steps.map((s, i) => {
-        const k = pop(t, s.at - 0.1);
-        return (
-          <Abs key={s.zone} x={1230} y={s.y}>
-            <div style={{ transform: `scale(${k})`, transformOrigin: "0 50%", width: 720 }}>
-              <Card style={{ padding: "20px 26px", display: "flex", alignItems: "center", gap: 20 }}>
-                <span style={{ width: 70, height: 70, borderRadius: 20, background: MINT.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  <s.Icon size={36} color={MINT.green} />
-                </span>
-                <Monogram name={s.product} size={70} radius={18} />
-                <div style={{ fontFamily: JAKARTA }}>
-                  <div style={{ fontWeight: 800, fontSize: 18, letterSpacing: "0.16em", textTransform: "uppercase", color: MINT.green }}>
-                    Étape {i + 1} · {s.zone}
-                  </div>
-                  <div style={{ fontWeight: 800, fontSize: 32, color: MINT.ink, letterSpacing: "-0.02em" }}>{s.product}</div>
-                </div>
+      <Title t={t} at={VAT.Y9b - 0.3} out={prouve - 0.35} text="Le conseil *parfait.*" y={160} size={84} />
+      <Title t={t} at={prouve - 0.1} text="C'est *prouvé.*" y={150} size={84} />
+      {left > 0 && (
+        <div style={{ position: "absolute", inset: 0, opacity: left }}>
+          <Abs x={600} y={590}>
+            <div style={{ transform: `scale(${pop(t, Math.min(seconde - 1.0, VAT.Y9b + 0.25))})` }}>
+              <Card style={{ width: 380, height: 380, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10 }}>
+                <Timer size={130} color={MINT.green} strokeWidth={1.8} style={{ transform: `rotate(${wobble(t, 4, 6, 3)}deg)` }} />
+                <span style={{ fontFamily: JAKARTA, fontWeight: 800, fontSize: 88, color: MINT.ink, letterSpacing: "-0.04em" }}>1 s</span>
               </Card>
             </div>
           </Abs>
-        );
-      })}
-      <Abs x={1230} y={780}>
-        <div style={{ transform: `scale(${pop(t, T.utilisation - 0.2)})`, transformOrigin: "0 50%", width: 720 }}>
-          <div style={{ padding: "16px 24px", borderRadius: 20, background: MINT.ink, color: "#FFFFFF", fontFamily: JAKARTA, fontWeight: 700, fontSize: 26, display: "flex", gap: 14, alignItems: "center" }}>
-            <CalendarCheck size={30} color={PB.citron} /> Les conseils d&apos;utilisation, prêts à dire
-          </div>
-        </div>
-      </Abs>
-      <Abs x={1230} y={900}>
-        <div style={{ transform: `scale(${pop(t, T.fond - 0.4)})`, transformOrigin: "0 50%", width: 720 }}>
-          <div style={{ padding: "14px 24px", borderRadius: 20, border: `3px dashed ${MINT.green}`, background: "rgba(255,255,255,.75)", color: MINT.deep, fontFamily: JAKARTA, fontWeight: 800, fontSize: 26 }}>+ Un traitement de fond, si la situation s&apos;y prête</div>
-        </div>
-      </Abs>
-    </>
-  );
-}
-
-// =====================================================================================================================
-// 12. Même logique pour la peau, les antibiotiques, et bien d'autres thèmes
-// =====================================================================================================================
-function Themes({ t }: { t: number }) {
-  const list: { text: string; at: number; on?: boolean }[] = [
-    { text: "Allergie", at: CUTS.themes[0] + 0.2, on: true },
-    { text: "Peau", at: T.peau },
-    { text: "Antibiotiques", at: T.antibio },
-    { text: "Digestion", at: T.autres - 0.2 },
-    { text: "Toux · gorge", at: T.autres - 0.05 },
-    { text: "Douleur", at: T.autres + 0.1 },
-    { text: "Sommeil", at: T.autres + 0.25 },
-    { text: "Voyage", at: T.autres + 0.4 },
-    { text: "Solaire", at: T.autres + 0.55 },
-  ];
-  return (
-    <>
-      <Abs x={960} y={200}>
-        <Rise t={t} at={T.logique - 0.2} text="Même logique, *pour chaque thème.*" size={80} />
-      </Abs>
-      <Abs x={960} y={590}>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 24, justifyContent: "center", width: 1500 }}>
-          {list.map((it) => (
-            <span key={it.text} style={{ transform: `scale(${pop(t, it.at)})`, padding: "22px 40px", borderRadius: 999, background: it.on ? MINT.green : "#FFFFFF", color: it.on ? "#FFFFFF" : MINT.ink, boxShadow: "0 24px 50px -30px rgba(15,43,38,.5)", fontFamily: JAKARTA, fontWeight: 800, fontSize: 44, letterSpacing: "-0.02em" }}>
-              {it.on ? "✓ " : ""}
-              {it.text}
-            </span>
-          ))}
-        </div>
-      </Abs>
-    </>
-  );
-}
-
-// =====================================================================================================================
-// 13. Même patient. Même ordonnance. Un conseil plus complet. (scène « même ordonnance »)
-// =====================================================================================================================
-const R_MEME: Remap = { id: "S5", win: CUTS.meme, keys: [[CUTS.meme[0], 21.45], [CUTS.meme[1] + 0.5, 23.0]] };
-function Meme({ t }: { t: number }) {
-  const k = pop(t, T.plusComplet - 0.5);
-  return (
-    <>
-      <Reprise t={t} r={R_MEME} />
-      <Abs x={960} y={860}>
-        <div style={{ transform: `scale(${k})`, padding: "20px 40px", borderRadius: 999, background: MINT.ink, color: "#FFFFFF", fontFamily: JAKARTA, fontWeight: 800, fontSize: 52, letterSpacing: "-0.03em", boxShadow: "0 30px 60px -30px rgba(0,0,0,.6)" }}>
-          Un conseil <span style={{ color: PB.citron }}>plus complet.</span>
-        </div>
-      </Abs>
-    </>
-  );
-}
-
-// =====================================================================================================================
-// 14. Vos gammes, votre stock — vos priorités remontent : date courte, laboratoire partenaire, challenge
-// =====================================================================================================================
-const GAMME_COLORS = ["#2C9AB7", "#0E8A7B", "#8448D0", "#E0884A", "#D0485F", "#3550C8"];
-function Gammes({ t }: { t: number }) {
-  const a = CUTS.gammes[0];
-  const hl = prog(t, T.gammes - 0.1, 0.4);
-  // Le classement : trois produits ; à « dates », le B passe premier ; à « laboratoires », le C gagne sa pastille ; etc.
-  const rows = [
-    { name: "Crème hydratante", chip: { kind: "date" as const, text: "Date courte", at: T.dates } },
-    { name: "Gel lavant doux", chip: { kind: "plain" as const, text: "♥ Labo partenaire", at: T.labos } },
-    { name: "Baume réparateur", chip: { kind: "challenge" as const, text: "Challenge en cours", at: T.challenges } },
-  ];
-  return (
-    <>
-      <Abs x={960} y={130}>
-        <Rise t={t} at={a + 0.15} text="Vos gammes. Votre stock. *Un conseil adapté.*" size={68} />
-      </Abs>
-      {/* Le rayon de l'officine */}
-      <Abs x={540} y={580}>
-        <Card style={{ padding: 30, width: 780 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, fontFamily: JAKARTA, fontWeight: 800, fontSize: 24, color: MINT.ink, letterSpacing: "0.12em", textTransform: "uppercase" }}>
-            <Store size={28} color={MINT.green} /> Votre officine
-          </div>
-          <div style={{ marginTop: 20, display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 14 }}>
-            {Array.from({ length: 18 }).map((_, i) => {
-              const col = i % 6;
-              const picked = col === 1 || col === 3;
-              const k = prog(t, a + 0.3 + i * 0.025, 0.35, SNAP);
-              return (
-                <div key={i} style={{ height: 92, borderRadius: 12, background: GAMME_COLORS[col], opacity: (0.35 + 0.65 * k) * (picked ? 1 : 1 - 0.55 * hl), transform: `scale(${0.7 + 0.3 * k}) translateY(${picked ? -8 * hl : 0}px)`, boxShadow: picked ? `0 0 0 ${4 * hl}px ${PB.citron}` : undefined }} />
-              );
-            })}
-          </div>
-          <div style={{ marginTop: 18, opacity: hl, fontFamily: JAKARTA, fontWeight: 700, fontSize: 24, color: MINT.deep }}>✓ Vos gammes référencées, d&apos;abord</div>
-        </Card>
-      </Abs>
-      {/* Vos priorités */}
-      <Abs x={1420} y={590}>
-        <div style={{ width: 640 }}>
-          <div style={{ opacity: prog(t, T.priorites - 0.3, 0.4), fontFamily: JAKARTA, fontWeight: 800, fontSize: 24, letterSpacing: "0.16em", textTransform: "uppercase", color: MINT.green, marginBottom: 18 }}>Vos priorités</div>
-          {rows.map((r, i) => (
-            <div key={r.name} style={{ transform: `scale(${pop(t, T.priorites + i * 0.12)})`, transformOrigin: "0 50%", marginBottom: 18 }}>
-              <Card style={{ padding: "18px 22px", display: "flex", alignItems: "center", gap: 18 }}>
-                <span style={{ width: 44, height: 44, borderRadius: 99, background: MINT.ink, color: "#FFFFFF", fontFamily: JAKARTA, fontWeight: 800, fontSize: 22, display: "flex", alignItems: "center", justifyContent: "center" }}>{i + 1}</span>
-                <Monogram name={r.name} size={62} radius={16} />
-                <div>
-                  <div style={{ fontFamily: JAKARTA, fontWeight: 800, fontSize: 28, color: MINT.ink }}>{r.name}</div>
-                  <div style={{ marginTop: 6, height: 38 }}>{t >= r.chip.at - 0.05 && <Chip t={t} kind={r.chip.kind} text={r.chip.text} at={r.chip.at - 0.05} size={22} />}</div>
-                </div>
-              </Card>
-            </div>
-          ))}
-        </div>
-      </Abs>
-    </>
-  );
-}
-
-// =====================================================================================================================
-// 15. Le surstock : payé, il dort en rayon ; une campagne, et PharmaBoost le remet en avant au comptoir
-// =====================================================================================================================
-function Surstock({ t }: { t: number }) {
-  const a = CUTS.surstock[0];
-  const on = prog(t, T.lancez + 0.35, 0.25, SNAP);
-  const leaving = (i: number) => prog(t, T.remet + 0.1 + i * 0.12, 0.6, SNAP);
-  const stamp = ressort(t, T.paye - 0.1, { damping: 9, stiffness: 260, mass: 0.6 });
-  return (
-    <>
-      <Abs x={960} y={130}>
-        <Rise t={t} at={a + 0.15} text="Valorisez votre stock grâce à un *conseil pertinent.*" size={64} />
-      </Abs>
-      {/* La pile qui dort */}
-      <Abs x={520} y={620}>
-        <div style={{ position: "relative", width: 640, height: 560 }}>
-          {Array.from({ length: 15 }).map((_, i) => {
-            const col = i % 5;
-            const row = Math.floor(i / 5);
-            const out = i >= 10 ? leaving(i - 10) : 0;
-            return (
-              <div key={i} style={{ position: "absolute", left: 40 + col * 116, top: 330 - row * 92 - out * 260, width: 104, height: 84, borderRadius: 10, background: "linear-gradient(160deg,#F2A65A,#E0884A)", boxShadow: "inset 0 -6px 0 rgba(0,0,0,.08)", opacity: 1 - out, transform: `rotate(${out * (col - 2) * 12}deg)` }}>
-                <div style={{ margin: "14px 12px 0", height: 10, borderRadius: 4, background: "rgba(255,255,255,.75)" }} />
-                <div style={{ margin: "8px 12px 0", width: 40, height: 8, borderRadius: 4, background: "rgba(255,255,255,.5)" }} />
-              </div>
-            );
-          })}
-          <div style={{ position: "absolute", left: 20, right: 20, top: 430, height: 16, borderRadius: 8, background: MINT.ink }} />
-          {/* La poussière, et les « z » qui dorment */}
-          {t < T.remet + 0.4 &&
-            [0, 1, 2].map((i) => {
-              const u = ((t - a) * 0.5 + i / 3) % 1;
-              return (
-                <div key={i} style={{ position: "absolute", left: 560 + i * 18, top: 120 - u * 120, opacity: Math.sin(u * Math.PI) * prog(t, T.dort - 0.1, 0.4), fontFamily: JAKARTA, fontWeight: 800, fontSize: 40 + i * 10, color: MINT.soft }}>z</div>
-              );
-            })}
-          <div style={{ position: "absolute", left: 40, top: 480, transform: `scale(${pop(t, T.surstock - 0.1)})`, transformOrigin: "0 50%" }}>
-            <Chip t={t} kind="plain" text="Surstock · 48 boîtes" size={28} />
-          </div>
-          <div style={{ position: "absolute", left: 300, top: 160, transform: `rotate(-10deg) scale(${stamp})`, opacity: t < T.paye - 0.1 ? 0 : Math.min(1, stamp), padding: "12px 24px", border: `5px solid #C23A2B`, borderRadius: 14, fontFamily: JAKARTA, fontWeight: 800, fontSize: 40, color: "#C23A2B", background: "rgba(255,255,255,.88)" }}>Déjà payé</div>
-        </div>
-      </Abs>
-      {/* La campagne */}
-      <Abs x={1400} y={430}>
-        <div style={{ transform: `scale(${pop(t, T.lancez - 0.15)})` }}>
-          <Card style={{ padding: "26px 30px", width: 640 }}>
-            <div style={{ fontFamily: JAKARTA, fontWeight: 800, fontSize: 22, letterSpacing: "0.16em", textTransform: "uppercase", color: MINT.green }}>Campagne surstock</div>
-            <div style={{ marginTop: 12, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div style={{ fontFamily: JAKARTA, fontWeight: 800, fontSize: 34, color: MINT.ink }}>{on > 0.5 ? "Activée" : "Désactivée"}</div>
-              <div style={{ width: 110, height: 60, borderRadius: 99, background: on > 0.5 ? MINT.green : "#D5DFDB", position: "relative" }}>
-                <div style={{ position: "absolute", top: 6, left: 6 + on * 50, width: 48, height: 48, borderRadius: 99, background: "#FFFFFF", boxShadow: "0 4px 10px rgba(0,0,0,.2)" }} />
-              </div>
-            </div>
-          </Card>
-        </div>
-      </Abs>
-      <Abs x={1400} y={680}>
-        <div style={{ transform: `scale(${pop(t, T.remet - 0.2)})` }}>
-          <Card style={{ padding: "18px 24px", width: 640, display: "flex", alignItems: "center", gap: 18, boxShadow: `0 0 0 3px ${PB.citron}, 0 40px 80px -40px rgba(15,43,38,.45)` }}>
-            <Cross size={36} />
-            <div style={{ fontFamily: JAKARTA }}>
-              <div style={{ fontWeight: 800, fontSize: 18, letterSpacing: "0.16em", textTransform: "uppercase", color: MINT.green }}>Au comptoir · en premier</div>
-              <div style={{ fontWeight: 800, fontSize: 32, color: MINT.ink }}>Votre produit en surstock</div>
-            </div>
-          </Card>
-        </div>
-      </Abs>
-      <Sparks t={t} at={T.remet + 0.1} x={520} y={500} count={22} color={PB.citron} />
-    </>
-  );
-}
-
-// =====================================================================================================================
-// 16. Pour le titulaire : des gammes mieux exploitées, une officine qui avance
-// =====================================================================================================================
-function Titulaire({ t }: { t: number }) {
-  const a = CUTS.titulaire[0];
-  const grow = prog(t, T.exploitees - 0.6, 1.8, SNAP);
-  return (
-    <>
-      <Abs x={960} y={130}>
-        <Tag t={t} at={a + 0.15}>Pour le titulaire</Tag>
-      </Abs>
-      <Abs x={960} y={240}>
-        <Rise t={t} at={T.exploitees - 0.6} text="Des gammes *mieux exploitées.*" size={72} />
-      </Abs>
-      <Abs x={960} y={640}>
-        <Card style={{ width: 1100, height: 520, padding: 40, position: "relative", overflow: "hidden" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, fontFamily: JAKARTA, fontWeight: 800, fontSize: 28, color: MINT.ink }}>
-            <TrendingUp size={34} color={MINT.green} /> L&apos;activité de votre officine
-          </div>
-          <div style={{ position: "absolute", left: 60, right: 60, bottom: 50, height: 330, display: "flex", alignItems: "flex-end", gap: 26 }}>
-            {[0.3, 0.38, 0.42, 0.5, 0.58, 0.66, 0.78, 0.92].map((h, i) => {
-              const k = prog(t, a + 0.4 + i * 0.1, 0.6, SNAP) * (0.55 + 0.45 * grow);
-              return <div key={i} style={{ flex: 1, height: `${h * 100 * k}%`, borderRadius: "12px 12px 4px 4px", background: i >= 6 ? `linear-gradient(180deg, ${PB.citron}, ${MINT.green})` : rgba(MINT.green, 0.25 + i * 0.06) }} />;
-            })}
-          </div>
-          <div style={{ position: "absolute", right: 60, top: 90, transform: `scale(${pop(t, T.avance - 0.2)})`, transformOrigin: "100% 0", padding: "12px 24px", borderRadius: 999, background: MINT.ink, color: "#FFFFFF", fontFamily: JAKARTA, fontWeight: 800, fontSize: 30 }}>
-            Une officine <span style={{ color: PB.citron }}>qui avance</span>
-          </div>
-        </Card>
-      </Abs>
-    </>
-  );
-}
-
-// =====================================================================================================================
-// 17. Pour le patient : le récapitulatif, imprimé, par e-mail ou en QR code
-// =====================================================================================================================
-function Patient({ t }: { t: number }) {
-  const a = CUTS.patient[0];
-  const ticket = prog(t, T.imprime - 0.1, 1.1, IN_OUT);
-  const formats = [
-    { at: T.imprime, Icon: Printer, text: "Imprimé" },
-    { at: T.email, Icon: Mail, text: "Par e-mail" },
-    { at: T.qr, Icon: QrCode, text: "En QR code" },
-  ];
-  return (
-    <>
-      <Abs x={1300} y={150}>
-        <Rise t={t} at={a + 0.25} text="Des explications *pour le patient.*" size={66} />
-      </Abs>
-      <Phone t={t} x={520} y={560} scale={1.08}>
-        <MailBilan t={t} at={a + 0.35} product="Routine allergie" />
-      </Phone>
-      <Abs x={1300} y={560}>
-        <div style={{ display: "flex", gap: 30, alignItems: "flex-end" }}>
-          {formats.map((f, i) => (
-            <div key={f.text} style={{ transform: `scale(${pop(t, f.at - 0.1)})`, transformOrigin: "50% 100%" }}>
-              <Card style={{ width: 280, height: 330, padding: 26, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 18, position: "relative", overflow: "hidden" }}>
-                {i === 0 && (
-                  <div style={{ position: "absolute", top: 24, width: 170, height: 200 * ticket, background: "#FBFAF6", borderRadius: 6, boxShadow: "inset 0 0 0 2px #E6E1D4", overflow: "hidden", padding: "14px 16px" }}>
-                    {[80, 100, 60, 90, 70].map((wd, j) => (
-                      <div key={j} style={{ height: 8, width: `${wd}%`, borderRadius: 4, background: j === 0 ? MINT.green : "#D8DED9", marginBottom: 12 }} />
-                    ))}
+          <Abs x={1250} y={590}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              {ROUTINE.map((p, i) => {
+                const k = pop(t, VAT.Y9b - 0.1 + i * 0.2);
+                return (
+                  <div key={p.k} style={{ transform: `translateX(${(1 - Math.min(1, k)) * 60}px)`, opacity: Math.min(1, k * 2) }}>
+                    <Card style={{ display: "flex", alignItems: "center", gap: 22, padding: "18px 30px 18px 18px", width: 620 }}>
+                      <GenericPic kind={p.k} size={84} radius={20} />
+                      <span style={{ fontFamily: JAKARTA, fontWeight: 800, fontSize: 36, color: MINT.ink }}>{p.text}</span>
+                    </Card>
                   </div>
-                )}
-                {i === 1 && <Mail size={110} color={MINT.green} strokeWidth={1.6} style={{ position: "absolute", top: 50 }} />}
-                {i === 2 && (
-                  <div style={{ position: "absolute", top: 40, padding: 10, borderRadius: 14, background: "#FFFFFF", boxShadow: "inset 0 0 0 3px #E3ECE8" }}>
-                    <QrArt size={150} />
-                  </div>
-                )}
-                <div style={{ display: "flex", alignItems: "center", gap: 10, fontFamily: JAKARTA, fontWeight: 800, fontSize: 30, color: MINT.ink }}>
-                  <f.Icon size={30} color={MINT.green} /> {f.text}
-                </div>
-              </Card>
+                );
+              })}
             </div>
-          ))}
-        </div>
-      </Abs>
-      <Abs x={1300} y={860}>
-        <div style={{ opacity: prog(t, T.recap, 0.4), fontFamily: JAKARTA, fontWeight: 700, fontSize: 30, color: MINT.deep }}>Un récapitulatif personnalisé des conseils retenus</div>
-      </Abs>
-    </>
-  );
-}
-
-// =====================================================================================================================
-// 18. Et bientôt, l'application PharmaBoost (scène « l'application »)
-// =====================================================================================================================
-const R_APPLI: Remap = { id: "S11", win: CUTS.appli, keys: [[CUTS.appli[0], 53.45], [CUTS.appli[1] + 0.5, 59.4]] };
-const Appli = ({ t }: { t: number }) => <Reprise t={t} r={R_APPLI} />;
-
-// =====================================================================================================================
-// 19. La signature : PharmaBoost. Votre expertise, soutenue à chaque délivrance. Réservez une démonstration.
-//     Puis les trois mots du fondateur, et le logo sur le dernier accord.
-// =====================================================================================================================
-function Fin({ t }: { t: number }) {
-  const outro = VOICE_END + 0.5;
-  const sloganOut = prog(t, outro - 0.2, 0.35, IN_OUT);
-  const finalIn = t >= FINAL_HIT - 0.05;
-  const btn = ressort(t, finalIn ? FINAL_HIT + 0.35 : T.reservez, { damping: 10, stiffness: 240, mass: 0.6 });
-  const words = ["Vous scannez.", "Vous conseillez.", "Vous décidez."];
-  const step = (FINAL_HIT - outro) / 3;
-  return (
-    <AbsoluteFill style={{ background: MINT.night }}>
-      <AdnBackdrop t={t} tone="night" width={1920} focus={[0.5, 0.45]} />
-      <Flash t={t} at={T.pbFinal - 0.05} dur={0.3} max={0.55} />
-      <Flash t={t} at={FINAL_HIT} dur={0.35} max={0.6} />
-      {!finalIn && (
-        <div style={{ position: "absolute", inset: 0, opacity: 1 - sloganOut, filter: `blur(${sloganOut * 10}px)` }}>
-          <Abs x={960} y={300}>
-            <PBLogo t={t} at={T.pbFinal} size={120} tone="dark" />
-          </Abs>
-          <Ring t={t} at={T.pbFinal + 0.1} x={960} y={300} max={1000} color={PB.citron} />
-          <Abs x={960} y={520}>
-            <Rise t={t} at={T.expertise - 0.15} text="Votre expertise, *soutenue à chaque délivrance.*" size={76} color="#FFFFFF" accent={PB.citron} style={{ width: 1500 }} />
-          </Abs>
-          <Abs x={960} y={760}>
-            <div style={{ transform: `scale(${t < T.reservez ? 0 : btn})`, display: "flex", alignItems: "center", gap: 16, padding: "26px 50px", borderRadius: 999, background: PB.citron, color: MINT.ink, fontFamily: JAKARTA, fontWeight: 800, fontSize: 42, boxShadow: `0 0 60px ${rgba(PB.citron, 0.45)}` }}>
-              <CalendarCheck size={44} /> Réserver une démonstration
-            </div>
-          </Abs>
-          <Abs x={960} y={880}>
-            <div style={{ opacity: prog(t, T.reservez + 0.8, 0.5), fontFamily: JAKARTA, fontWeight: 700, fontSize: 32, color: rgba("#FFFFFF", 0.75) }}>pharmaboost.app/decouvrir</div>
           </Abs>
         </div>
       )}
-      {/* Les trois mots, un à un */}
-      {!finalIn &&
-        words.map((wd, i) => {
-          const at = outro + i * step;
-          if (t < at - 0.02 || t > at + step) return null;
-          const k = prog(t, at, 0.28, SNAP);
-          const out = prog(t, at + step - 0.18, 0.18, IN_OUT);
-          return (
-            <Abs key={wd} x={960} y={540}>
-              <div style={{ opacity: k * (1 - out), transform: `scale(${1.25 - 0.25 * k + 0.05 * (t - at)})`, filter: `blur(${(1 - k) * 12 + out * 10}px)`, fontFamily: JAKARTA, fontWeight: 800, fontSize: 170, letterSpacing: "-0.05em", color: i === 2 ? PB.citron : "#FFFFFF", whiteSpace: "nowrap" }}>{wd}</div>
-            </Abs>
-          );
-        })}
-      {finalIn && (
-        <>
-          <Abs x={960} y={360}>
-            <PBLogo t={t} at={FINAL_HIT} size={140} tone="dark" />
-          </Abs>
-          <Ring t={t} at={FINAL_HIT + 0.05} x={960} y={360} max={1100} color={PB.citron} />
-          <Confetti t={t} at={FINAL_HIT + 0.1} x={960} y={420} count={70} power={1500} />
+      {t > prouve - 0.3 && (
+        <div style={{ position: "absolute", inset: 0, opacity: 1 - left }}>
           <Abs x={960} y={600}>
-            <div style={{ opacity: prog(t, FINAL_HIT + 0.3, 0.5), fontFamily: JAKARTA, fontWeight: 800, fontSize: 52, letterSpacing: "-0.03em", color: "#FFFFFF" }}>
-              Votre expertise, <span style={{ color: PB.citron }}>soutenue à chaque délivrance.</span>
-            </div>
+            <Card style={{ width: 1180, height: 560, padding: "40px 54px", position: "relative" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+                <span style={{ display: "inline-flex", width: 64, height: 64, borderRadius: 18, background: MINT.bg, alignItems: "center", justifyContent: "center" }}>
+                  <Store size={36} color={MINT.green} />
+                </span>
+                <div>
+                  <div style={{ fontFamily: JAKARTA, fontWeight: 800, fontSize: 40, color: MINT.ink, letterSpacing: "-0.02em", opacity: prog(t, go, 0.4) }}>Nos pharmacies tests</div>
+                  <div style={{ fontFamily: JAKARTA, fontWeight: 700, fontSize: 26, color: MINT.soft, opacity: prog(t, ca - 0.1, 0.4) }}>Chiffre d&apos;affaires</div>
+                </div>
+                <div style={{ marginLeft: "auto", transform: `scale(${pop(t, ca + 0.9)})` }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 12, padding: "14px 26px", borderRadius: 999, background: MINT.green, color: "#FFFFFF", fontFamily: JAKARTA, fontWeight: 800, fontSize: 32 }}>
+                    <TrendingUp size={34} /> En hausse
+                  </span>
+                </div>
+              </div>
+              <div style={{ position: "absolute", left: 54, right: 54, bottom: 50, height: 330, display: "flex", alignItems: "flex-end", gap: 34 }}>
+                {bars.map((h, i) => {
+                  const k = prog(t, go + i * 0.14, 0.6, SNAP);
+                  return <div key={i} style={{ flex: 1, height: `${h * 100 * k}%`, borderRadius: "14px 14px 4px 4px", background: i >= 3 ? `linear-gradient(180deg, ${MINT.green}, ${MINT.deep})` : "#D6E2DD" }} />;
+                })}
+              </div>
+              <svg style={{ position: "absolute", left: 54, bottom: 50, overflow: "visible" }} width={1072} height={330} viewBox="0 0 1072 330">
+                <path d="M40 210 C 220 170, 380 190, 520 140 S 820 40, 1030 10" fill="none" stroke={PB.gold} strokeWidth={8} strokeLinecap="round" pathLength={1} strokeDasharray={1} strokeDashoffset={1 - grow} />
+              </svg>
+              <div style={{ position: "absolute", left: 54 + 3 * (1072 / 7), top: 150, fontFamily: JAKARTA, fontWeight: 800, fontSize: 22, color: MINT.green, letterSpacing: "0.12em", opacity: prog(t, ca + 0.5, 0.4) }}>AVEC PHARMABOOST →</div>
+            </Card>
           </Abs>
-          <Abs x={960} y={780}>
-            <div style={{ transform: `scale(${btn})`, display: "flex", alignItems: "center", gap: 16, padding: "24px 46px", borderRadius: 999, background: PB.citron, color: MINT.ink, fontFamily: JAKARTA, fontWeight: 800, fontSize: 40 }}>
-              <CalendarCheck size={42} /> Réserver une démonstration
+        </div>
+      )}
+    </>
+  );
+}
+
+// =====================================================================================================================
+// 4. Le patient revient
+// =====================================================================================================================
+/** L'écran de l'appli PharmaBoost du patient : ses conseils, sa routine, sa cure. */
+function AppBilan({ t, at, lit }: { t: number; at: number; lit: { conseils: number; routine: number; cure: number } }) {
+  const tx = (size: number, weight = 700, color = "#101828"): CSSProperties => ({ fontFamily: JAKARTA, fontWeight: weight, fontSize: size, color, letterSpacing: size > 20 ? "-0.02em" : 0 });
+  const box = (k: number): CSSProperties => ({ marginTop: 10, borderRadius: 18, background: "#FFFFFF", padding: 12, boxShadow: k > 0.01 ? `0 0 0 ${3 * k}px ${rgba(MINT.green, 0.6)}, 0 10px 24px -14px rgba(0,0,0,.3)` : "0 0 0 1px #E4ECE9", transform: `scale(${1 + 0.03 * k})` });
+  const st = (i: number): CSSProperties => ({ opacity: prog(t, at + 0.1 * i, 0.35), transform: `translateY(${(1 - prog(t, at + 0.1 * i, 0.35, SNAP)) * 16}px)` });
+  const cureK = prog(t, at + 0.6, 1.4, IN_OUT);
+  return (
+    <div style={{ position: "absolute", inset: 0, background: "#EEF3F1", padding: "56px 14px 0" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, ...st(0) }}>
+        <span style={{ display: "inline-flex", width: 34, height: 34, borderRadius: 10, background: PB.green, alignItems: "center", justifyContent: "center" }}>
+          <Cross size={18} color={PB.citron} />
+        </span>
+        <span style={tx(16, 800)}>PharmaBoost</span>
+        <span style={{ marginLeft: "auto", ...tx(12, 600, "#64748B") }}>Pharmacie du Centre</span>
+      </div>
+      <div style={{ marginTop: 14, ...tx(24, 800, "#0B3B47"), ...st(1) }}>Mon bilan</div>
+      <div style={{ ...st(2) }}>
+        <div style={box(lit.conseils)}>
+          <div style={{ ...tx(11, 800, MINT.deep), letterSpacing: "0.06em", textTransform: "uppercase" }}>Mes conseils</div>
+          {ROUTINE.map((p) => (
+            <div key={p.k} style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 10 }}>
+              <GenericPic kind={p.k} size={34} radius={9} />
+              <span style={tx(14, 700)}>{p.text}</span>
             </div>
+          ))}
+        </div>
+      </div>
+      <div style={{ ...st(3) }}>
+        <div style={box(lit.routine)}>
+          <div style={{ ...tx(11, 800, MINT.deep), letterSpacing: "0.06em", textTransform: "uppercase" }}>Ma routine allergie</div>
+          <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+            {[
+              { I: Eye, l: "Yeux" },
+              { I: Droplets, l: "Nez" },
+              { I: Candy, l: "Gorge" },
+            ].map(({ I, l }) => (
+              <span key={l} style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 5, padding: "8px 0", borderRadius: 10, background: "#EAF5EF", ...tx(13, 700, MINT.deep) }}>
+                <I size={15} /> {l}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div style={{ ...st(4) }}>
+        <div style={{ ...box(lit.cure), display: "flex", alignItems: "center", gap: 12 }}>
+          <svg width={56} height={56} viewBox="0 0 56 56">
+            <circle cx={28} cy={28} r={23} fill="none" stroke="#E3ECE8" strokeWidth={7} />
+            <circle cx={28} cy={28} r={23} fill="none" stroke={MINT.green} strokeWidth={7} strokeLinecap="round" pathLength={1} strokeDasharray={1} strokeDashoffset={1 - 0.77 * cureK} transform="rotate(-90 28 28)" />
+          </svg>
+          <div>
+            <div style={{ ...tx(11, 800, MINT.deep), letterSpacing: "0.06em", textTransform: "uppercase" }}>Ma cure</div>
+            <div style={tx(15, 800)}>Jour {Math.max(1, Math.round(23 * cureK))} sur 30</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const ALLERGY_POINTS = [
+  { Icon: Eye, title: "Les yeux", text: "collyre anti-allergique" },
+  { Icon: Droplets, title: "Le nez", text: "eau de mer, nez allergique" },
+  { Icon: Candy, title: "La gorge", text: "pastilles adoucissantes" },
+];
+/** 0 → 1 → 0 autour d'un mot (la section de l'appli s'allume quand on la nomme). */
+const pulseOn = (t: number, at: number) => prog(t, at - 0.1, 0.25, SNAP) * (1 - prog(t, at + 1.1, 0.4, IN_OUT));
+
+/** « Et ça ne s'arrête pas au comptoir. Par e-mail et dans l'application PharmaBoost, le patient retrouve son bilan… » */
+function Bilan({ t }: { t: number }) {
+  const par = VAT.Y11;
+  const devices = prog(t, par - 0.2, 0.6, SNAP);
+  return (
+    <>
+      <Title t={t} at={VAT.Y10} out={par - 0.3} text="Et ça ne s'arrête pas *au comptoir.*" y={520} size={86} />
+      <Title t={t} at={par} text="Son bilan, *par e-mail et dans l'appli.*" y={110} size={60} />
+      {devices > 0 && (
+        <>
+          <Phone t={t} x={700} y={610} scale={0.98 * (0.9 + 0.1 * devices)} tilt={10} style={{ opacity: devices }}>
+            <MailBilan t={t} at={par} product="Collyre anti-allergique" kind="yeux" why="Avec l'allergie, les yeux piquent ou pleurent souvent : ce collyre agit contre l'allergie des yeux, en complément de votre traitement." points={ALLERGY_POINTS} />
+          </Phone>
+          <Phone t={t} x={1220} y={610} scale={0.98 * (0.9 + 0.1 * devices)} tilt={-10} style={{ opacity: devices }}>
+            <AppBilan t={t} at={w("Y11", "l'application") - 0.2} lit={{ conseils: pulseOn(t, w("Y11", "conseils,")), routine: pulseOn(t, w("Y11", "routine,")), cure: pulseOn(t, w("Y11", "cure.")) }} />
+          </Phone>
+          <Abs x={400} y={330}>
+            <Pill t={t} at={w("Y11", "e-mail")} size={28}>
+              <Mail size={30} color={MINT.green} /> Par e-mail
+            </Pill>
           </Abs>
-          <Abs x={960} y={900}>
-            <div style={{ opacity: prog(t, FINAL_HIT + 0.8, 0.5), fontFamily: JAKARTA, fontWeight: 700, fontSize: 32, color: rgba("#FFFFFF", 0.75) }}>pharmaboost.app/decouvrir</div>
+          <Abs x={1520} y={330}>
+            <Pill t={t} at={w("Y11", "l'application")} size={28}>
+              <Smartphone size={30} color={MINT.green} /> Dans l&apos;appli
+            </Pill>
           </Abs>
         </>
       )}
-    </AbsoluteFill>
+    </>
   );
 }
 
-// ---- Les mots, en bas, calés sur la voix -----------------------------------------------------------------------------
-/** Les phrases du sous-titre : une coupure après « . : ? » (au plus ~11 mots par ligne). */
-const LINES_OF_WORDS: Word[][] = (() => {
-  const out: Word[][] = [];
-  let cur: Word[] = [];
-  for (const wd of WORDS) {
-    cur.push(wd);
-    if (/[.:?…]$/.test(wd.w) || (cur.length >= 6 && /,$/.test(wd.w)) || cur.length >= 11) {
-      out.push(cur);
-      cur = [];
+const LOCK_BG = "linear-gradient(170deg,#CFEDE2,#8FD0BC 60%,#5DB8A2)";
+
+/** « Une notification lui rappelle que sa cure se termine : il revient. » */
+function Rappel({ t }: { t: number }) {
+  const notif = w("Y12", "notification") - 0.1;
+  const revient = w("Y12", "revient");
+  const walk = prog(t, revient - 0.5, 1.4, IN_OUT);
+  return (
+    <>
+      <Title t={t} at={VAT.Y12} text="Fin de cure : *il revient.*" y={120} size={70} />
+      <Phone t={t} x={720} y={600} scale={1.02} buzz={notif} screen={LOCK_BG}>
+        <div style={{ position: "absolute", top: 120, left: 0, right: 0, textAlign: "center", fontFamily: JAKARTA, fontWeight: 300, fontSize: 84, color: "#FFFFFF", letterSpacing: "-0.03em" }}>9:41</div>
+        <div style={{ position: "absolute", top: 215, left: 0, right: 0, textAlign: "center", fontFamily: JAKARTA, fontWeight: 600, fontSize: 18, color: "#FFFFFF" }}>mardi 3 novembre</div>
+        <div style={{ position: "absolute", top: 270, left: 0, right: 0, height: 200 }}>
+          <Notification t={t} at={notif} icon="robot" app="PharmaBoost" title="Votre cure se termine bientôt" body="Plus que 7 jours. Passez nous voir à la Pharmacie du Centre." />
+        </div>
+      </Phone>
+      <Abs x={1330} y={600}>
+        <div style={{ position: "relative", width: 520, height: 520, opacity: prog(t, notif + 0.4, 0.5) }}>
+          <div style={{ position: "absolute", left: 110, top: 70, width: 300, height: 400, borderRadius: "16px 16px 0 0", background: "linear-gradient(180deg,#DCEFE7,#C7E6DA)", border: `8px solid ${MINT.ink}`, borderBottom: "none" }}>
+            <div style={{ position: "absolute", left: 0, right: 0, top: 30, textAlign: "center", fontFamily: JAKARTA, fontWeight: 800, fontSize: 22, letterSpacing: "0.2em", color: MINT.deep }}>PHARMACIE</div>
+          </div>
+          <div style={{ position: "absolute", left: 230, top: 0 }}>
+            <Cross size={60} glow={0.6} />
+          </div>
+          <div style={{ position: "absolute", left: 0, right: 0, top: 470, height: 10, borderRadius: 5, background: MINT.ink }} />
+          <div style={{ position: "absolute", left: 470 - 250 * walk, top: 270 - Math.abs(Math.sin(walk * 18)) * 8, opacity: 1 - prog(t, revient + 0.85, 0.3) }}>
+            <div style={{ width: 56, height: 56, borderRadius: 99, background: "#F0BAC6", margin: "0 auto" }} />
+            <div style={{ width: 84, height: 140, borderRadius: "40px 40px 12px 12px", background: "#E58BA1", marginTop: 6 }} />
+          </div>
+        </div>
+      </Abs>
+      <Abs x={1330} y={920}>
+        <Pill t={t} at={revient} size={30}>
+          <Repeat size={32} color={MINT.green} /> Il revient en pharmacie
+        </Pill>
+      </Abs>
+    </>
+  );
+}
+
+/** « Votre pharmacie lance une campagne avec un laboratoire : ses patients sont prévenus, directement dans l'appli. » */
+function Campagne({ t }: { t: number }) {
+  const lance = w("Y13", "lance");
+  const labo = w("Y13", "laboratoire");
+  const prev = w("Y13", "prévenus,");
+  const click = labo + 0.55;
+  return (
+    <>
+      <Title t={t} at={VAT.Y13} text="Vos campagnes, *dans leur poche.*" y={110} size={64} />
+      <Abs x={560} y={590}>
+        <div style={{ transform: `scale(${pop(t, lance - 0.35)})` }}>
+          <Card style={{ width: 640, padding: 34 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <span style={{ display: "inline-flex", width: 56, height: 56, borderRadius: 16, background: MINT.bg, alignItems: "center", justifyContent: "center" }}>
+                <Megaphone size={30} color={MINT.green} />
+              </span>
+              <span style={{ fontFamily: JAKARTA, fontWeight: 800, fontSize: 34, color: MINT.ink }}>Nouvelle campagne</span>
+            </div>
+            {[
+              { l: "Laboratoire", v: "Laboratoire partenaire", at: labo - 0.1 },
+              { l: "Gamme", v: "Soins solaires", at: labo + 0.05 },
+              { l: "Offre", v: "−20 % en pharmacie", at: labo + 0.2 },
+            ].map((f) => (
+              <div key={f.l} style={{ marginTop: 18, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px", borderRadius: 14, background: "#F4F8F6", opacity: prog(t, f.at, 0.3), fontFamily: JAKARTA }}>
+                <span style={{ fontWeight: 600, fontSize: 24, color: MINT.soft }}>{f.l}</span>
+                <span style={{ fontWeight: 800, fontSize: 26, color: MINT.ink }}>{f.v}</span>
+              </div>
+            ))}
+            <div style={{ marginTop: 24, display: "flex", justifyContent: "flex-end" }}>
+              <span style={{ padding: "16px 34px", borderRadius: 999, background: t > click ? MINT.deep : MINT.green, color: "#FFFFFF", fontFamily: JAKARTA, fontWeight: 800, fontSize: 28, transform: `scale(${t > click && t < click + 0.15 ? 0.94 : 1})` }}>{t > click + 0.1 ? "✓ Campagne lancée" : "Lancer la campagne"}</span>
+            </div>
+          </Card>
+        </div>
+      </Abs>
+      {[0, 1, 2].map((i) => {
+        const at = prev - 0.35 + i * 0.18;
+        const k = prog(t, at - 0.5, 0.5, SNAP);
+        return (
+          <Phone key={i} t={t} x={1180 + i * 250} y={600 + (i === 1 ? -40 : 30)} scale={0.62} rot={(i - 1) * 5} buzz={at} style={{ opacity: k }} screen={LOCK_BG}>
+            <div style={{ position: "absolute", top: 110, left: 0, right: 0, textAlign: "center", fontFamily: JAKARTA, fontWeight: 300, fontSize: 80, color: "#FFFFFF" }}>9:41</div>
+            <div style={{ position: "absolute", top: 240, left: 0, right: 0, height: 200 }}>
+              <Notification t={t} at={at} icon="robot" app="PharmaBoost" title="Pharmacie du Centre" body="−20 % sur les soins solaires de notre laboratoire partenaire." />
+            </div>
+          </Phone>
+        );
+      })}
+      <Abs x={1430} y={950}>
+        <Pill t={t} at={w("Y13", "directement")} size={28}>
+          <Bell size={30} color={MINT.green} /> Vos patients prévenus
+        </Pill>
+      </Abs>
+    </>
+  );
+}
+
+// =====================================================================================================================
+// 5. Même rue, deux pharmacies — c'est un cercle
+// =====================================================================================================================
+const PASSANTS = ["#F0BAC6", "#8EEBD3", "#F6D98A", "#9CC7F0", "#C9B8F0", "#F4B59A"];
+const SHELF = ["#2C9AB7", "#0E8A7B", "#7A5BD0", "#F2A23A", "#1E88C8", "#D0485F", "#109C7C"];
+function Shop({ x, lit, t }: { x: number; lit: number; t: number }) {
+  const on = lit > 0.5;
+  const frame = on ? MINT.ink : "#B9C2BF";
+  return (
+    <div style={{ position: "absolute", left: x - 320, top: 330, width: 640, height: 560 }}>
+      <div style={{ position: "absolute", left: 0, top: 60, width: 640, height: 500, borderRadius: "22px 22px 0 0", background: on ? "#FFFFFF" : "#ECEFEE", boxShadow: "0 40px 70px -40px rgba(15,43,38,.45), 0 0 0 2px rgba(15,43,38,.06)" }} />
+      <div style={{ position: "absolute", left: 30, top: 90, width: 580, height: 70, borderRadius: 14, background: frame, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <span style={{ fontFamily: JAKARTA, fontWeight: 800, fontSize: 32, letterSpacing: "0.22em", color: on ? "#FFFFFF" : "#E9EDEC" }}>PHARMACIE</span>
+      </div>
+      <svg style={{ position: "absolute", left: 20, top: 168 }} width={600} height={62} viewBox="0 0 600 62">
+        {Array.from({ length: 10 }, (_, i) => (
+          <path key={i} d={`M${i * 60} 0 h60 v38 a30 22 0 0 1 -60 0 Z`} fill={i % 2 ? "#FFFFFF" : on ? MINT.green : "#AEB8B5"} stroke={rgba(MINT.ink, 0.08)} />
+        ))}
+      </svg>
+      <div style={{ position: "absolute", left: 40, top: 250, width: 330, height: 250, borderRadius: 12, background: on ? "linear-gradient(160deg,#F4FFD8,#DFF5E8)" : "linear-gradient(160deg,#E2E6E5,#D3D9D7)", boxShadow: `inset 0 0 0 6px ${frame}`, overflow: "hidden" }}>
+        {[0, 1, 2].map((r) => (
+          <div key={r} style={{ position: "absolute", left: 20, right: 20, top: 66 + r * 70, height: 6, borderRadius: 3, background: on ? rgba(MINT.ink, 0.25) : "#C2C9C7" }}>
+            {Array.from({ length: 7 }, (_, i) => (
+              <div key={i} style={{ position: "absolute", left: 6 + i * 40, bottom: 6, width: 28, height: 30 + ((i * 7 + r * 3) % 4) * 6, borderRadius: 4, background: on ? SHELF[(i + r) % 7] : "#BFC7C4" }} />
+            ))}
+          </div>
+        ))}
+      </div>
+      <div style={{ position: "absolute", left: 410, top: 250, width: 180, height: 310, borderRadius: "12px 12px 0 0", background: on ? "linear-gradient(180deg,#DCEFE7,#C7E6DA)" : "#D3D9D7", boxShadow: `inset 0 0 0 6px ${frame}` }}>
+        <div style={{ position: "absolute", right: 22, top: 140, width: 12, height: 50, borderRadius: 6, background: frame }} />
+      </div>
+      <div style={{ position: "absolute", left: 560, top: 0 }}>
+        <Cross size={90} color={on ? "#2BD67B" : "#C3CBC8"} glow={lit * (0.7 + 0.3 * Math.sin(t * 3))} />
+      </div>
+    </div>
+  );
+}
+
+function Rue({ t }: { t: number }) {
+  const a = VAT.Y14;
+  const mais = w("Y15", "mais");
+  const lit = prog(t, mais - 0.1, 0.5, SNAP);
+  const back = w("Y15", "reviennent");
+  const cercle = w("Y15", "nouveau") - 0.2;
+  const veil = prog(t, cercle, 0.5, IN_OUT) * (1 - prog(t, VAT.Y16 - 0.4, 0.45, IN_OUT));
+  const pan = prog(t, VAT.Y16 + 0.1, 1.3, IN_OUT);
+  const bx = (i: number) => (i === 0 ? 560 : 1360);
+  const nodes = [
+    { I: Store, l: "Le conseil au comptoir" },
+    { I: Mail, l: "Le bilan, e-mail et appli" },
+    { I: Bell, l: "La notification" },
+    { I: Repeat, l: "Le retour en pharmacie" },
+  ];
+  const spin = (t - cercle) * 0.55;
+  return (
+    <>
+      <div style={{ position: "absolute", inset: 0, transformOrigin: "1450px 720px", transform: `scale(${1 + 1.3 * pan})` }}>
+        <div style={{ position: "absolute", left: 0, right: 0, top: 890, height: 12, background: MINT.ink, opacity: 0.85 }} />
+        <div style={{ position: "absolute", left: 0, right: 0, top: 902, height: 178, background: "linear-gradient(180deg,#E3ECE8,#F4F8F6)" }} />
+        {[0, 1].map((i) => (
+          <div key={i} style={{ position: "absolute", inset: 0, opacity: prog(t, a + 0.1 + i * 0.15, 0.5), transform: `translateY(${(1 - prog(t, a + 0.1 + i * 0.15, 0.6, SNAP)) * 60}px)` }}>
+            <Shop x={bx(i)} lit={i === 0 ? lit : 0} t={t} />
+          </div>
+        ))}
+        {[0, 1].map((i) => (
+          <div key={`m${i}`} style={{ position: "absolute", left: bx(i) - 120, top: 240, display: "flex", gap: 30, alignItems: "flex-end", opacity: 1 - prog(t, mais, 0.4) }}>
+            <div style={{ transform: `scale(${pop(t, w("Y14", "boîtes,") - 0.1)})`, transformOrigin: "50% 100%" }}>
+              <MedBox kind="cetirizine" w={120} />
+            </div>
+            <div style={{ transform: `scale(${pop(t, w("Y14", "ordonnances") - 0.1)})`, transformOrigin: "50% 100%" }}>
+              <Ordonnance w={80} />
+            </div>
+          </div>
+        ))}
+        {PASSANTS.map((c, i) => {
+          const s = back - 0.6 + i * 0.32;
+          const k = prog(t, s, 1.6, IN_OUT);
+          if (t < s || k >= 1) return null;
+          return (
+            <div key={i} style={{ position: "absolute", left: 1010 - 330 * k, top: 720 - Math.abs(Math.sin(k * 14)) * 8, opacity: Math.min(1, k * 6) * (1 - prog(t, s + 1.35, 0.25)) }}>
+              <div style={{ width: 44, height: 44, borderRadius: 99, background: c, margin: "0 auto" }} />
+              <div style={{ width: 66, height: 112, borderRadius: "33px 33px 10px 10px", background: c, filter: "brightness(.9)", marginTop: 5 }} />
+            </div>
+          );
+        })}
+        <div style={{ position: "absolute", left: 420, top: 250, opacity: 1 - prog(t, cercle - 0.2, 0.3) }}>
+          <Pill t={t} at={back} size={30}>
+            <Repeat size={32} color={MINT.green} /> Ils reviennent
+          </Pill>
+        </div>
+      </div>
+      <Flash t={t} at={mais} dur={0.4} max={0.35} color="#F4FFB8" />
+      <Title t={t} at={a} out={mais - 0.3} text="Même rue. *Deux pharmacies.*" y={130} size={70} />
+      <Title t={t} at={mais - 0.1} out={cercle - 0.1} text="Dans l'une, les patients *reviennent.*" y={130} size={70} />
+      <Title t={t} at={VAT.Y16} text="Pendant ce temps, *à côté…*" y={130} size={70} />
+      {veil > 0 && (
+        <div style={{ position: "absolute", inset: 0, opacity: veil }}>
+          <AbsoluteFill style={{ background: rgba("#F7FBF9", 0.95) }} />
+          <Abs x={960} y={110}>
+            <Rise t={t} at={w("Y15", "cercle.")} text="C'est un *cercle.*" size={76} style={{ width: 1400 }} />
+          </Abs>
+          <Abs x={960} y={590}>
+            <div style={{ position: "relative", width: 760, height: 760 }}>
+              <svg width={760} height={760} viewBox="-380 -380 760 760" style={{ position: "absolute", inset: 0 }}>
+                <circle r={250} fill="none" stroke={rgba(MINT.green, 0.15)} strokeWidth={14} />
+                <circle r={250} fill="none" stroke={MINT.green} strokeWidth={14} strokeLinecap="round" pathLength={1} strokeDasharray={1} strokeDashoffset={1 - prog(t, cercle + 0.1, 1.6, IN_OUT)} transform="rotate(-90)" />
+                <circle cx={250 * Math.cos(spin * Math.PI * 2 - Math.PI / 2)} cy={250 * Math.sin(spin * Math.PI * 2 - Math.PI / 2)} r={16} fill={PB.gold} opacity={prog(t, cercle + 1.4, 0.3)} />
+              </svg>
+              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <PBLogo t={t} at={cercle + 0.2} size={56} variant="icon" tone="light" />
+              </div>
+              {nodes.map(({ I, l }, i) => {
+                const ang = (i / 4) * Math.PI * 2 - Math.PI / 2;
+                const k = pop(t, cercle + 0.25 + i * 0.32);
+                return (
+                  <div key={l} style={{ position: "absolute", left: 380 + 250 * Math.cos(ang), top: 380 + 250 * Math.sin(ang), transform: `translate(-50%, -50%) scale(${k})` }}>
+                    <Card style={{ display: "flex", alignItems: "center", gap: 14, padding: "16px 24px", whiteSpace: "nowrap" }}>
+                      <span style={{ display: "inline-flex", width: 52, height: 52, borderRadius: 14, background: MINT.green, alignItems: "center", justifyContent: "center" }}>
+                        <I size={28} color="#FFFFFF" />
+                      </span>
+                      <span style={{ fontFamily: JAKARTA, fontWeight: 800, fontSize: 28, color: MINT.ink }}>{l}</span>
+                    </Card>
+                  </div>
+                );
+              })}
+            </div>
+          </Abs>
+        </div>
+      )}
+    </>
+  );
+}
+
+// =====================================================================================================================
+// 6. La signature (fond blanc)
+// =====================================================================================================================
+function Fin({ t }: { t: number }) {
+  const pb = w("Y17", "pharmaboost");
+  const vous = VAT.Y18;
+  const reservez = w("Y18", "réservez");
+  const sloganOut = prog(t, vous - 0.25, 0.35, IN_OUT);
+  const finalIn = t >= FINAL_HIT - 0.05;
+  const btn = ressort(t, finalIn ? FINAL_HIT + 0.35 : reservez, { damping: 10, stiffness: 240, mass: 0.6 });
+  const vousOut = prog(t, FINAL_HIT - 0.4, 0.35, IN_OUT);
+  return (
+    <>
+      <Flash t={t} at={pb - 0.05} dur={0.3} max={0.5} />
+      <Flash t={t} at={FINAL_HIT} dur={0.35} max={0.55} />
+      <Abs x={960} y={finalIn ? 320 : 270}>
+        <PBLogo t={t} at={finalIn ? FINAL_HIT : pb} size={finalIn ? 130 : 110} tone="light" grad />
+      </Abs>
+      <Ring t={t} at={pb + 0.1} x={960} y={270} max={1000} color={MINT.green} />
+      {!finalIn && (
+        <>
+          <div style={{ position: "absolute", inset: 0, opacity: 1 - sloganOut }}>
+            <Abs x={960} y={500}>
+              <Rise t={t} at={w("Y17", "votre") - 0.1} text="Votre expertise, *soutenue à chaque délivrance.*" size={70} style={{ width: 1500 }} />
+            </Abs>
+          </div>
+          <div style={{ position: "absolute", inset: 0, opacity: 1 - vousOut }}>
+            <Abs x={960} y={500}>
+              <Rise t={t} at={vous} text="Et vous, quelle pharmacie *voulez-vous être ?*" size={70} style={{ width: 1600 }} />
+            </Abs>
+          </div>
+        </>
+      )}
+      {finalIn && (
+        <>
+          <Confetti t={t} at={FINAL_HIT + 0.1} x={960} y={420} count={70} power={1500} />
+          <Abs x={960} y={560}>
+            <div style={{ opacity: prog(t, FINAL_HIT + 0.3, 0.5), fontFamily: JAKARTA, fontWeight: 800, fontSize: 54, letterSpacing: "-0.03em", color: MINT.ink, whiteSpace: "nowrap" }}>
+              Votre expertise, <span style={{ color: MINT.green }}>soutenue à chaque délivrance.</span>
+            </div>
+          </Abs>
+        </>
+      )}
+      <Abs x={960} y={finalIn ? 740 : 700}>
+        <div style={{ transform: `scale(${t < reservez ? 0 : btn})`, display: "flex", alignItems: "center", gap: 16, padding: "26px 50px", borderRadius: 999, background: MINT.green, color: "#FFFFFF", fontFamily: JAKARTA, fontWeight: 800, fontSize: 42, boxShadow: `0 24px 50px -20px ${rgba(MINT.green, 0.7)}` }}>
+          <CalendarCheck size={44} /> Réserver une démonstration
+        </div>
+      </Abs>
+      <Abs x={960} y={finalIn ? 860 : 820}>
+        <div style={{ opacity: prog(t, reservez + 0.8, 0.5), fontFamily: JAKARTA, fontWeight: 800, fontSize: 36, color: MINT.deep }}>pharmaboost.app</div>
+      </Abs>
+      <Sparkle t={t} at={FINAL_HIT + 0.2} x={1240} y={320} size={80} color={PB.gold} />
+    </>
+  );
+}
+
+// ---- Les sous-titres : les mots de chaque phrase, calés sur la voix --------------------------------------------------
+type CapLine = { at: number; words: Word[]; quote: boolean };
+const CAPTION_LINES: CapLine[] = (() => {
+  const out: CapLine[] = [];
+  for (const l of LINES) {
+    if (VAT[l.id] === undefined) continue;
+    const quote = l.who === "clemence" || l.who === "eric";
+    let cur: Word[] = [];
+    for (const wd of M[l.id].words) {
+      cur.push(wd);
+      if (/[.:?!…]$/.test(wd.w) || (cur.length >= 6 && /,$/.test(wd.w)) || cur.length >= 11) {
+        out.push({ at: VAT[l.id], words: cur, quote });
+        cur = [];
+      }
     }
+    if (cur.length) out.push({ at: VAT[l.id], words: cur, quote });
   }
-  if (cur.length) out.push(cur);
   return out;
 })();
 
 function Captions({ t }: { t: number }) {
-  const vt = t - VOICE_AT;
-  const line = LINES_OF_WORDS.find((l) => vt >= l[0].at - 0.15 && vt <= l[l.length - 1].end + 0.3);
+  const line = CAPTION_LINES.find((l) => t >= l.at + l.words[0].at - 0.15 && t <= l.at + l.words[l.words.length - 1].end + 0.3);
   if (!line) return null;
-  const dark = (t >= CUTS.occasion[0] && t < CUTS.occasion[1]) || t >= CUTS.fin[0];
+  const vt = t - line.at;
   return (
-    <Abs x={960} y={1010}>
-      <div style={{ maxWidth: 1600, padding: "10px 24px", borderRadius: 16, background: dark ? "rgba(6,35,30,.7)" : "rgba(255,255,255,.9)", boxShadow: "0 10px 30px -18px rgba(15,43,38,.4)", textAlign: "center", fontFamily: JAKARTA, fontWeight: 700, fontSize: 32, lineHeight: 1.3, whiteSpace: "nowrap" }}>
-        {line.map((wd, i) => (
-          <span key={i} style={{ color: vt >= wd.at ? (dark ? "#FFFFFF" : MINT.ink) : rgba(dark ? "#FFFFFF" : MINT.ink, 0.3) }}>
-            {wd.w}{" "}
+    <Abs x={960} y={1018}>
+      <div style={{ maxWidth: 1700, padding: "10px 24px", borderRadius: 16, background: "rgba(255,255,255,.92)", boxShadow: "0 10px 30px -18px rgba(15,43,38,.4)", textAlign: "center", fontFamily: JAKARTA, fontWeight: 700, fontSize: 31, lineHeight: 1.3, whiteSpace: "nowrap", fontStyle: line.quote ? "italic" : undefined, color: MINT.ink }}>
+        {line.quote ? "« " : ""}
+        {line.words.map((wd, i) => (
+          <span key={i} style={{ color: vt >= wd.at ? MINT.ink : rgba(MINT.ink, 0.3) }}>
+            {wd.w}
+            {i < line.words.length - 1 ? " " : ""}
           </span>
         ))}
+        {line.quote ? " »" : ""}
       </div>
     </Abs>
   );
 }
 
-// ---- La musique : le « groove » de Rembobinons, bouclé sur ses mesures, et sa fin sur le dernier accord -------------
-// Le fichier (69 s) : le groove de 20 s à 58 s (19 mesures de 2 s), la fin de 58 s à 69 s, son dernier accord à 66 s.
+// ---- La musique de « Rembobinons » ------------------------------------------------------------------------------------
+// Le fichier (69 s) : la tension de 0 à 20 s (le DROP), le groove de 20 à 58 s (mesures de 2 s), la fin de 58 à 69 s,
+// son dernier accord à 66 s.
 const LOOP: [number, number] = [20, 58];
 const TAIL_AT = FINAL_HIT - (66 - 58);
-const MUSIC: { at: number; from: number; to: number }[] = (() => {
-  const out: { at: number; from: number; to: number }[] = [];
-  let at = 0;
+type Seg = { at: number; from: number; to: number; gain: (t: number) => number };
+const SPANS = Object.keys(VAT).map((id) => [VAT[id], end(id)] as const);
+function duck(t: number) {
+  let d = 0;
+  for (const [a, b] of SPANS) if (t >= a - 0.2 && t <= b + 0.45) d = Math.max(d, Math.min(1, (t - (a - 0.2)) / 0.2, (b + 0.45 - t) / 0.45));
+  return d;
+}
+const level = (t: number) => 0.3 + (0.1 - 0.3) * duck(t);
+const MUSIC: Seg[] = (() => {
+  const out: Seg[] = [];
+  // La lettre : le groove, doux, qui s'efface quand le comptoir arrive.
+  out.push({ at: 0, from: 20, to: 20 + A + 0.6, gain: (t) => Math.min(1, t / 1.5) * 0.11 * (1 - prog(t, A - 0.3, 0.8)) });
+  // L'acte 1 : la tension, calée pour que le DROP (20 s du fichier) tombe sur le retour de la bande.
+  const len = DROP - A;
+  out.push({ at: A, from: Math.max(0, 20 - len), to: 20, gain: (t) => (t < A + 6 ? 0.18 : 0.22 + (0.12 - 0.22) * duck(t)) });
+  // Le groove, bouclé, jusqu'à la fin ; plus bas « à côté » (la pharmacie d'à côté, sans PharmaBoost).
+  let at = DROP;
   while (at < TAIL_AT - 0.01) {
-    const len = Math.min(LOOP[1] - LOOP[0], TAIL_AT - at);
-    out.push({ at, from: LOOP[0], to: LOOP[0] + len });
-    at += len;
+    const l = Math.min(LOOP[1] - LOOP[0], TAIL_AT - at);
+    out.push({ at, from: LOOP[0], to: LOOP[0] + l, gain: (t) => level(t) * (t > B - 0.3 && t < F0 ? 0.35 : 1) });
+    at += l;
   }
-  out.push({ at: TAIL_AT, from: 58, to: 69 });
+  out.push({ at: TAIL_AT, from: 58, to: 69, gain: (t) => Math.max(level(t), t > end("Y18") ? 0.42 : 0) * (1 - prog(t, TOTAL - 1.6, 1.5)) });
   return out;
 })();
-/** Discrète sous la voix ; elle remonte pour la fin. */
-function musicGain(t: number) {
-  const fadeIn = Math.min(1, t / 1.5);
-  const outro = prog(t, VOICE_END + 0.1, 0.6);
-  const end = 1 - prog(t, TOTAL - 1.6, 1.5);
-  return fadeIn * (0.12 + 0.3 * outro) * end;
-}
 
+// ---- Les bruitages ---------------------------------------------------------------------------------------------------
 const SFX: Cue[] = [
-  cue("papier", 0.5, 0.5),
-  cue("carte-depliee", T.lettre, 0.45),
-  cue("telephone-vibre", T.deranger + 0.25, 0.35),
-  cue("ui-pop", T.deranger + 0.7, 0.35),
-  cue("tic", T.chargee - 0.2, 0.3),
-  cue("whoosh-pb", CUTS.lgo[0] + 0.3, 0.45),
-  cue("ui-pop", T.lgo - 0.3, 0.4),
-  cue("ui-ding", T.gener - 0.1, 0.35),
-  cue("pop-leger", T.patients - 0.15, 0.35),
-  cue("pop-leger", T.produits - 0.15, 0.35),
-  cue("papier", T.ordonnances - 0.15, 0.4),
-  cue("bulle", T.questions - 0.1, 0.4),
-  cue("bulle", T.questions + 0.35, 0.35),
-  cue("telephone-vibre", T.interruptions - 0.25, 0.4),
-  cue("notif-douce", T.interruptions + 0.15, 0.35),
-  cue("notif-douce", T.interruptions + 0.5, 0.35),
-  cue("whoosh-lourd", T.comment - 0.15, 0.35),
-  cue("impact-revelation", CUTS.occasion[0], 0.45),
-  cue("scan-laser", T.scan - 0.1, 0.4),
-  cue("etincelle", T.occasion + 0.1, 0.4),
-  cue("carte-depliee", CUTS.fiche[0] + 0.1, 0.4),
-  cue("ui-pop", T.lesQuestions - 0.1, 0.35),
-  cue("ui-pop", T.interet - 0.1, 0.35),
-  cue("ui-pop", T.precautions - 0.1, 0.35),
-  cue("whoosh-rapide", T.exemple - 0.2, 0.3),
-  cue("scanner-bip", T.cetirizine + 0.1, 0.5),
-  cue("pop-leger", T.conseillee, 0.35),
-  cue("pop-leger", T.prescrite, 0.35),
-  cue("carte-ping", CUTS.routineBanniere[0] + 0.3, 0.4),
-  cue("ui-pop", T.nez - 0.1, 0.35),
-  cue("ui-pop", T.yeux - 0.1, 0.35),
-  cue("ui-pop", T.gorge - 0.1, 0.35),
-  cue("ui-ding", T.utilisation - 0.2, 0.3),
-  cue("pop-leger", T.fond - 0.4, 0.35),
-  cue("pop-leger", T.peau, 0.35),
-  cue("pop-leger", T.antibio, 0.35),
-  ...[0, 1, 2, 3, 4, 5].map((i) => cue("pop-leger", T.autres - 0.2 + i * 0.15, 0.3)),
-  cue("whoosh-pb", CUTS.gammes[0] + 0.1, 0.4),
-  cue("pop-leger", T.dates, 0.35),
-  cue("pop-leger", T.labos, 0.35),
-  cue("etincelle", T.challenges, 0.35),
-  cue("tampon", T.paye - 0.05, 0.5),
-  cue("ui-clic", T.lancez + 0.35, 0.6),
-  cue("whoosh-rapide", T.remet + 0.1, 0.35),
-  cue("montee", T.exploitees - 0.6, 0.3),
-  cue("ticket-imprime", T.imprime - 0.1, 0.4),
-  cue("mail", T.email - 0.1, 0.45),
-  cue("ui-pop", T.qr - 0.1, 0.4),
-  cue("impact-net", T.pbFinal - 0.05, 0.45),
-  cue("ui-ding", T.reservez, 0.35),
-  cue("whoosh-rapide", VOICE_END + 0.45, 0.35),
-  cue("tampon", VOICE_END + 0.5 + (FINAL_HIT - VOICE_END - 0.5) / 3, 0.35),
-  cue("tampon", VOICE_END + 0.5 + (2 * (FINAL_HIT - VOICE_END - 0.5)) / 3, 0.4),
+  cue("papier", w("Y1", "lettre,") - 0.5, 0.5),
+  cue("tic", w("Y1", "plutôt"), 0.3),
+  cue("telephone-vibre", w("Y1", "déranger"), 0.4),
+  cue("ui-ding", w("Y2", "deux"), 0.35),
+  cue("whoosh-rapide", A - 0.2, 0.35),
+  ...actCues(ACT),
+  cue("pharmacie-ambiance", A, 0.5, 1, 6.4),
+  cue("whoosh-pb", ACT_END - 0.1, 0.4),
+  cue("etincelle", w("Y9b", "parfait,"), 0.4),
+  cue("chrono", w("Y9b", "seconde") - 0.6, 0.35),
+  cue("tampon", w("Y9b", "prouvé"), 0.45),
+  cue("montee", w("Y9b", "chiffre") - 0.2, 0.35),
+  cue("cloche-reussite", w("Y9b", "augmenté") - 0.1, 0.35),
+  cue("whoosh-rapide", P0, 0.3),
+  cue("mail", w("Y11", "e-mail") - 0.1, 0.4),
+  cue("swipe-tel", w("Y11", "l'application") - 0.2, 0.35),
+  cue("pop-leger", w("Y11", "conseils,"), 0.3),
+  cue("pop-leger", w("Y11", "routine,"), 0.3),
+  cue("pop-leger", w("Y11", "cure."), 0.3),
+  cue("telephone-vibre", w("Y12", "notification") - 0.1, 0.45),
+  cue("notif-douce", w("Y12", "notification"), 0.4),
+  cue("porte-carillon", w("Y12", "revient") + 0.3, 0.4),
+  cue("ui-clic", w("Y13", "laboratoire") + 0.55, 0.5),
+  cue("notif-douce", w("Y13", "prévenus,") - 0.35, 0.35),
+  cue("notif-douce", w("Y13", "prévenus,") - 0.17, 0.3, 1.08),
+  cue("notif-douce", w("Y13", "prévenus,"), 0.3, 1.16),
+  cue("whoosh-pb", R0, 0.35),
+  cue("pop-leger", w("Y14", "boîtes,") - 0.1, 0.3),
+  cue("pop-leger", w("Y14", "ordonnances") - 0.1, 0.3),
+  cue("neon", w("Y15", "mais"), 0.45),
+  cue("porte-carillon", w("Y15", "reviennent"), 0.3),
+  cue("orbite", w("Y15", "nouveau") - 0.1, 0.35),
+  cue("whoosh-lourd", VAT.Y16 + 0.1, 0.35),
+  ...actCues(COTE, ["S1"], 6.2),
+  cue("pharmacie-ambiance", B, 0.45, 1, 6.2),
+  cue("impact-net", w("Y17", "pharmaboost") - 0.05, 0.45),
+  cue("ui-ding", w("Y18", "réservez"), 0.35),
   cue("confettis", FINAL_HIT + 0.1, 0.35),
 ];
-
-const REPRISES: Remap[] = [R_COMPTOIR, R_SCAN, R_DECIDE, R_MEME, R_APPLI];
 
 export function LettreFilm() {
   const frame = useCurrentFrame();
   const t = frame / FPS;
+  const inAct = t >= A - 0.05 && t < ACT_END + 0.5;
+  const inCote = t >= B - 0.5 && t < F0 + 0.5;
   return (
-    <AbsoluteFill style={{ background: `radial-gradient(90% 80% at 50% 0%, #FFFFFF 0%, ${MINT.paper} 55%, #E2EEEA 100%)` }}>
-      <div style={{ position: "absolute", inset: 0, opacity: 0.35 }}>
-        <AdnBackdrop t={t} tone="paper" width={1920} focus={[0.8, 0.3]} style={{ background: "transparent" }} />
+    <AbsoluteFill style={{ background: MINT.paper }}>
+      <AbsoluteFill style={{ background: `radial-gradient(90% 80% at 50% 0%, #FFFFFF 0%, ${MINT.paper} 55%, #E2EEEA 100%)` }} />
+      <div style={{ position: "absolute", inset: 0, opacity: 0.3 }}>
+        <AdnBackdrop t={t} tone="paper" width={1920} focus={[0.82, 0.3]} style={{ background: "transparent" }} />
       </div>
-      <Scene t={t} win={CUTS.ouverture}>
-        <Ouverture t={t} />
+      <Scene t={t} from={0} to={w("Y1", "plutôt") - 0.35}>
+        <Lettre1 t={t} />
       </Scene>
-      <Scene t={t} win={CUTS.lgo}>
-        <ACoteDuLgo t={t} />
+      <Scene t={t} from={w("Y1", "plutôt") - 0.3} to={VAT.Y2 - 0.25}>
+        <Journee t={t} />
       </Scene>
-      <Scene t={t} win={CUTS.comptoir} still>
-        <Comptoir t={t} />
+      <Scene t={t} from={VAT.Y2 - 0.2} to={A - 0.1}>
+        <DeuxMinutes t={t} />
       </Scene>
-      <Scene t={t} win={CUTS.rush}>
-        <Rush t={t} />
+      {inAct && (
+        <AbsoluteFill style={{ opacity: prog(t, A - 0.05, 0.3) * (1 - prog(t, ACT_END, 0.45, IN_OUT)) }}>
+          <Act t={t} keys={ACT} />
+        </AbsoluteFill>
+      )}
+      <Scene t={t} from={ACT_END} to={P0}>
+        <Preuve t={t} />
       </Scene>
-      <Scene t={t} win={CUTS.occasion} still>
-        <Occasion t={t} />
+      <Scene t={t} from={P0} to={VAT.Y12 - 0.3}>
+        <Bilan t={t} />
       </Scene>
-      <Scene t={t} win={CUTS.scan} still>
-        <Scan t={t} />
+      <Scene t={t} from={VAT.Y12 - 0.25} to={VAT.Y13 - 0.3}>
+        <Rappel t={t} />
       </Scene>
-      <Scene t={t} win={CUTS.fiche}>
-        <Fiche t={t} />
+      <Scene t={t} from={VAT.Y13 - 0.25} to={R0}>
+        <Campagne t={t} />
       </Scene>
-      <Scene t={t} win={CUTS.decide} still>
-        <Decide t={t} />
+      <Scene t={t} from={R0} to={B}>
+        <Rue t={t} />
       </Scene>
-      <Scene t={t} win={CUTS.exemple}>
-        <Exemple t={t} />
-      </Scene>
-      <Scene t={t} win={CUTS.routineBanniere}>
-        <RoutineBanniere t={t} />
-      </Scene>
-      <Scene t={t} win={CUTS.routine}>
-        <Routine t={t} />
-      </Scene>
-      <Scene t={t} win={CUTS.themes}>
-        <Themes t={t} />
-      </Scene>
-      <Scene t={t} win={CUTS.meme} still>
-        <Meme t={t} />
-      </Scene>
-      <Scene t={t} win={CUTS.gammes}>
-        <Gammes t={t} />
-      </Scene>
-      <Scene t={t} win={CUTS.surstock}>
-        <Surstock t={t} />
-      </Scene>
-      <Scene t={t} win={CUTS.titulaire}>
-        <Titulaire t={t} />
-      </Scene>
-      <Scene t={t} win={CUTS.patient}>
-        <Patient t={t} />
-      </Scene>
-      <Scene t={t} win={CUTS.appli} still>
-        <Appli t={t} />
-      </Scene>
-      <Scene t={t} win={CUTS.fin} still>
+      {inCote && (
+        <AbsoluteFill style={{ opacity: prog(t, B - 0.4, 0.45) * (1 - prog(t, F0 - 0.1, 0.45, IN_OUT)) }}>
+          <Act t={t} keys={COTE} only={["S1"]} />
+        </AbsoluteFill>
+      )}
+      <Scene t={t} from={F0} to={TOTAL + 1}>
         <Fin t={t} />
       </Scene>
       <Captions t={t} />
-      <Grain t={t} opacity={0.025} />
+      <Grain t={t} opacity={0.02} />
       <Vignette strength={0.12} />
-      <Sequence from={Math.round(VOICE_AT * FPS)}>
-        <Audio src={staticFile("lettre/voix.mp3")} volume={1} />
-      </Sequence>
-      {MUSIC.map((m, i) => (
-        <Sequence key={i} from={Math.round(m.at * FPS)} durationInFrames={Math.round((m.to - m.from) * FPS)}>
-          <Audio src={staticFile("rembobine/music/musique.wav")} startFrom={Math.round(m.from * FPS)} endAt={Math.round(m.to * FPS)} volume={(f: number) => musicGain(m.at + f / FPS)} />
+      {LINES.filter((l) => VAT[l.id] !== undefined).map((l) => (
+        <Sequence key={`v-${l.id}`} from={Math.round(VAT[l.id] * FPS)} layout="none" name={`Voix ${l.id}`}>
+          <Audio src={staticFile(`lettre/voix/${l.id}.wav`)} volume={1} />
         </Sequence>
       ))}
-      <Cues cues={[...SFX, ...REPRISES.flatMap(repriseCues)]} />
+      {MUSIC.map((m, i) => (
+        <Sequence key={`m-${i}`} from={Math.round(m.at * FPS)} durationInFrames={Math.max(1, Math.round((m.to - m.from) * FPS))} layout="none" name={`Musique ${i}`}>
+          <Audio src={staticFile("rembobine/music/musique.wav")} startFrom={Math.round(m.from * FPS)} volume={(f: number) => m.gain(m.at + f / FPS)} />
+        </Sequence>
+      ))}
+      <Cues cues={SFX} />
     </AbsoluteFill>
   );
 }
-
-void Bell;
