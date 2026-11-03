@@ -19,7 +19,16 @@ export type TreeState = {
 
 const NOBODY: TreeView = { questions: [], guidance: [], unlocked: [] };
 
+/**
+ * Fenêtre « Une question à poser » SUSPENDUE (fondateur, 3 nov. 2026) : « Pourquoi le patient prend-il… ? Fièvre, mal de tête,
+ * douleur localisée » s'affichait aussi pour les anti-inflammatoires, où ce n'est pas la bonne question. Plus aucune question
+ * de l'arbre, ni au poste ni sur l'écran de la vente, en attendant les nouvelles questions du fondateur. Les conseils du bout
+ * d'une branche (poche par zone, thermomètre) restent cachés : sans la réponse, ils seraient à côté.
+ */
+export const QUESTION_TREE_SUSPENDED = true;
+
 export function treeState(input: { opportunities: TreeOpportunity[]; lineNames: ReadonlyMap<string, string>; answers: TreeAnswers }): TreeState {
+  if (QUESTION_TREE_SUSPENDED) return { active: false, view: NOBODY, isVisible: (ruleKey) => !ruleKey || !TREE_RULE_KEYS.has(ruleKey) };
   const inTree = input.opportunities.filter((opportunity) => opportunity.ruleKey !== null && TREE_RULE_KEYS.has(opportunity.ruleKey));
   if (inTree.length === 0) return { active: false, view: NOBODY, isVisible: () => true };
   // La question nomme le médicament qui a ouvert l'arbre : le premier de la vente qui l'a déclenché.
