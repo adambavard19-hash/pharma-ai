@@ -107,6 +107,7 @@ function demoSale(lines: DemoLine[], shelf: DemoProduct[], rank: number) {
     opportunities: result.opportunities.map((opportunity) => ({ ruleKey: opportunity.ruleKey ?? null, answer: null, triggeredLineIds: opportunity.triggeredBy.map((trigger) => String(trigger.lineIndex)) })),
     lineNames,
     answers: {},
+    suspended: false,
   });
   const proposed = result.recommendations.flatMap((rec) => {
     const product = byId.get(rec.productId);

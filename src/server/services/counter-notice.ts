@@ -44,6 +44,8 @@ export type CounterSaleRead = {
 
 /** Une boîte arrivée plus tard que cela après la précédente : peut-être le client suivant (« C'est un autre client ? »). */
 export const LATE_BOX_MS = 30 * 1000;
+/** La question « C'est un autre client ? » : coupée (fondateur, 4 nov. 2026). */
+export const OTHER_CLIENT_QUESTION = false;
 
 /**
  * Les boîtes bipées, pour « Retirer » sur la bannière du poste : dès le bip, analyse finie ou non. La DERNIÈRE boîte, arrivée plus
@@ -54,7 +56,9 @@ const boxesOf = (lines: { id: string; drugName: string | null; createdAt: Date; 
   const byTime = [...named].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   const last = byTime[byTime.length - 1];
   const before = byTime[byTime.length - 2];
-  const lateId = last && before && last.createdAt.getTime() - before.createdAt.getTime() > LATE_BOX_MS ? last.id : null;
+  // « C'est un autre client ? » RETIRÉ (fondateur, 4 nov. 2026) : « Fin / Valider » dans LGPI termine déjà la vente, PharmaBoost
+  // sait donc quand le client change. Plus aucune boîte n'est marquée en retard, la question ne s'affiche plus nulle part.
+  const lateId = OTHER_CLIENT_QUESTION && last && before && last.createdAt.getTime() - before.createdAt.getTime() > LATE_BOX_MS ? last.id : null;
   // La péremption lue dans le Datamatrix : seulement une boîte périmée, ou qui périme dans le mois (voir box-expiry.ts).
   return named.map((line) => ({ id: line.id, name: line.drugName ?? "", challenge: challenges.get(line.id)?.title ?? null, reward: challenges.get(line.id)?.reward ?? null, late: line.id === lateId, expiry: boxExpiry(line.expiresOn, now) }));
 };

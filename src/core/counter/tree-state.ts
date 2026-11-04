@@ -27,8 +27,9 @@ const NOBODY: TreeView = { questions: [], guidance: [], unlocked: [] };
  */
 export const QUESTION_TREE_SUSPENDED = true;
 
-export function treeState(input: { opportunities: TreeOpportunity[]; lineNames: ReadonlyMap<string, string>; answers: TreeAnswers }): TreeState {
-  if (QUESTION_TREE_SUSPENDED) return { active: false, view: NOBODY, isVisible: (ruleKey) => !ruleKey || !TREE_RULE_KEYS.has(ruleKey) };
+export function treeState(input: { opportunities: TreeOpportunity[]; lineNames: ReadonlyMap<string, string>; answers: TreeAnswers; suspended?: boolean }): TreeState {
+  // `suspended: false` : les essais du moteur et l'aperçu de démonstration voient l'arbre tel qu'il reviendra.
+  if (input.suspended ?? QUESTION_TREE_SUSPENDED) return { active: false, view: NOBODY, isVisible: (ruleKey) => !ruleKey || !TREE_RULE_KEYS.has(ruleKey) };
   const inTree = input.opportunities.filter((opportunity) => opportunity.ruleKey !== null && TREE_RULE_KEYS.has(opportunity.ruleKey));
   if (inTree.length === 0) return { active: false, view: NOBODY, isVisible: () => true };
   // La question nomme le médicament qui a ouvert l'arbre : le premier de la vente qui l'a déclenché.

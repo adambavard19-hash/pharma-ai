@@ -236,6 +236,7 @@ describe("l'arbre de questions : chaque réponse qui débloque un conseil en mon
       opportunities: result.opportunities.map((o) => ({ ruleKey: o.ruleKey ?? o.key, answer: null, triggeredLineIds: o.triggeredBy.map((t) => String(t.lineIndex)) })),
       lineNames: new Map([["0", DOLIPRANE.name]]),
       answers,
+      suspended: false,
     });
     return result.recommendations.filter((r) => state.isVisible(result.opportunities.find((o) => o.key === r.opportunityKey)?.ruleKey ?? r.opportunityKey));
   }
