@@ -111,14 +111,7 @@ export default async function SitePage() {
           <p className="mt-6 max-w-2xl text-[18px] leading-7 text-text-secondary md:text-[21px] md:leading-8">
             À chaque boîte scannée, PharmaBoost montre à votre équipe le bon produit à conseiller, pris dans votre stock. Plus de conseils vendus, sans changer votre logiciel.
           </p>
-          <div className="mt-9 flex flex-wrap justify-center gap-3">
-            <Link href="/decouvrir/demo" className="inline-flex h-12 items-center gap-2 rounded-full bg-brand-600 px-6 text-[15px] font-semibold text-white shadow-[0_14px_30px_-12px_rgba(14,138,123,0.7)] hover:bg-brand-700">
-              Réserver une démo <ArrowRight className="size-4" aria-hidden="true" />
-            </Link>
-            <Link href="#tarif" className="inline-flex h-12 items-center rounded-full border border-border-default bg-white/70 px-6 text-[15px] font-semibold text-text-primary backdrop-blur hover:bg-white">
-              Voir le tarif
-            </Link>
-          </div>
+          {/* Plus de boutons sous le texte du héros (fondateur, 5 nov. 2026) : la vidéo vient juste après. */}
         </div>
         {/* La présentation se lance seule sous le héros, sans le son (fondateur, 20 oct. 2026, d'après limova.ai). */}
         <div className="px-5 pb-16 md:pb-24">
