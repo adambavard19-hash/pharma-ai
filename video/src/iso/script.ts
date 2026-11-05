@@ -29,7 +29,8 @@ export const LINES: Line[] = [
   // Acte 2 : la même scène, avec PharmaBoost
   { id: "I4", who: "yann", say: "Même patient. Même ordonnance. Mais cette fois, PharmaBoost est au comptoir.", reuse: "lettre/voix/Y6.wav" },
   { id: "I5", who: "yann", say: "Rien ne change dans vos habitudes : PharmaBoost se connecte directement à votre logiciel." },
-  { id: "I6", who: "yann", say: "En une seconde, personne ne peut tout avoir en tête : le stock, les dates courtes, les challenges, le bon conseil, la routine parfaite." },
+  // Les deux questions du fondateur (5 nov. 2026), à la place de « En une seconde, personne ne peut tout avoir en tête ».
+  { id: "I6", who: "yann", say: "Votre équipe exploite-t-elle réellement tout le potentiel de conseil de chaque ordonnance ? Combien d'opportunités de conseil passent chaque jour inaperçues au comptoir ?" },
   { id: "I7", who: "yann", say: "PharmaBoost, lui, y pense pour vous." },
   { id: "I8", who: "yann", say: "Dès l'isotrétinoïne scannée, la routine d'accompagnement s'affiche, prise dans votre stock : un nettoyant doux, un soin hydratant, un baume à lèvres, une protection solaire." },
   { id: "I9", who: "yann", say: "Les questions à poser. Les mots à dire. Le challenge, la date courte." },
@@ -38,8 +39,10 @@ export const LINES: Line[] = [
   { id: "D4", who: "eric", say: "Ah oui, je veux bien !", reuse: "rembobine/voix/D4.wav" },
   { id: "I11", who: "yann", say: "Le pharmacien décide. Le conseil est complet dès la première délivrance." },
   // Acte 3 : après le comptoir
-  { id: "I12", who: "yann", say: "Le patient reçoit son bilan conseil par e-mail…" },
+  // Le bilan par QR code (5 nov. 2026), à la place de l'e-mail.
+  { id: "I12", who: "yann", say: "Le patient scanne le QR code : son bilan conseil s'ouvre sur son téléphone…" },
   { id: "I13", who: "yann", say: "…et le retrouve dans l'application PharmaBoost : ses conseils, sa routine, le rappel avant la fin de sa cure." },
+  { id: "I16", who: "yann", say: "Et aucune donnée de santé n'est gardée : tout reste sur le téléphone du patient." },
   { id: "I14", who: "yann", say: "Vous lancez une campagne avec un laboratoire, une remise ? Toute votre patientèle reçoit la notification… et revient chez vous, plutôt qu'ailleurs." },
   { id: "I15", who: "yann", say: "Et le titulaire suit son équipe : conseils vendus, chiffre d'affaires et marge de chacun, le classement, et où chacun en est dans les challenges." },
   // La signature

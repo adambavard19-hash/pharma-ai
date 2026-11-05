@@ -478,7 +478,7 @@ function Tag({ t, swing }: { t: number; swing: number }) {
           color: "#FFFFFF",
         }}
       >
-        Rétinoïde <span style={{ color: XR }}>·</span> <span style={{ fontFamily: MONO, fontWeight: 700, color: XR }}>20</span> mg
+        Isotrétinoïne <span style={{ color: XR }}>·</span> <span style={{ fontFamily: MONO, fontWeight: 700, color: XR }}>20</span> mg
       </div>
     </>
   );

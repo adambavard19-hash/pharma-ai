@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import { AbsoluteFill, Audio, Sequence, staticFile, useCurrentFrame } from "remotion";
-import { Bell, Boxes, CalendarCheck, CalendarClock, Check, Lightbulb, ListChecks, Mail, Megaphone, MousePointer2, Play, Plug, Repeat, ShieldAlert, Smartphone, Sun, Trophy, Droplets, Smile, Sparkles } from "lucide-react";
+import { Bell, Boxes, CalendarCheck, CalendarClock, Check, Lightbulb, ListChecks, Lock, Megaphone, QrCode, ShieldCheck, MousePointer2, Play, Plug, Repeat, ShieldAlert, Smartphone, Sun, Trophy, Droplets, Smile, Sparkles } from "lucide-react";
 import { AdnBackdrop, BagDrugs, Confetti, Cues, DUPES, Dupe, DupeTile, Flash, JAKARTA, MailBilan, Notification, PB, PBLogo, Phone, Ring, Sparkle, cue, rgba, type Cue, type DupeKind } from "../rembobine/kit";
 import { ISO } from "../rembobine/iso";
 import { FilmClock } from "../presentation/motion/kit/clock";
@@ -123,7 +123,8 @@ export function makeFilm(variant: Variant) {
   const ACT3_END = end("I11") + 0.9;
   VAT.I12 = ACT3_END + 0.35;
   VAT.I13 = end("I12") + 0.25;
-  const B_END = end("I13") + 0.5;
+  VAT.I16 = end("I13") + 0.3;
+  const B_END = end("I16") + 0.6;
   VAT.I14 = B_END + 0.35;
   const C_END = end("I14") + 0.5;
   VAT.I15 = C_END + 0.35;
@@ -313,66 +314,62 @@ export function makeFilm(variant: Variant) {
   // « En une seconde, personne ne peut tout avoir en tête… PharmaBoost, lui, y pense pour vous. »
   // ===================================================================================================================
   function UneSeconde({ t }: { t: number }) {
+    // Les deux questions du fondateur (5 nov. 2026), puis « PharmaBoost, lui, y pense pour vous » : ce à quoi il pense, coché.
     const items = [
-      { I: Boxes, l: "Le stock", at: w("I6", "stock,") },
-      { I: CalendarClock, l: "Les dates courtes", at: w("I6", "dates") },
-      { I: Trophy, l: "Les challenges", at: w("I6", "challenges,") },
-      { I: Lightbulb, l: "Le bon conseil", at: w("I6", "bon") },
-      { I: ListChecks, l: "La routine parfaite", at: w("I6", "routine") },
+      { I: Boxes, l: "Le stock" },
+      { I: CalendarClock, l: "Les dates courtes" },
+      { I: Trophy, l: "Les challenges" },
+      { I: Lightbulb, l: "Le bon conseil" },
+      { I: ListChecks, l: "La routine parfaite" },
     ];
     const order = VAT.I7;
-    const tidy = prog(t, order + 0.15, 0.9, IN_OUT);
-    const spots = [
-      [-430, -170],
-      [360, -210],
-      [-500, 120],
-      [470, 110],
-      [-40, 250],
+    const questions = [
+      { at: VAT.I6, text: "Votre équipe exploite-t-elle réellement *tout le potentiel de conseil* de chaque ordonnance ?" },
+      { at: w("I6", "Combien") - 0.1, text: "Combien d'opportunités de conseil passent *chaque jour inaperçues* au comptoir ?" },
     ];
-    const ticking = t < order;
+    const leave = prog(t, order - 0.1, 0.5, IN_OUT);
+    const rich = (text: string) =>
+      text.split("*").map((part, i) => (
+        <span key={i} style={i % 2 ? { color: MINT.green } : undefined}>
+          {part}
+        </span>
+      ));
     return (
       <>
-        <Title t={t} at={VAT.I6} out={order - 0.3} text="En une seconde, *impossible de tout avoir en tête.*" y={120} size={62} />
+        {leave < 1 &&
+          questions.map((q, i) => {
+            const k = pop(t, q.at);
+            if (k <= 0) return null;
+            return (
+              <Abs key={i} x={960} y={430 + i * 260 - leave * 60}>
+                <div style={{ opacity: Math.min(1, k * 1.6) * (1 - leave), transform: `translateY(${(1 - Math.min(1, k)) * 40}px) scale(${0.9 + 0.1 * Math.min(1, k)})` }}>
+                  <Card style={{ display: "flex", alignItems: "center", gap: 28, width: 1360, padding: "34px 44px", borderRadius: 34 }}>
+                    <span style={{ display: "inline-flex", flexShrink: 0, width: 92, height: 92, borderRadius: 26, background: "#FCEBDD", alignItems: "center", justifyContent: "center", ...tx(62, 800), color: "#D9772A" }}>?</span>
+                    <span style={{ ...tx(46, 800), lineHeight: 1.18, letterSpacing: "-0.02em" }}>{rich(q.text)}</span>
+                  </Card>
+                </div>
+              </Abs>
+            );
+          })}
         <Title t={t} at={order} text="PharmaBoost *y pense pour vous.*" y={120} size={70} />
-        {/* Le chrono */}
-        <Abs x={960 - 520 * tidy} y={570}>
-          <div style={{ transform: `scale(${pop(t, VAT.I6 + 0.2) * (1 - 0.25 * tidy)})` }}>
-            <Card style={{ width: 300, height: 300, borderRadius: 999, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-              <svg width={300} height={300} viewBox="0 0 300 300" style={{ position: "absolute" }}>
-                <circle cx={150} cy={150} r={132} fill="none" stroke={rgba(MINT.green, 0.15)} strokeWidth={14} />
-                <circle cx={150} cy={150} r={132} fill="none" stroke={tidy > 0 ? MINT.green : "#E0884A"} strokeWidth={14} strokeLinecap="round" pathLength={1} strokeDasharray={1} strokeDashoffset={ticking ? 1 - ((t - VAT.I6) % 1) : 0} transform="rotate(-90 150 150)" />
-              </svg>
-              <span style={tx(96, 800)}>1 s</span>
-            </Card>
-          </div>
-        </Abs>
-        {items.map((it, i) => {
-          const k = pop(t, it.at - 0.05);
-          if (k <= 0) return null;
-          const [sx, sy] = spots[i];
-          const jit = ticking ? wobble(t, i + 7, 7, 1.6) : 0;
-          // Rangés : une liste cochée, à droite.
-          const x = 960 + sx * (1 - tidy) + (330 - 0) * tidy;
-          const y = 570 + sy * (1 - tidy) + (-200 + i * 100 - sy * 0) * tidy;
-          const checked = prog(t, order + 0.6 + i * 0.12, 0.25, SNAP);
-          return (
-            <Abs key={it.l} x={x} y={y + jit}>
-              <div style={{ transform: `scale(${k}) rotate(${(1 - tidy) * (i % 2 ? 4 : -4)}deg)` }}>
-                <Card style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 26px 16px 16px", width: tidy > 0.5 ? 520 : undefined, borderRadius: 22 }}>
-                  <span style={{ display: "inline-flex", width: 56, height: 56, borderRadius: 16, background: checked > 0 ? MINT.green : "#FCEBDD", alignItems: "center", justifyContent: "center" }}>
-                    {checked > 0 ? <Check size={32} color="#FFFFFF" strokeWidth={3} style={{ transform: `scale(${checked})` }} /> : <it.I size={30} color="#D9772A" />}
-                  </span>
-                  <span style={tx(32, 800)}>{it.l}</span>
-                </Card>
-              </div>
-            </Abs>
-          );
-        })}
-        <Abs x={960 + 330} y={570 - 330}>
-          <div style={{ opacity: prog(t, order + 0.2, 0.4) }}>
-            <PBLogo t={t} at={order + 0.1} size={46} tone="light" />
-          </div>
-        </Abs>
+        {t >= order &&
+          items.map((it, i) => {
+            const k = pop(t, order + 0.25 + i * 0.14);
+            if (k <= 0) return null;
+            const checked = prog(t, order + 0.55 + i * 0.14, 0.25, SNAP);
+            return (
+              <Abs key={it.l} x={960} y={330 + i * 112}>
+                <div style={{ transform: `scale(${k})` }}>
+                  <Card style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 26px 16px 16px", width: 560, borderRadius: 22 }}>
+                    <span style={{ display: "inline-flex", width: 56, height: 56, borderRadius: 16, background: checked > 0 ? MINT.green : "#FCEBDD", alignItems: "center", justifyContent: "center" }}>
+                      {checked > 0 ? <Check size={32} color="#FFFFFF" strokeWidth={3} style={{ transform: `scale(${checked})` }} /> : <it.I size={30} color="#D9772A" />}
+                    </span>
+                    <span style={tx(32, 800)}>{it.l}</span>
+                  </Card>
+                </div>
+              </Abs>
+            );
+          })}
       </>
     );
   }
@@ -534,40 +531,90 @@ export function makeFilm(variant: Variant) {
   }
 
   function Bilan({ t }: { t: number }) {
-    const mailIn = prog(t, VAT.I12 - 0.2, 0.6, SNAP);
+    // Le bilan par QR code (fondateur, 5 nov. 2026) : le QR code sur la bannière du comptoir, le téléphone du patient le scanne,
+    // le bilan s'ouvre et se garde dans l'appli ; puis « aucune donnée de santé n'est gardée ».
+    const qrIn = prog(t, VAT.I12 - 0.2, 0.6, SNAP);
+    const scan = w("I12", "scanne");
+    const opens = w("I12", "s'ouvre") - 0.15;
     const appAt = w("I13", "l'application") - 0.25;
-    const shift = prog(t, appAt - 0.3, 0.7, IN_OUT);
-    const appK = prog(t, appAt - 0.2, 0.6, SNAP);
+    const camera = prog(t, scan - 0.2, 0.4, SNAP) * (1 - prog(t, opens, 0.35));
+    const beam = ((t - scan) % 1.2) / 1.2;
+    const opened = prog(t, opens, 0.5, SNAP);
+    const safe = prog(t, VAT.I16 - 0.1, 0.6, SNAP);
     return (
       <>
-        <Title t={t} at={VAT.I12} out={appAt - 0.3} text="Son bilan conseil, *par e-mail.*" y={110} size={64} />
-        <Title t={t} at={appAt - 0.1} text="Et dans *l'application PharmaBoost.*" y={110} size={64} />
-        <Phone t={t} x={960 - 260 * shift} y={620} scale={0.98 * (0.9 + 0.1 * mailIn)} tilt={10 * shift} style={{ opacity: mailIn }}>
-          <MailBilan
-            t={t}
-            at={VAT.I12}
-            product="Votre routine isotrétinoïne"
-            routine={ROUTINE.map((r) => ({ kind: r.k, name: DUPES[r.k].name }))}
-            why="Ce traitement dessèche la peau et les lèvres dès les premières semaines : nettoyer en douceur, hydrater et se protéger du soleil, dès aujourd'hui."
-            points={ROUTINE.map((r) => ({ Icon: r.Icon, title: r.gest, text: DUPES[r.k].short.toLowerCase() }))}
-          />
-        </Phone>
-        {appK > 0 && (
-          <Phone t={t} x={1220} y={620} scale={0.98 * (0.9 + 0.1 * appK)} tilt={-10} style={{ opacity: appK }}>
-            <AppIso t={t} at={appAt} />
-          </Phone>
-        )}
-        <Abs x={400} y={330}>
-          <Pill t={t} at={w("I12", "e-mail…")} size={28}>
-            <Mail size={30} color={MINT.green} /> Par e-mail
-          </Pill>
+        <Title t={t} at={VAT.I12} out={appAt - 0.3} text="Son bilan conseil, *par QR code.*" y={110} size={64} />
+        <Title t={t} at={appAt - 0.1} out={VAT.I16 - 0.3} text="Gardé dans *l'application PharmaBoost.*" y={110} size={64} />
+        <Title t={t} at={VAT.I16 - 0.1} text="Aucune donnée de santé *chez nous.*" y={110} size={64} />
+        {/* La bannière du comptoir et son QR code */}
+        <Abs x={600} y={600}>
+          <div style={{ opacity: qrIn, transform: `scale(${0.9 + 0.1 * qrIn})` }}>
+            <Card style={{ width: 430, padding: "30px 30px 26px", borderRadius: 32, display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+              <span style={tx(28, 800)}>Le bilan du patient</span>
+              <QrArt size={260} />
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 10, ...tx(22, 700, MINT.soft) }}>
+                <QrCode size={24} color={MINT.green} /> Scannez avec votre téléphone
+              </span>
+            </Card>
+          </div>
         </Abs>
-        <Abs x={1530} y={330}>
-          <Pill t={t} at={appAt + 0.2} size={28}>
-            <Smartphone size={30} color={MINT.green} /> Dans l&apos;appli
-          </Pill>
+        <Phone t={t} x={1280} y={620} scale={0.98 * (0.9 + 0.1 * qrIn)} tilt={-8} style={{ opacity: qrIn }}>
+          <div style={{ position: "absolute", inset: 0 }}>
+            {camera > 0.01 && (
+              <div style={{ position: "absolute", inset: 0, background: "#0B1714", opacity: camera, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ position: "relative", width: 230, height: 230, borderRadius: 24, border: `4px solid ${MINT.green}` }}>
+                  <div style={{ position: "absolute", inset: 18, opacity: 0.9 }}>
+                    <QrArt size={186} light />
+                  </div>
+                  <div style={{ position: "absolute", left: 10, right: 10, top: `${10 + beam * 200}px`, height: 4, borderRadius: 4, background: MINT.green, boxShadow: `0 0 18px ${MINT.green}` }} />
+                </div>
+              </div>
+            )}
+            {opened > 0.01 && (
+              <div style={{ position: "absolute", inset: 0, opacity: opened }}>
+                <AppIso t={t} at={opens} />
+              </div>
+            )}
+          </div>
+        </Phone>
+        <Abs x={600} y={880}>
+          <div style={{ opacity: safe, transform: `translateY(${(1 - safe) * 30}px)` }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 14, padding: "16px 28px", borderRadius: 999, background: "#FFFFFF", boxShadow: "0 18px 40px -22px rgba(15,43,38,.5)", ...tx(28, 800) }}>
+              <ShieldCheck size={32} color={MINT.green} /> Tout reste sur le téléphone du patient <Lock size={26} color={MINT.green} />
+            </span>
+          </div>
         </Abs>
       </>
+    );
+  }
+
+  /** Un QR code dessiné (illustration) : trois repères et un motif fixe, jamais un vrai lien. */
+  function QrArt({ size, light = false }: { size: number; light?: boolean }) {
+    const n = 25;
+    const cell = size / n;
+    const ink = light ? "#FFFFFF" : MINT.deep;
+    const finder = (fx: number, fy: number) => (
+      <g key={`${fx}-${fy}`}>
+        <rect x={fx * cell} y={fy * cell} width={7 * cell} height={7 * cell} fill={ink} />
+        <rect x={(fx + 1) * cell} y={(fy + 1) * cell} width={5 * cell} height={5 * cell} fill={light ? "#0B1714" : "#FFFFFF"} />
+        <rect x={(fx + 2) * cell} y={(fy + 2) * cell} width={3 * cell} height={3 * cell} fill={ink} />
+      </g>
+    );
+    const inFinder = (x: number, y: number) => (x < 8 && y < 8) || (x >= n - 8 && y < 8) || (x < 8 && y >= n - 8);
+    const cells: ReactNode[] = [];
+    for (let y = 0; y < n; y++)
+      for (let x = 0; x < n; x++) {
+        if (inFinder(x, y)) continue;
+        const v = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+        if (v - Math.floor(v) > 0.52) cells.push(<rect key={`${x}-${y}`} x={x * cell} y={y * cell} width={cell + 0.4} height={cell + 0.4} fill={ink} />);
+      }
+    return (
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: "block" }}>
+        {cells}
+        {finder(0, 0)}
+        {finder(n - 7, 0)}
+        {finder(0, n - 7)}
+      </svg>
     );
   }
 
@@ -892,7 +939,9 @@ export function makeFilm(variant: Variant) {
     cue("ui-clic", w("I5", "connecte"), 0.35),
     cue("pop-leger", w("I5", "directement"), 0.35),
     cue("chrono", VAT.I6 + 0.1, 0.3),
-    ...["stock,", "dates", "challenges,", "bon", "routine"].map((wd, i) => cue("pop-leger", w("I6", wd) - 0.05, 0.28, 1 + i * 0.05)),
+    cue("pop-leger", VAT.I6 + 0.02, 0.3, 1),
+    cue("pop-leger", w("I6", "Combien") - 0.08, 0.3, 1.05),
+    ...[0, 1, 2, 3, 4].map((i) => cue("pop-leger", VAT.I7 + 0.25 + i * 0.14, 0.26, 1 + i * 0.05)),
     cue("etincelle", VAT.I7 + 0.1, 0.4),
     cue("cloche-reussite", VAT.I7 + 0.7, 0.3),
     cue("whoosh-rapide", S_END - 0.2, 0.3),
@@ -904,7 +953,9 @@ export function makeFilm(variant: Variant) {
     cue("whoosh-rapide", F_END - 0.2, 0.3),
     ...actCues(ACT3, ["S8"], 35.3, 45.3),
     cue("whoosh-pb", ACT3_END - 0.1, 0.35),
-    cue("mail", w("I12", "e-mail…") - 0.1, 0.4),
+    cue("pop-leger", w("I12", "scanne") - 0.1, 0.35, 1),
+    cue("mail", w("I12", "s'ouvre") - 0.1, 0.4),
+    cue("pop-leger", VAT.I16 - 0.05, 0.35, 0.95),
     cue("swipe-tel", w("I13", "l'application") - 0.2, 0.35),
     cue("pop-leger", w("I13", "conseils,"), 0.3),
     cue("pop-leger", w("I13", "routine,"), 0.3),

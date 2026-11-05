@@ -899,7 +899,7 @@ function XrayBag({ T }: { T: number }) {
       </div>
       {tagK > 0.01 && (
         <div style={{ position: "absolute", left: 560, top: HB.y + slot0.y, transform: `translate(-100%, -50%) scale(${0.85 + 0.15 * Math.min(1, tagK)})`, transformOrigin: "100% 50%", opacity: clamp01(tagK * 1.5), padding: "14px 22px 15px", borderRadius: 16, background: rgba("#06131A", 0.82), border: `2px solid ${rgba(XR, 0.75)}`, whiteSpace: "nowrap", fontFamily: JAKARTA, fontWeight: 800, fontSize: 32, color: "#FFFFFF" }}>
-          Rétinoïde <span style={{ color: XR }}>·</span> <span style={{ fontFamily: MONO, color: XR }}>20</span> mg
+          Isotrétinoïne <span style={{ color: XR }}>·</span> <span style={{ fontFamily: MONO, color: XR }}>20</span> mg
         </div>
       )}
       {T >= S2.rien && (
