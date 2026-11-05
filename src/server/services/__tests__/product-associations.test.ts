@@ -18,11 +18,13 @@ const mocks = vi.hoisted(() => ({
   },
   recordAudit: vi.fn(),
   loadAssociationDrugProducts: vi.fn(),
+  loadAdviceModules: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/server/db/client", () => ({ prisma: mocks.prisma }));
 vi.mock("@/server/audit/log", () => ({ recordAudit: mocks.recordAudit }));
 vi.mock("../catalog", () => ({ loadAssociationDrugProducts: mocks.loadAssociationDrugProducts }));
+vi.mock("../advice-modules", () => ({ loadAdviceModules: mocks.loadAdviceModules }));
 
 import { createAssociation, createAssociationGrid, createAssociations, deleteAssociation, listAssociations, loadAssociationInput, resolveLineTriggers, updateAssociation } from "../product-associations";
 
@@ -38,6 +40,7 @@ beforeEach(() => {
   mocks.prisma.product.findMany.mockResolvedValue([]);
   mocks.prisma.drugSpecialty.findMany.mockResolvedValue([]);
   mocks.prisma.pharmacyDrugStock.findMany.mockResolvedValue([]);
+  mocks.loadAdviceModules.mockResolvedValue([]);
   mocks.loadAssociationDrugProducts.mockResolvedValue(new Map());
 });
 
@@ -139,10 +142,17 @@ describe("les associations communes à toutes les officines", () => {
     mocks.prisma.centralAssociation.findMany.mockResolvedValue([central()]);
     mocks.prisma.product.findMany.mockResolvedValueOnce([{ id: "p_advice", ean: "3401111111111" }]);
     const input = await loadAssociationInput(SCOPE, [line(0, "CORYZALIA, comprimé orodispersible")]);
-    expect(mocks.prisma.centralAssociation.findMany.mock.calls[0][0].where).toEqual({ status: "VALIDATED" });
+    expect(mocks.prisma.centralAssociation.findMany.mock.calls[0][0].where).toEqual({ status: "VALIDATED", OR: [{ module: null }] });
     expect(mocks.prisma.product.findMany.mock.calls[0][0].where).toMatchObject({ pharmacyId: "ph_1", ean: { in: ["3401111111111"] }, deletedAt: null });
     expect(input?.rules).toEqual([{ id: "central:ca1", triggerKey: "drug:CORYZALIA", adviceProductId: "p_advice", sentence: "Pour accompagner.", sortOrder: 1_000_000 }]);
     expect(input?.lines).toEqual([{ lineIndex: 0, keys: ["drug:CORYZALIA"], productId: null }]);
+  });
+
+  it("les associations d'un module ne sont lues que pour une pharmacie qui a choisi ce module", async () => {
+    mocks.loadAdviceModules.mockResolvedValue(["PHYTOTHERAPIE"]);
+    await loadAssociationInput(SCOPE, [line(0, "CORYZALIA, comprimé orodispersible")]);
+    expect(mocks.loadAdviceModules).toHaveBeenCalledWith("ph_1");
+    expect(mocks.prisma.centralAssociation.findMany.mock.calls[0][0].where).toEqual({ status: "VALIDATED", OR: [{ module: null }, { module: { in: ["PHYTOTHERAPIE"] } }] });
   });
 
   it("une officine qui n'a pas le produit conseillé en stock ne reçoit pas l'association : rien du tout", async () => {

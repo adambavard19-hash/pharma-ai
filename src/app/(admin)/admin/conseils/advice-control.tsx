@@ -13,6 +13,7 @@ import { Alert } from "@/components/ui/feedback";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { formatDate } from "@/lib/format";
+import { moduleLabel } from "@/core/ai/advice-modules";
 import { cn } from "@/lib/utils";
 import { AssociationEditForm, EditHistory, MedicineTriggerPicker, RevertButton, RuleEditForm, type HistoryLine } from "./edit-forms";
 
@@ -266,6 +267,7 @@ export function AssociationItem({ association }: { association: AssociationCard 
                 extra={
                   <>
                     <Badge tone="neutral">{association.triggerKind === "MEDICINE" ? "Déclenché par un médicament" : association.triggerKind === "FAMILY" ? "Déclenché par une famille" : association.triggerKind === "ATC" ? "Déclenché par un code ATC" : "Déclenché par un produit"}</Badge>
+                    {association.module && <Badge tone="success">Module {moduleLabel(association.module)}</Badge>}
                     {association.fromRobot && <Badge tone="info">Proposé par le robot, validé</Badge>}
                     {association.modified && <Badge tone="info">Modifié{association.modified.by ? ` par ${association.modified.by}` : ""} le {formatDate(association.modified.at)}</Badge>}
                   </>
@@ -512,7 +514,7 @@ type KnownProduct = { ean: string; name: string; brand: string | null };
 
 export type FamilyChoice = { id: string; name: string; count: number };
 
-export function NewAssociationForm({ onDone, families = [], initialFamilyId = null }: { onDone: () => void; families?: FamilyChoice[]; initialFamilyId?: string | null }) {
+export function NewAssociationForm({ onDone, families = [], initialFamilyId = null, module = null }: { onDone: () => void; families?: FamilyChoice[]; initialFamilyId?: string | null; /** Association d'un module (Console → Gestion → Modules). */ module?: string | null }) {
   const [mode, setMode] = useState<"MEDICINE" | "PRODUCT" | "FAMILY" | "ATC">(initialFamilyId ? "FAMILY" : "MEDICINE");
   // Plusieurs médicaments (tous les dosages de Mounjaro) ou plusieurs codes ATC pour une même famille (fondateur, 28 oct. 2026) :
   // une association par déclencheur et par produit conseillé.
@@ -561,7 +563,7 @@ export function NewAssociationForm({ onDone, families = [], initialFamilyId = nu
       let created = 0;
       for (const trigger of triggers) {
         for (const advice of advices) {
-          const result = await addCentralAssociationAction({ trigger, advice: { ean: advice.ean, name: advice.name }, sentence: sentence.trim() || null });
+          const result = await addCentralAssociationAction({ trigger, advice: { ean: advice.ean, name: advice.name }, sentence: sentence.trim() || null, module });
           if (result.ok) created += 1;
           else failed.push(`${advice.name} : ${result.error}`);
         }

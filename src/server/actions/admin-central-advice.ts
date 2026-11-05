@@ -51,15 +51,17 @@ const associationSchema = z.object({
   ]),
   advice: z.object({ ean: z.string().trim().min(7).max(20), name: z.string().trim().min(1).max(200) }),
   sentence: z.string().max(600).nullable().optional(),
+  module: z.string().max(40).nullable().optional(),
 });
 
 export async function addCentralAssociationAction(payload: z.input<typeof associationSchema>): Promise<ActionResult<null>> {
   const session = await requirePlatformSession();
   const parsed = associationSchema.safeParse(payload);
   if (!parsed.success) return fail("Vérifiez le déclencheur et le produit conseillé.");
-  const result = await addCentralAssociation({ id: session.admin.id, fullName: session.admin.fullName }, { ...parsed.data, sentence: parsed.data.sentence ?? null });
+  const result = await addCentralAssociation({ id: session.admin.id, fullName: session.admin.fullName }, { ...parsed.data, sentence: parsed.data.sentence ?? null, module: parsed.data.module ?? null });
   if (!result.ok) return fail(result.error);
   revalidatePath("/admin/conseils");
+  revalidatePath("/admin/conseils/modules");
   return ok(null, "Association en ligne dans toutes les pharmacies qui ont le produit conseillé en stock. Elle reste « à relire » jusqu'à votre validation.");
 }
 

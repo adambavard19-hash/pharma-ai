@@ -2685,6 +2685,9 @@ model CentralAssociation {
   adviceLabel      String
   /// Ce que le pharmacien dit au patient, écrit par la pharmacienne de PharmaBoost.
   sentence         String?
+  /// Le module de conseil (« PHYTOTHERAPIE »…) : l'association ne vaut que dans les pharmacies qui ont choisi ce module.
+  /// `null` : association commune à toutes les pharmacies.
+  module           String?
   status           CentralStatus      @default(ACTIVE)
   sortOrder        Int                @default(0)
   decidedAt        DateTime?
@@ -2697,6 +2700,7 @@ model CentralAssociation {
 
   @@unique([triggerKey, adviceEan])
   @@index([status])
+  @@index([module])
   @@map("central_associations")
 }
 

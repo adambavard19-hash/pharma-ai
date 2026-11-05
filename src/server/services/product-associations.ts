@@ -11,6 +11,7 @@ import { belongsToFamily, familyKey, type FamilyDefinition } from "@/core/associ
 import type { CatalogProduct } from "@/core/ai/types";
 import type { TenantScope } from "@/server/db/tenant";
 import { loadAssociationDrugProducts } from "./catalog";
+import { loadAdviceModules } from "./advice-modules";
 
 /**
  * Les associations de produits de l'officine : lecture pour le moteur, et gestion par le pharmacien.
@@ -108,8 +109,10 @@ export async function resolveLineTriggers(
  */
 async function loadCentralRules(pharmacyId: string): Promise<{ rules: AssociationInput["rules"]; triggerProductIds: string[]; families: FamilyDefinition[] }> {
   // Seules les associations VALIDÉES par Adam ou Donna (2 nov. 2026 : « rien en ligne sans notre validation »).
+  // Une association d'un module (Console → Gestion → Modules) ne vaut que dans les pharmacies qui ont choisi ce module.
+  const modules = await loadAdviceModules(pharmacyId).catch(() => []);
   const central = await prisma.centralAssociation.findMany({
-    where: { status: "VALIDATED" },
+    where: { status: "VALIDATED", OR: [{ module: null }, ...(modules.length > 0 ? [{ module: { in: modules } }] : [])] },
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }, { id: "asc" }],
     select: { id: true, triggerKind: true, triggerKey: true, adviceEan: true, sentence: true, sortOrder: true },
   });

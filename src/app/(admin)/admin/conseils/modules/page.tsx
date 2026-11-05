@@ -4,6 +4,9 @@ import { listPharmacyModules } from "@/server/services/advice-modules";
 import { ADVICE_MODULES } from "@/core/ai/advice-modules";
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { PharmacyModules } from "./pharmacy-modules";
+import { ModuleAssociations } from "./module-associations";
+import { listCentralAssociations, loadEditHistory, modifiedAssociations } from "@/server/services/central-advice";
+import { listTriggerFamilies } from "@/server/services/trigger-families";
 
 export const metadata: Metadata = { title: "Modules de conseil" };
 
@@ -14,7 +17,20 @@ export const metadata: Metadata = { title: "Modules de conseil" };
  */
 export default async function AdviceModulesPage() {
   await requirePlatformSession();
-  const pharmacies = await listPharmacyModules();
+  const [pharmacies, all, history, edits, families] = await Promise.all([listPharmacyModules(), listCentralAssociations(), loadEditHistory(), modifiedAssociations(), listTriggerFamilies()]);
+  const associations = all
+    .filter((association) => association.module !== null)
+    .map((association) => {
+      const edit = edits.get(association.id);
+      return {
+        ...association,
+        decidedAt: association.decidedAt ? association.decidedAt.toISOString() : null,
+        createdAt: association.createdAt.toISOString(),
+        modified: edit ? { by: edit.by, at: edit.at.toISOString() } : null,
+        history: (history.get(`association:${association.id}`) ?? []).map((entry) => ({ ...entry, at: entry.at.toISOString() })),
+        fromRobot: false,
+      };
+    });
   return (
     <>
       <AdminPageHeader
@@ -33,6 +49,10 @@ export default async function AdviceModulesPage() {
           </div>
         ))}
       </div>
+      <ModuleAssociations
+        associations={associations}
+        families={families.filter((family) => family.status !== "REMOVED").map((family) => ({ id: family.id, name: family.name, count: family.products.length }))}
+      />
       <PharmacyModules pharmacies={pharmacies} />
     </>
   );

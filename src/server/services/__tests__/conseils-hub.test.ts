@@ -193,7 +193,7 @@ describe("la recherche sur les vraies règles du moteur", () => {
 
 describe("les autres conseils dans la même liste", () => {
   it("un conseil déclenché par un produit, une suggestion du robot : leurs filtres et leur recherche", () => {
-    const association = associationFacets({ id: "as_1", triggerKind: "PRODUCT", triggerLabel: "Crème solaire SPF50", adviceLabel: "Après-soleil", adviceEan: "3402222222222", sentence: "Après l'exposition, apaisez la peau.", status: "ACTIVE", decidedBy: null, decidedAt: null, createdBy: "Donna", createdAt: new Date() }, new Set());
+    const association = associationFacets({ id: "as_1", triggerKind: "PRODUCT", triggerLabel: "Crème solaire SPF50", adviceLabel: "Après-soleil", adviceEan: "3402222222222", sentence: "Après l'exposition, apaisez la peau.", module: null, status: "ACTIVE", decidedBy: null, decidedAt: null, createdBy: "Donna", createdAt: new Date() }, new Set());
     expect(matchesFilter(association, "PRODUCT")).toBe(true);
     expect(matchesFilter(association, "MEDICINE")).toBe(false);
     expect(matchesHubQuery(association, parseHubQuery("apaisez solaire"))).toBe(true);

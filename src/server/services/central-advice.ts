@@ -1,4 +1,5 @@
 import "server-only";
+import { ADVICE_MODULES } from "@/core/ai/advice-modules";
 import { randomBytes } from "node:crypto";
 import { Prisma } from "@/generated/prisma";
 import { prisma } from "@/server/db/client";
@@ -140,6 +141,8 @@ export type CentralAssociationView = {
   adviceLabel: string;
   adviceEan: string;
   sentence: string | null;
+  /** Le module de conseil de l'association ; `null` : commune à toutes les pharmacies. */
+  module: string | null;
   status: CentralStatus;
   decidedBy: string | null;
   decidedAt: Date | null;
@@ -259,6 +262,7 @@ export async function listCentralAssociations(): Promise<CentralAssociationView[
     adviceLabel: row.adviceLabel,
     adviceEan: row.adviceEan,
     sentence: row.sentence,
+    module: row.module,
     status: row.status,
     decidedBy: row.status === "ACTIVE" ? null : row.decidedByName,
     decidedAt: row.status === "ACTIVE" ? null : row.decidedAt,
@@ -328,9 +332,13 @@ export type AssociationDraft = {
   trigger: { kind: "MEDICINE"; name: string } | { kind: "PRODUCT"; ean: string; name: string } | { kind: "FAMILY"; familyId: string } | { kind: "ATC"; code: string; label: string | null };
   advice: { ean: string; name: string };
   sentence: string | null;
+  /** Le module de conseil (Console → Gestion → Modules) : l'association ne vaut que chez les pharmacies de ce module. */
+  module?: string | null;
 };
 
 export async function addCentralAssociation(admin: Admin, draft: AssociationDraft): Promise<{ ok: true; id: string } | Failure> {
+  const adviceModule = draft.module ?? null;
+  if (adviceModule !== null && !ADVICE_MODULES.some((item) => item.code === adviceModule)) return { ok: false, error: "Module inconnu." };
   let familyName: string | null = null;
   if (draft.trigger.kind === "FAMILY") {
     const family = await prisma.triggerFamily.findFirst({ where: { id: draft.trigger.familyId, status: { not: "REMOVED" } }, select: { name: true } });
@@ -369,12 +377,13 @@ export async function addCentralAssociation(admin: Admin, draft: AssociationDraf
         adviceEan,
         adviceLabel: draft.advice.name.slice(0, 160),
         sentence,
+        module: adviceModule,
         createdByAdminId: admin.id,
         createdByName: admin.fullName,
       },
       select: { id: true },
     });
-    await recordAudit({ action: "central_advice.association_created", entityType: "CentralAssociation", entityId: created.id, platformAdminId: admin.id, metadata: { triggerKey, adviceEan } });
+    await recordAudit({ action: "central_advice.association_created", entityType: "CentralAssociation", entityId: created.id, platformAdminId: admin.id, metadata: { triggerKey, adviceEan, module: adviceModule } });
     return { ok: true, id: created.id };
   } catch (error) {
     if (typeof error === "object" && error !== null && (error as { code?: string }).code === "P2002") return { ok: false, error: "Cette association existe déjà." };
