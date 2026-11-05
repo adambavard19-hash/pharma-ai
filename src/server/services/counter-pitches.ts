@@ -1,4 +1,5 @@
 import "server-only";
+import { SHOW_MARGIN_AT_COUNTER } from "@/core/counter/notice";
 import { createHash } from "node:crypto";
 import { after } from "next/server";
 import { prisma } from "@/server/db/client";
@@ -166,7 +167,7 @@ export async function answersForSheet(pharmacyId: string, answers: PitchAnswer[]
       cache.set(ean, {
         name: row.name,
         ...(stock !== "UNKNOWN" && row.salePriceCents > 0 ? { price: euros(row.salePriceCents) } : {}),
-        ...(margin && margin.marginCents > 0 ? { margin: euros(margin.marginCents) } : {}),
+        ...(SHOW_MARGIN_AT_COUNTER && margin && margin.marginCents > 0 ? { margin: euros(margin.marginCents) } : {}),
         stock,
         ...(stock !== "UNKNOWN" && typeof row.stockItem?.quantity === "number" && row.stockItem.quantity >= 0 ? { quantity: row.stockItem.quantity } : {}),
       });

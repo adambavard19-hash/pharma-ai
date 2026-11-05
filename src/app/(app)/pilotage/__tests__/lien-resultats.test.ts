@@ -100,7 +100,10 @@ describe("la page « Performances » — onglet « Classement de l'équipe »", 
     const page = text(await render());
     expect(page).toContain("Toute l'officine");
     expect(page).toContain("Mes ventes et mon poste");
-    expect(page).toContain("Qui a vendu le plus de conseils ce mois-ci");
+    expect(page).toContain("Classement de l'équipe ce mois-ci");
+    // Le titulaire voit, pour chaque pharmacien, le chiffre d'affaires et la marge générés (fondateur, 4 nov. 2026).
+    expect(page).toContain("de chiffre d'affaires");
+    expect(page).toContain("de marge HT");
     expect(mocks.loadSoldCounter).toHaveBeenCalledWith(expect.objectContaining({ pharmacyId: "ph_a", onlyFor: { userId: "user_a", postIds: ["post_1"] } }));
     expect(mocks.loadSoldCounter).toHaveBeenCalledWith(expect.not.objectContaining({ onlyFor: expect.anything() }));
   });
@@ -116,5 +119,9 @@ describe("la page « Performances » — onglet « Classement de l'équipe »", 
     expect(page).not.toContain("Challenges en cours");
     expect(page).not.toContain("Classement de l'équipe");
     expect(mocks.loadTeamRanking).not.toHaveBeenCalled();
+    // Aucun montant pour un membre de l'équipe : son classement se lit en conseils (fondateur, 4 nov. 2026).
+    expect(page).not.toContain("€");
+    expect(page).not.toContain("Chiffre d'affaires");
+    expect(page).toMatch(/Vous\s*\d+ conseils?/);
   });
 });

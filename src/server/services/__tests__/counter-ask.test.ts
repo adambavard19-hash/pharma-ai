@@ -15,14 +15,15 @@ const answer = (proposals: unknown[], over: Record<string, unknown> = {}) => ({ 
 const row = { id: "p1", ean: null, salePriceCents: 990, purchasePriceCents: 500, vatRate: 5.5, stockItem: { quantity: 4, alertThreshold: 2 } };
 
 describe("« Demander un conseil » : la réponse dans la forme d'une vente bipée", () => {
-  it("un conseil : nom de gamme, prix, marge, stock, fiche (posologie de la gamme, à dire au patient, questions)", () => {
+  it("un conseil : nom de gamme, prix, stock (sans marge), fiche (posologie de la gamme, à dire au patient, questions)", () => {
     const body = askNoticeBody("diarrhée depuis hier", answer([proposal()]), [row]);
     expect(body.subject).toBe("diarrhée depuis hier");
     expect(body.items).toHaveLength(1);
     const item = body.items![0]!;
     expect(item.name).toBe("Hydratis, pastilles d'électrolytes · goût au choix");
     expect(item.priceCents).toBe(990);
-    expect(item.marginCents).toBeGreaterThan(0);
+    // Plus de marge sur la bannière (fondateur, 4 nov. 2026).
+    expect(item.marginCents ?? null).toBeNull();
     const sheet = item.sheet as { description: string; usage: { text: string }[]; ask: string[] };
     expect(sheet.description).toMatch(/par jour/);
     expect(sheet.usage.map((line) => line.text)).toContain("Diarrhée au-delà de 48 h : consultez.");

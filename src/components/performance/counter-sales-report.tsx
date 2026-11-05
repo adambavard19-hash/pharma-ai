@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
  * survole jour par jour (ou heure par heure), par collaborateur, par produit — et le PDF à télécharger. Même écran pour le
  * titulaire et pour la console de PharmaBoost.
  */
-export function CounterSalesReport({ report, hrefs, pdfHref }: { report: SalesReportView; /** L'adresse de chaque période (calculée côté serveur). */ hrefs: Record<SalesReportPeriod, string>; /** Absent : pas de PDF (l'historique d'un membre de l'équipe). */ pdfHref?: string }) {
+export function CounterSalesReport({ report, hrefs, pdfHref, money = true }: { report: SalesReportView; /** L'adresse de chaque période (calculée côté serveur). */ hrefs: Record<SalesReportPeriod, string>; /** Absent : pas de PDF (l'historique d'un membre de l'équipe). */ pdfHref?: string; /** false : aucun montant, pour un membre de l'équipe (fondateur, 4 nov. 2026). */ money?: boolean }) {
   const [hover, setHover] = useState<number | null>(null);
   const max = Math.max(1, ...report.buckets.map((bucket) => bucket.sales));
   const focus = hover !== null ? report.buckets[hover] : null;
@@ -66,13 +66,17 @@ export function CounterSalesReport({ report, hrefs, pdfHref }: { report: SalesRe
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+        <div className={cn("grid grid-cols-2 gap-3 md:grid-cols-3", money && "lg:grid-cols-6")}>
           <Tile label="Ventes terminées" value={String(report.sales)} />
           <Tile label="Avec un conseil vendu" value={String(report.withAdvice)} sub={percent(report.attachRate)} />
           <Tile label="Conseils vendus" value={String(report.sold)} sub={`sur ${report.proposed} proposés`} />
-          <Tile label="Chiffre d'affaires ajouté" value={euros(report.revenueCents)} accent />
-          <Tile label="Marge ajoutée (HT)" value={report.marginCents > 0 ? euros(report.marginCents) : "—"} />
-          <Tile label="CA ajouté par vente" value={report.revenuePerSaleCents === null ? "—" : euros(report.revenuePerSaleCents)} />
+          {money && (
+            <>
+              <Tile label="Chiffre d'affaires ajouté" value={euros(report.revenueCents)} accent />
+              <Tile label="Marge ajoutée (HT)" value={report.marginCents > 0 ? euros(report.marginCents) : "—"} />
+              <Tile label="CA ajouté par vente" value={report.revenuePerSaleCents === null ? "—" : euros(report.revenuePerSaleCents)} />
+            </>
+          )}
         </div>
 
         {/* Le graphique, qu'on survole */}
@@ -82,7 +86,7 @@ export function CounterSalesReport({ report, hrefs, pdfHref }: { report: SalesRe
             <p className="text-[12.5px] text-text-secondary" aria-live="polite">
               {focus ? (
                 <>
-                  <strong className="text-text-primary">{focus.label}</strong> · {focus.sales} vente{focus.sales > 1 ? "s" : ""} · {focus.withAdvice} avec conseil · {focus.sold} conseil{focus.sold > 1 ? "s" : ""} · {euros(focus.revenueCents)}
+                  <strong className="text-text-primary">{focus.label}</strong> · {focus.sales} vente{focus.sales > 1 ? "s" : ""} · {focus.withAdvice} avec conseil · {focus.sold} conseil{focus.sold > 1 ? "s" : ""}{money ? ` · ${euros(focus.revenueCents)}` : ""}
                 </>
               ) : (
                 <span className="inline-flex items-center gap-3">
@@ -99,7 +103,7 @@ export function CounterSalesReport({ report, hrefs, pdfHref }: { report: SalesRe
                 type="button"
                 onMouseEnter={() => setHover(index)}
                 onFocus={() => setHover(index)}
-                aria-label={`${bucket.label} : ${bucket.sales} ventes, ${bucket.withAdvice} avec conseil vendu, ${euros(bucket.revenueCents)}`}
+                aria-label={`${bucket.label} : ${bucket.sales} ventes, ${bucket.withAdvice} avec conseil vendu${money ? `, ${euros(bucket.revenueCents)}` : ""}`}
                 className={cn("group relative flex h-full flex-1 items-end rounded-t-sm", hover === index && "bg-surface-sunken")}
               >
                 <span className="relative block w-full rounded-t-sm bg-border-default transition-all" style={{ height: `${(bucket.sales / max) * 100}%` }}>
@@ -124,14 +128,14 @@ export function CounterSalesReport({ report, hrefs, pdfHref }: { report: SalesRe
             rows={report.byPerson.map((person) => ({
               key: person.who,
               label: person.who,
-              detail: `${person.sales} vente${person.sales > 1 ? "s" : ""} · ${person.withAdvice} avec conseil (${percent(person.sales ? person.withAdvice / person.sales : null)})`,
-              value: euros(person.revenueCents),
+              detail: `${person.sales} vente${person.sales > 1 ? "s" : ""} · ${person.withAdvice} avec conseil (${percent(person.sales ? person.withAdvice / person.sales : null)})${money && person.marginCents > 0 ? ` · marge ${euros(person.marginCents)} HT` : ""}`,
+              value: money ? euros(person.revenueCents) : `${person.sold} conseil${person.sold > 1 ? "s" : ""}`,
             }))}
           />
           <List
             title="Conseils les plus vendus"
             empty="Aucun conseil vendu pour l'instant."
-            rows={report.topProducts.map((product) => ({ key: product.name, label: product.name, detail: `${product.sold} vendu${product.sold > 1 ? "s" : ""}`, value: euros(product.revenueCents) }))}
+            rows={report.topProducts.map((product) => ({ key: product.name, label: product.name, detail: `${product.sold} vendu${product.sold > 1 ? "s" : ""}`, value: money ? euros(product.revenueCents) : "" }))}
           />
         </div>
       </CardContent>

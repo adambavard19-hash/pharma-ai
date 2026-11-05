@@ -13,6 +13,12 @@ import type { ViewQuestion } from "./question-tree";
 import type { CounterSheet } from "../../../agent/src/counter-sheet";
 import { saleTitle } from "./sale-title";
 
+/**
+ * La marge ne s'affiche PLUS sur la bannière, pour personne, titulaire compris (fondateur, 4 nov. 2026) : « ça peut être mal vu ».
+ * Elle reste comptée pour le titulaire dans Performance (par pharmacien), jamais au comptoir.
+ */
+export const SHOW_MARGIN_AT_COUNTER = false;
+
 export type NoticeAlert = { severity: string; subjectType: string; code: string; message: string; acknowledged: boolean };
 
 /**
@@ -260,7 +266,7 @@ export function buildCounterNotice(input: CounterNoticeInput): CounterNotice {
     name: shortName(rec.name),
     priceCents: reliable && rec.priceCents !== null && rec.priceCents > 0 ? rec.priceCents : null,
     // Une marge négative ou nulle trahit un prix mal lu : on ne l'affiche pas plutôt que d'afficher un chiffre faux.
-    ...(rec.marginCents != null && rec.marginCents > 0 ? { marginCents: rec.marginCents } : {}),
+    ...(SHOW_MARGIN_AT_COUNTER && rec.marginCents != null && rec.marginCents > 0 ? { marginCents: rec.marginCents } : {}),
     reason: rec.reason,
     availability: availabilityOf(rec.quantity, rec.alertThreshold, reliable),
     quantity: reliable ? (rec.quantity ?? null) : null,

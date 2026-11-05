@@ -12,7 +12,8 @@ export async function salesReportPdfFile(pharmacyId: string, period: SalesReport
   // Une période de la console (« 2026-10-16 », « mois-en-cours »…) ou une des trois périodes historiques.
   const range = resolveReportRange(typeof period === "string" ? (SALES_REPORT_PERIODS.find((entry) => entry.key === period)?.param ?? "semaine") : period.param, now, TIME_ZONE);
   const report = await loadSalesReport({ pharmacyId, range, now, onlyFor: options.onlyFor });
-  const bytes = await renderSalesReportPdf({ pharmacyName: options.person ? `${pharmacy.name} · ${options.person}` : pharmacy.name, report, generatedAt: now, timeZone: TIME_ZONE });
+  // Le PDF d'un membre de l'équipe ne montre aucun montant (fondateur, 4 nov. 2026) ; celui du titulaire, tout.
+  const bytes = await renderSalesReportPdf({ pharmacyName: options.person ? `${pharmacy.name} · ${options.person}` : pharmacy.name, report, generatedAt: now, timeZone: TIME_ZONE, money: !options.onlyFor });
   const day = new Intl.DateTimeFormat("fr-CA", { timeZone: TIME_ZONE }).format(now);
   const slug = pharmacy.name.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
   const label = range.param;

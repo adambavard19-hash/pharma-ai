@@ -28,8 +28,9 @@ function safe(text: string): string {
 
 const fmtDate = (date: Date, timeZone: string, style: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("fr-FR", { timeZone, ...style }).format(date);
 
-export async function renderSalesReportPdf(input: { pharmacyName: string; report: SalesReport; generatedAt: Date; timeZone: string }): Promise<Uint8Array> {
+export async function renderSalesReportPdf(input: { pharmacyName: string; report: SalesReport; generatedAt: Date; timeZone: string; /** false : aucun montant, pour un membre de l'équipe (fondateur, 4 nov. 2026). */ money?: boolean }): Promise<Uint8Array> {
   const { report, timeZone } = input;
+  const money = input.money !== false;
   const pdf = await PDFDocument.create();
   const periodLabel = report.label;
   pdf.setTitle(safe(`Performance du comptoir - ${input.pharmacyName} - ${periodLabel}`));
@@ -84,9 +85,13 @@ export async function renderSalesReportPdf(input: { pharmacyName: string; report
     ["Ventes terminées", String(report.sales)],
     ["Avec un conseil vendu", `${report.withAdvice} (${percent(report.attachRate)})`],
     ["Conseils vendus / proposés", `${report.sold} / ${report.proposed} (${percent(report.proposed > 0 ? report.sold / report.proposed : null)})`],
-    ["Chiffre d'affaires ajouté", euros(report.revenueCents)],
-    ["Marge ajoutée (HT)", report.marginCents > 0 ? euros(report.marginCents) : "-"],
-    ["CA ajouté par vente", report.revenuePerSaleCents === null ? "-" : euros(report.revenuePerSaleCents)],
+    ...(money
+      ? ([
+          ["Chiffre d'affaires ajouté", euros(report.revenueCents)],
+          ["Marge ajoutée (HT)", report.marginCents > 0 ? euros(report.marginCents) : "-"],
+          ["CA ajouté par vente", report.revenuePerSaleCents === null ? "-" : euros(report.revenuePerSaleCents)],
+        ] as [string, string][])
+      : []),
   ];
   const tileW = (width - 2 * 10) / 3;
   tiles.forEach(([label, value], index) => {
@@ -96,7 +101,7 @@ export async function renderSalesReportPdf(input: { pharmacyName: string; report
     text(label, x + 10, top - 16, 8.5, regular, GREY);
     text(value, x + 10, top - 36, 13, bold);
   });
-  y -= 128;
+  y -= money ? 128 : 70;
 
   // Le graphique : chiffre d'affaires ajouté par jour (ou par heure)
   text(report.byHour ? "Par heure" : "Par jour", M, y, 11, bold);
@@ -123,7 +128,7 @@ export async function renderSalesReportPdf(input: { pharmacyName: string; report
   text("Détail", M, y, 11, bold);
   y -= 16;
   const cols = [M, M + 120, M + 230, M + 340, M + width];
-  const header = ["", "Ventes terminées", "Avec conseil vendu", "Conseils vendus", "CA ajouté"];
+  const header = ["", "Ventes terminées", "Avec conseil vendu", "Conseils vendus", money ? "CA ajouté" : ""];
   header.forEach((label, index) => (index === 0 ? text(report.byHour ? "Heure" : "Jour", cols[0], y, 8.5, bold, GREY) : right(label, index === 4 ? cols[4] : cols[index] + 90, y, 8.5, bold, GREY)));
   y -= 6;
   page.drawLine({ start: { x: M, y }, end: { x: M + width, y }, thickness: 0.6, color: LINE });
@@ -134,7 +139,7 @@ export async function renderSalesReportPdf(input: { pharmacyName: string; report
     right(String(bucket.sales), cols[1] + 90, y, 9);
     right(`${bucket.withAdvice} (${percent(bucket.sales ? bucket.withAdvice / bucket.sales : null)})`, cols[2] + 90, y, 9);
     right(String(bucket.sold), cols[3] + 90, y, 9);
-    right(euros(bucket.revenueCents), cols[4], y, 9, bold);
+    if (money) right(euros(bucket.revenueCents), cols[4], y, 9, bold);
   }
   if (report.sales === 0) {
     y -= 14;
@@ -150,8 +155,8 @@ export async function renderSalesReportPdf(input: { pharmacyName: string; report
     for (const person of report.byPerson) {
       ensure(16);
       text(person.who, M, y, 9);
-      right(`${person.sales} ventes - ${person.withAdvice} avec conseil (${percent(person.sales ? person.withAdvice / person.sales : null)}) - ${person.sold} conseils`, M + width - 90, y, 9, regular, GREY);
-      right(euros(person.revenueCents), M + width, y, 9, bold);
+      right(`${person.sales} ventes - ${person.withAdvice} avec conseil (${percent(person.sales ? person.withAdvice / person.sales : null)}) - ${person.sold} conseils${money && person.marginCents > 0 ? ` - marge ${euros(person.marginCents)} HT` : ""}`, M + width - 90, y, 9, regular, GREY);
+      if (money) right(euros(person.revenueCents), M + width, y, 9, bold);
       y -= 13;
     }
     y -= 14;
@@ -166,7 +171,7 @@ export async function renderSalesReportPdf(input: { pharmacyName: string; report
       ensure(16);
       text(product.name.length > 70 ? `${product.name.slice(0, 67)}...` : product.name, M, y, 9);
       right(`${product.sold} vendu${product.sold > 1 ? "s" : ""}`, M + width - 90, y, 9, regular, GREY);
-      right(euros(product.revenueCents), M + width, y, 9, bold);
+      if (money) right(euros(product.revenueCents), M + width, y, 9, bold);
       y -= 13;
     }
   }

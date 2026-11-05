@@ -61,7 +61,7 @@ export type SalesReport = {
   /** Chiffre d'affaires ajouté par vente terminée. */
   revenuePerSaleCents: number | null;
   buckets: ReportBucket[];
-  byPerson: { who: string; sales: number; withAdvice: number; sold: number; revenueCents: number }[];
+  byPerson: { who: string; sales: number; withAdvice: number; sold: number; revenueCents: number; /** Marge HT ajoutée (prix connus), pour le titulaire seul. */ marginCents: number }[];
   topProducts: { name: string; sold: number; revenueCents: number }[];
   emailsSent: number;
 };
@@ -149,10 +149,11 @@ export function buildSalesReport(input: { period?: SalesReportPeriod; range?: Re
       if (hasAdvice) bucket.withAdvice += 1;
     }
 
-    const person = people.get(sale.who) ?? { who: sale.who, sales: 0, withAdvice: 0, sold: 0, revenueCents: 0 };
+    const person = people.get(sale.who) ?? { who: sale.who, sales: 0, withAdvice: 0, sold: 0, revenueCents: 0, marginCents: 0 };
     person.sales += 1;
     person.sold += sale.sold;
     person.revenueCents += revenue;
+    person.marginCents += sale.soldItems.reduce((sum, item) => sum + (item.marginCents ?? 0), 0);
     if (hasAdvice) person.withAdvice += 1;
     people.set(sale.who, person);
 

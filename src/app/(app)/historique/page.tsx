@@ -74,6 +74,7 @@ export default async function HistoriquePage({ searchParams }: { searchParams: P
         report={toSalesReportView(report)}
         hrefs={Object.fromEntries(SALES_REPORT_PERIODS.map((entry) => [entry.key, `/historique?periode=${entry.param}`])) as Record<SalesReportPeriod, string>}
         pdfHref={everyone ? `/api/performance/comptoir-pdf?periode=${param(period)}` : undefined}
+        money={everyone}
       />
 
       <Card>
@@ -119,7 +120,7 @@ export default async function HistoriquePage({ searchParams }: { searchParams: P
                   <th className="px-4 py-3">Boîtes scannées</th>
                   <th className="px-4 py-3">Conseils</th>
                   <th className="px-4 py-3">Vendus</th>
-                  <th className="px-4 py-3 text-right">CA ajouté</th>
+                  {everyone && <th className="px-4 py-3 text-right">CA ajouté</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-subtle">
@@ -161,7 +162,7 @@ export default async function HistoriquePage({ searchParams }: { searchParams: P
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-right font-semibold whitespace-nowrap text-text-primary tabular-nums">{revenue > 0 ? euros(revenue) : "—"}</td>
+                      {everyone && <td className="px-4 py-3 text-right font-semibold whitespace-nowrap text-text-primary tabular-nums">{revenue > 0 ? euros(revenue) : "—"}</td>}
                     </tr>
                   );
                 })}

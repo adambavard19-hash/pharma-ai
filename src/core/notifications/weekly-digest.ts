@@ -51,13 +51,14 @@ export function buildDailyDigest(input: DailyDigestInput, ctx: EmailContext): Re
     items: [
       { value: String(advice.proposed), label: plural(advice.proposed, "conseil proposé", "conseils proposés"), trend: `dans ${advice.sales} ${plural(advice.sales, "vente", "ventes")}` },
       { value: String(advice.sold), label: plural(advice.sold, "conseil vendu", "conseils vendus"), trend: null },
-      { value: euros(advice.revenueTtcCents), label: "de chiffre d'affaires ajouté (TTC)", trend: null },
+      // Le chiffre d'affaires pour le titulaire seul : un membre de l'équipe ne voit aucun montant (fondateur, 4 nov. 2026).
+      ...(owner ? [{ value: euros(advice.revenueTtcCents), label: "de chiffre d'affaires ajouté (TTC)", trend: null }] : []),
     ],
   });
   const rate = Math.round((advice.sold / advice.proposed) * 1000) / 10;
   blocks.push({
     kind: "note",
-    text: `Taux de vente : ${rate.toLocaleString("fr-FR")} % des conseils proposés ont été vendus. Compté sur les ventes terminées au comptoir : un conseil bipé (ou déclaré vendu) est vendu, au prix de vente de l'officine.${input.pdfAttached ? " Le rapport complet de la semaine est joint en PDF." : ""}`,
+    text: `Taux de vente : ${rate.toLocaleString("fr-FR")} % des conseils proposés ont été vendus. Compté sur les ventes terminées au comptoir : un conseil bipé (ou déclaré vendu) est vendu${owner ? ", au prix de vente de l'officine" : ""}.${input.pdfAttached ? " Le rapport complet de la semaine est joint en PDF." : ""}`,
   });
   blocks.push({ kind: "button", url: input.links.results, label: owner ? "Voir les résultats de l'officine" : "Voir mes ventes" });
 
@@ -78,7 +79,7 @@ export function buildDailyDigest(input: DailyDigestInput, ctx: EmailContext): Re
   return renderEmail(ctx, {
     website: true,
     subject: owner ? `Votre bilan de la semaine — ${pharmacy}` : `Votre performance de la semaine — ${pharmacy}`,
-    preheader: `${advice.proposed} ${plural(advice.proposed, "conseil proposé", "conseils proposés")}, ${advice.sold} ${plural(advice.sold, "vendu", "vendus")}, ${euros(advice.revenueTtcCents)} de chiffre d'affaires ajouté.`,
+    preheader: `${advice.proposed} ${plural(advice.proposed, "conseil proposé", "conseils proposés")}, ${advice.sold} ${plural(advice.sold, "vendu", "vendus")}${owner ? `, ${euros(advice.revenueTtcCents)} de chiffre d'affaires ajouté` : ""}.`,
     eyebrow: `Bilan de la semaine · ${input.dayLabel}`,
     title: owner ? `La semaine de ${pharmacy}` : "Votre semaine au comptoir",
     greeting: input.firstName ? `Bonjour ${input.firstName},` : "Bonjour,",

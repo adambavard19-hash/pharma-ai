@@ -48,7 +48,7 @@ export default async function PilotagePage({ searchParams }: { searchParams: Pro
     return (
       <div className="space-y-6">
         <PageHeader title="Mes performances" description={`${session.user.firstName}, voici les conseils que vous avez vendus au comptoir.`} />
-        <SoldCounter periods={mine.periods} title="Mes conseils vendus" subtitle="Vos ventes terminées, déclarées « Vendu »" initial={2} />
+        <SoldCounter periods={mine.periods} title="Mes conseils vendus" subtitle="Vos ventes terminées, déclarées « Vendu »" initial={2} money={false} />
         <MyPlaceAndProducts me={session.user.fullName} ranking={team.reports[2].byPerson} products={mine.reports[2].topProducts} />
       </div>
     );

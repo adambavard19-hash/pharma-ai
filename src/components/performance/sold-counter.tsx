@@ -43,7 +43,7 @@ function useCountUp(target: number) {
   return value;
 }
 
-export function SoldCounter({ periods, title, subtitle, initial = 1 }: { periods: CounterPeriod[]; title: string; subtitle: string; initial?: number }) {
+export function SoldCounter({ periods, title, subtitle, initial = 1, money = true }: { periods: CounterPeriod[]; title: string; subtitle: string; initial?: number; /** false : aucun montant (l'espace d'un membre de l'équipe, fondateur 4 nov. 2026). */ money?: boolean }) {
   const [index, setIndex] = useState(initial);
   const period = periods[index];
   const shown = useCountUp(period.sold);
@@ -81,11 +81,13 @@ export function SoldCounter({ periods, title, subtitle, initial = 1 }: { periods
         <Trophy className="mb-3 hidden size-10 text-amber-300 sm:block" aria-hidden="true" />
       </div>
 
-      <dl className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="rounded-2xl bg-white/10 p-3.5">
-          <dt className="text-[12.5px] text-white/70">Chiffre d&apos;affaires ajouté</dt>
-          <dd className="mt-0.5 text-[22px] font-semibold tabular">{period.revenue}</dd>
-        </div>
+      <dl className={cn("mt-5 grid grid-cols-1 gap-3", money ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
+        {money && (
+          <div className="rounded-2xl bg-white/10 p-3.5">
+            <dt className="text-[12.5px] text-white/70">Chiffre d&apos;affaires ajouté</dt>
+            <dd className="mt-0.5 text-[22px] font-semibold tabular">{period.revenue}</dd>
+          </div>
+        )}
         <div className="rounded-2xl bg-white/10 p-3.5">
           <dt className="text-[12.5px] text-white/70">Ventes avec un conseil vendu</dt>
           <dd className="mt-0.5 text-[22px] font-semibold tabular">{period.salesWithAdvice}</dd>

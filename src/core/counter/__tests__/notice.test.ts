@@ -76,8 +76,8 @@ describe("les conseils structurés de la fenêtre du poste (photo, disponibilit�
     expect(items).toEqual([{ id: null, drug: null, challenge: null, shortDateOn: null, outcome: "NONE", name: "ELUDAY GENCIVE 500 ml", priceCents: 790, reason: "Sécheresse buccale", availability: "IN_STOCK", quantity: 6, imageUrl: "https://images.openbeautyfacts.org/x.jpg", sheet: null }]);
   });
 
-  it("passe la marge HT positive au pharmacien, et l'omet quand elle est nulle ou négative (prix mal lu)", () => {
-    expect(notice([{ ...rec(), marginCents: 1110 }]).items[0]).toMatchObject({ marginCents: 1110 });
+  it("ne montre plus jamais la marge sur la bannière, même positive (fondateur, 4 nov. 2026)", () => {
+    expect(notice([{ ...rec(), marginCents: 1110 }]).items[0]).not.toHaveProperty("marginCents");
     expect(notice([{ ...rec(), marginCents: -1480 }]).items[0]).not.toHaveProperty("marginCents");
   });
 

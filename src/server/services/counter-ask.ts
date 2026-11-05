@@ -1,4 +1,5 @@
 import "server-only";
+import { SHOW_MARGIN_AT_COUNTER } from "@/core/counter/notice";
 import { prisma } from "@/server/db/client";
 import type { TenantScope } from "@/server/db/tenant";
 import { adviseCounterRequest, type CounterRequestAnswer } from "@/server/services/counter-request";
@@ -116,7 +117,7 @@ export function askNoticeBody(text: string, answer: CounterRequestAnswer, produc
       outcome: "NONE",
       name,
       priceCents: priceTrusted && proposal.salePriceCents > 0 ? proposal.salePriceCents : null,
-      marginCents: priceTrusted && margin && margin.marginCents > 0 ? margin.marginCents : null,
+      marginCents: SHOW_MARGIN_AT_COUNTER && priceTrusted && margin && margin.marginCents > 0 ? margin.marginCents : null,
       reason: proposal.shortReason || null,
       availability: availabilityOf(row?.stockItem?.quantity ?? proposal.stockQuantity, row?.stockItem?.alertThreshold ?? null, true),
       quantity: row?.stockItem?.quantity ?? proposal.stockQuantity ?? null,

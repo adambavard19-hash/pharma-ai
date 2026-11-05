@@ -11,7 +11,10 @@ import { cn } from "@/lib/utils";
 type Person = SalesReport["byPerson"][number];
 type Product = SalesReport["topProducts"][number];
 
-/** Sa place dans l'équipe ce mois-ci, ce qu'il manque pour passer devant, et ses conseils qui partent le mieux. */
+/**
+ * Sa place dans l'équipe ce mois-ci, ce qu'il manque pour passer devant, le classement de l'équipe en CONSEILS VENDUS et ses
+ * conseils qui partent le mieux. Aucun montant : le membre de l'équipe ne voit ni chiffre d'affaires ni marge (fondateur, 4 nov. 2026).
+ */
 export function MyPlaceAndProducts({ me, ranking: unsorted, products }: { me: string; ranking: Person[]; products: Product[] }) {
   const ranking = [...unsorted].sort((a, b) => b.sold - a.sold);
   const rank = ranking.findIndex((person) => person.who === me);
@@ -50,6 +53,19 @@ export function MyPlaceAndProducts({ me, ranking: unsorted, products }: { me: st
             </p>
           </>
         )}
+        {ranking.length > 0 && (
+          <ol className="mt-4 space-y-1.5 border-t border-border-subtle pt-3" aria-label="Classement de l'équipe en conseils vendus">
+            {ranking.slice(0, 8).map((person, i) => (
+              <li key={person.who} className={cn("flex items-center gap-3 rounded-lg px-2 py-1 text-[14px]", person.who === me && "bg-brand-50 font-semibold dark:bg-brand-950/40")}>
+                <span className="w-5 text-right text-[13px] text-text-tertiary tabular">{i + 1}</span>
+                <span className="min-w-0 flex-1 truncate text-text-primary">{person.who === me ? "Vous" : person.who}</span>
+                <span className="shrink-0 tabular text-text-primary">
+                  {person.sold} conseil{person.sold > 1 ? "s" : ""}
+                </span>
+              </li>
+            ))}
+          </ol>
+        )}
       </section>
 
       <section aria-labelledby="mes-top" className="rounded-2xl border border-border-subtle bg-surface-card p-5">
@@ -63,9 +79,7 @@ export function MyPlaceAndProducts({ me, ranking: unsorted, products }: { me: st
             {myMonth.topProducts.slice(0, 6).map((product) => (
               <li key={product.name} className="flex items-baseline justify-between gap-3 py-2">
                 <span className="truncate text-[14px] text-text-primary">{product.name}</span>
-                <span className="shrink-0 text-[13.5px] tabular text-text-secondary">
-                  {product.sold} × · {euros(product.revenueCents)}
-                </span>
+                <span className="shrink-0 text-[13.5px] tabular text-text-secondary">{product.sold} vendu{product.sold > 1 ? "s" : ""}</span>
               </li>
             ))}
           </ul>
@@ -75,15 +89,18 @@ export function MyPlaceAndProducts({ me, ranking: unsorted, products }: { me: st
   );
 }
 
-/** Qui a vendu le plus de conseils ce mois-ci, et les conseils qui partent le mieux, pour toute l'officine. */
+/**
+ * Pour le titulaire seul : chaque pharmacien classé par conseils vendus, avec le chiffre d'affaires et la marge qu'il a générés
+ * (fondateur, 4 nov. 2026), et les conseils qui partent le mieux dans toute l'officine.
+ */
 export function TeamSoldBoard({ people: unsorted, products }: { people: Person[]; products: Product[] }) {
-  const people = [...unsorted].sort((a, b) => b.sold - a.sold || b.revenueCents - a.revenueCents).slice(0, 6);
+  const people = [...unsorted].sort((a, b) => b.sold - a.sold || b.revenueCents - a.revenueCents).slice(0, 12);
   const best = people[0]?.sold ?? 0;
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <section aria-labelledby="qui-vend" className="rounded-2xl border border-border-subtle bg-surface-card p-5">
         <h2 id="qui-vend" className="text-[17px] font-semibold text-text-primary">
-          Qui a vendu le plus de conseils ce mois-ci
+          Classement de l&apos;équipe ce mois-ci
         </h2>
         {people.length === 0 ? (
           <p className="mt-3 text-[14px] text-text-secondary">Aucune vente terminée ce mois-ci.</p>
@@ -115,7 +132,7 @@ export function TeamSoldBoard({ people: unsorted, products }: { people: Person[]
                     />
                   </div>
                   <p className="mt-0.5 text-[12px] text-text-tertiary">
-                    {euros(person.revenueCents)} ajoutés · {person.sales} vente
+                    {euros(person.revenueCents)} de chiffre d&apos;affaires · {person.marginCents > 0 ? euros(person.marginCents) : "—"} de marge HT · {person.sales} vente
                     {person.sales > 1 ? "s" : ""}
                   </p>
                 </div>
