@@ -23,7 +23,7 @@ const members = [{ id: "lea", name: "Léa Martin" }, { id: "marc", name: "Marc D
 /** Le compteur des conseils vendus : `sold` ce mois-ci ; le classement du mois met Marc devant Léa. */
 const counter = (sold: number) => {
   const report = { byPerson: [{ who: "Marc Durand", sales: 20, withAdvice: 4, sold: 7, revenueCents: 9000 }, { who: "Léa Martin", sales: 10, withAdvice: 2, sold: 3, revenueCents: 4000 }], topProducts: [{ name: "Ultra-levure", sold: 3, revenueCents: 2700 }] };
-  const period = (key: string, label: string) => ({ key, label, sold, revenue: "1,00 €", salesWithAdvice: "1 sur 10 (10 %)", sales: 10, share: 0.1 });
+  const period = (key: string, label: string) => ({ key, label, sold, revenue: "1,00 €", salesWithAdvice: "1 sur 10 (10 %)", sales: 10, withAdvice: 1, share: 0.1 });
   return { periods: [period("jour", "Aujourd'hui"), period("semaine-en-cours", "Cette semaine"), period("mois-en-cours", "Ce mois-ci"), period("annee", "Cette année")], reports: [report, report, report, report] };
 };
 

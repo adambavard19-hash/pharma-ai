@@ -21,6 +21,8 @@ export type CounterPeriod = {
   sales: number;
   /** Ventes avec au moins un conseil vendu, de 0 à 1 ; null sans vente. */
   share: number | null;
+  /** Ventes terminées reparties avec au moins un conseil vendu. */
+  withAdvice: number;
 };
 
 function useCountUp(target: number) {
@@ -45,12 +47,10 @@ function useCountUp(target: number) {
   return value;
 }
 
-export function SoldCounter({ periods, title, subtitle, initial = 1, money = true }: { periods: CounterPeriod[]; title: string; subtitle: string; initial?: number; /** false : aucun montant (l'espace d'un membre de l'équipe, fondateur 4 nov. 2026). */ money?: boolean }) {
+export function SoldCounter({ periods, title, subtitle, initial = 1, money = true, rateLabel }: { periods: CounterPeriod[]; title: string; subtitle: string; initial?: number; /** false : aucun montant (l'espace d'un membre de l'équipe, fondateur 4 nov. 2026). */ money?: boolean; /** Le libellé du taux de conseil (par défaut : celui de la pharmacie, ou « Votre taux » sans montants). */ rateLabel?: string }) {
   const [index, setIndex] = useState(initial);
   const period = periods[index];
   const shown = useCountUp(period.sold);
-  const goal = 0.1;
-  const share = period.share ?? 0;
 
   // Une carte de verre posée sur l'ADN (fondateur, 5 nov. 2026 : « plus moderne, l'ADN en fond plutôt que le fond vert »).
   return (
@@ -91,17 +91,26 @@ export function SoldCounter({ periods, title, subtitle, initial = 1, money = tru
         {money && (
           <Tile icon={<TrendingUp className="size-4" />} label="Marge générée (HT)" value={period.margin ?? "—"} />
         )}
-        <Tile icon={<Target className="size-4" />} label="Ventes avec un conseil vendu" value={period.salesWithAdvice} />
-        <div className="rounded-2xl border border-border-subtle bg-white/70 p-3.5 dark:bg-white/5">
-          <dt className="text-[12.5px] text-text-secondary">Objectif : 10 % des ventes</dt>
-          <dd className="mt-2 h-2.5 overflow-hidden rounded-full bg-surface-sunken">
-            <span className={cn("block h-full rounded-full transition-[width] duration-700", share >= goal ? "bg-emerald-500" : "bg-amber-400")} style={{ width: `${Math.min(100, (share / goal) * 100)}%` }} />
+        <div className={"rounded-2xl border border-border-subtle bg-white/70 p-3.5 sm:col-span-2 dark:bg-white/5"}>
+          <dt className="flex items-center gap-1.5 text-[12.5px] text-text-secondary">
+            <span className="text-brand-600"><Target className="size-4" /></span>
+            {rateLabel ?? (money ? "Taux de conseil de la pharmacie" : "Votre taux de conseil")}
+          </dt>
+          <dd className="mt-0.5 text-[22px] font-semibold text-text-primary tabular">{period.share === null ? "—" : exactPercent(period.share)}</dd>
+          <dd className="mt-0.5 text-[12.5px] text-text-secondary">
+            {period.share === null
+              ? "Aucune vente terminée sur la période"
+              : `${period.withAdvice.toLocaleString("fr-FR")} client${period.withAdvice > 1 ? "s" : ""} sur ${period.sales.toLocaleString("fr-FR")} repart${period.withAdvice > 1 ? "ent" : ""} avec au moins un conseil vendu`}
           </dd>
-          <dd className="mt-1.5 text-[12.5px] text-text-secondary">{period.share === null ? "Aucune vente terminée sur la période" : share >= goal ? "Objectif atteint" : `${Math.round(share * 100)} % sur 10 %`}</dd>
         </div>
       </dl>
     </section>
   );
+}
+
+/** Le pourcentage exact, à une décimale : « 12,4 % ». */
+function exactPercent(rate: number): string {
+  return `${(Math.round(rate * 1000) / 10).toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} %`;
 }
 
 function Tile({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {

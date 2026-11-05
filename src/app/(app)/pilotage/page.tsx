@@ -73,7 +73,7 @@ export default async function PilotagePage({ searchParams }: { searchParams: Pro
       <PerformanceTabs active="equipe" />
 
       <SoldCounter periods={officine.periods} title="Toute l'officine" subtitle="Conseils vendus au comptoir, déclarés « Vendu »" initial={2} />
-      <SoldCounter periods={mine.periods} title="Mes ventes et mon poste" subtitle={`${session.user.firstName}, vos ventes et celles de vos comptoirs`} initial={2} />
+      <SoldCounter periods={mine.periods} title="Mes ventes et mon poste" subtitle={`${session.user.firstName}, vos ventes et celles de vos comptoirs`} initial={2} rateLabel="Votre taux de conseil" />
       <TeamSoldBoard people={officine.reports[2].byPerson} products={officine.reports[2].topProducts} />
 
       <nav aria-label="Période" className="flex flex-wrap gap-1.5">

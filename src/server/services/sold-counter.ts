@@ -28,6 +28,7 @@ export async function loadSoldCounter(input: { pharmacyId: string; now: Date; on
     margin: report.marginCents > 0 ? euros(report.marginCents) : "—",
     salesWithAdvice: `${report.withAdvice.toLocaleString("fr-FR")} sur ${report.sales.toLocaleString("fr-FR")} (${percent(report.attachRate)})`,
     sales: report.sales,
+    withAdvice: report.withAdvice,
     share: report.attachRate,
   }));
   return { periods, reports };

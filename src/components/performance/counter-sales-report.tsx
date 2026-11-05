@@ -3,9 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Download, Target, TrendingUp } from "lucide-react";
-import { ATTACH_TARGET, euros, percent, SALES_REPORT_PERIODS, type SalesReportPeriod, type SalesReportView } from "@/core/counter/sales-report";
+import { euros, percent, SALES_REPORT_PERIODS, type SalesReportPeriod, type SalesReportView } from "@/core/counter/sales-report";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 
@@ -50,17 +49,15 @@ export function CounterSalesReport({ report, hrefs, pdfHref, money = true }: { r
           </div>
         </div>
 
-        {/* Le verdict : l'objectif des 10 % */}
-        <div className={cn("flex items-center gap-3 rounded-xl border p-3.5", report.meetsTarget === false ? "border-warning-300 bg-warning-50 dark:bg-warning-700/10" : "border-brand-200 bg-brand-50/60 dark:border-brand-800 dark:bg-brand-950/30")}>
-          <Target className={cn("size-5 shrink-0", report.meetsTarget === false ? "text-warning-700" : "text-brand-700 dark:text-brand-300")} aria-hidden="true" />
+        {/* Le taux de conseil exact de la période (plus d'objectif affiché, fondateur 5 nov. 2026) */}
+        <div className={cn("flex items-center gap-3 rounded-xl border p-3.5", "border-brand-200 bg-brand-50/60 dark:border-brand-800 dark:bg-brand-950/30")}>
+          <Target className={cn("size-5 shrink-0", "text-brand-700 dark:text-brand-300")} aria-hidden="true" />
           <p className="text-[13.5px] leading-5 text-text-primary">
             {report.attachRate === null ? (
               "Aucune vente terminée sur la période : les chiffres apparaîtront dès la première."
             ) : (
               <>
-                <strong>{percent(report.attachRate)}</strong> des ventes terminées repartent avec au moins un conseil vendu{" "}
-                <span className="text-text-secondary">(objectif : {percent(ATTACH_TARGET)} minimum)</span>{" "}
-                {report.meetsTarget ? <Badge tone="success">Objectif atteint</Badge> : <Badge tone="warning">En dessous de l&apos;objectif</Badge>}
+                Taux de conseil : <strong>{percent(report.attachRate)}</strong> — {report.withAdvice} client{report.withAdvice > 1 ? "s" : ""} sur {report.sales} repart{report.withAdvice > 1 ? "ent" : ""} avec au moins un conseil vendu.
               </>
             )}
           </p>
