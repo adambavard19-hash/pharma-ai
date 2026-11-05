@@ -109,7 +109,7 @@ export default async function SitePage() {
             <span className="bg-gradient-to-r from-brand-600 to-[#0796b4] bg-clip-text text-transparent">de votre pharmacie.</span>
           </h1>
           <p className="mt-6 max-w-2xl text-[18px] leading-7 text-text-secondary md:text-[21px] md:leading-8">
-            À chaque boîte scannée, PharmaBoost montre à votre équipe le bon produit à conseiller, pris dans votre stock. Plus de conseils vendus, sans changer votre logiciel.
+            À chaque boîte scannée, PharmaBoost montre à votre équipe les conseils à proposer et la routine complète, avec les produits de votre stock. Plus de conseils vendus, sans changer votre logiciel.
           </p>
           {/* Plus de boutons sous le texte du héros (fondateur, 5 nov. 2026) : la vidéo vient juste après. */}
         </div>

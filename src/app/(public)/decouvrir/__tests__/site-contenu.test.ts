@@ -47,7 +47,7 @@ describe("le site dit ce que fait l'application, et rien de plus", () => {
     // Le premier écran façon limova.ai (fondateur, 24 oct. 2026).
     expect(homeText).toContain("Le copilote IA du comptoir de votre pharmacie.");
     expect(homeText).toContain("Réserver une démo");
-    expect(homeText).toContain("À chaque boîte scannée, PharmaBoost montre à votre équipe le bon produit à conseiller, pris dans votre stock.");
+    expect(homeText).toContain("À chaque boîte scannée, PharmaBoost montre à votre équipe les conseils à proposer et la routine complète, avec les produits de votre stock.");
   });
 
   it("n'emploie aucun mot interdit ni aucune promesse", () => {

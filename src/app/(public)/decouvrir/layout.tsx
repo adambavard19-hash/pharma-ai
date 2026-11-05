@@ -22,7 +22,7 @@ import { VisitBeacon } from "./_components/visit-beacon";
  * version générée par code, en PNG, pesait 470 Ko avec l'hélice. À refaire si le premier écran change.
  */
 const SHARE_TITLE = "PharmaBoost — Le copilote IA du comptoir de votre pharmacie.";
-const SHARE_TEXT = "À chaque boîte scannée, PharmaBoost montre à votre équipe le bon produit à conseiller, pris dans votre stock. Plus de conseils vendus, sans changer votre logiciel.";
+const SHARE_TEXT = "À chaque boîte scannée, PharmaBoost montre à votre équipe les conseils à proposer et la routine complète, avec les produits de votre stock. Plus de conseils vendus, sans changer votre logiciel.";
 
 export const metadata: Metadata = {
   title: { absolute: "PharmaBoost — Le copilote IA du comptoir de votre pharmacie", template: "%s · PharmaBoost" },
