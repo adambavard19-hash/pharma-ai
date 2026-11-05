@@ -194,6 +194,29 @@ export async function createOverstockCampaign(scope: TenantScope, draft: Campaig
   return { ok: true, id: created.id };
 }
 
+/**
+ * « Modifier » (fondateur, 5 nov. 2026 : « passer mon objectif de 3 boîtes à 5 ») : tous les réglages d'une campagne en
+ * cours — situations (classes, familles), phrase, objectif de stock, date de fin. Le produit et le stock de départ ne
+ * bougent pas (la barre d'avancement reste juste). Seulement les campagnes de CETTE officine.
+ */
+export async function updateOverstockCampaign(scope: TenantScope, id: string, draft: Omit<CampaignDraft, "productId">, now: Date = new Date()): Promise<{ ok: true } | { ok: false; error: string }> {
+  const campaign = await prisma.overstockCampaign.findFirst({ where: { id, pharmacyId: scope.pharmacyId, isActive: true }, select: { id: true, productId: true, product: { select: { name: true, stockItem: { select: { quantity: true } } } } } });
+  if (!campaign) return { ok: false, error: "Campagne introuvable ou déjà arrêtée." };
+  const clean: CampaignDraft = { ...draft, productId: campaign.productId, atcCodes: [...new Set(draft.atcCodes)], familyIds: [...new Set(draft.familyIds)], sentence: draft.sentence.replace(/\s+/g, " ").trim() };
+  const error = campaignDraftError(clean, parisDayKey(now));
+  if (error) return { ok: false, error };
+  const families = clean.familyIds.length ? await prisma.triggerFamily.count({ where: { id: { in: clean.familyIds }, status: { not: "REMOVED" } } }) : 0;
+  if (families !== clean.familyIds.length) return { ok: false, error: "Une des familles choisies n'existe plus." };
+  const quantity = campaign.product.stockItem?.quantity ?? 0;
+  if (quantity <= clean.targetQuantity) return { ok: false, error: `Le stock (${quantity}) est déjà à cet objectif : choisissez moins de ${quantity} boîtes, ou arrêtez la campagne.` };
+  await prisma.overstockCampaign.update({
+    where: { id: campaign.id },
+    data: { triggerAtcCodes: clean.atcCodes, familyIds: clean.familyIds, sentence: clean.sentence || null, targetQuantity: clean.targetQuantity, endsOn: clean.endsOn ? new Date(`${clean.endsOn}T00:00:00Z`) : null },
+  });
+  await recordAudit({ action: "overstock.campaign_updated", entityType: "OverstockCampaign", entityId: campaign.id, pharmacyId: scope.pharmacyId, userId: scope.userId, metadata: { product: campaign.product.name, target: clean.targetQuantity, endsOn: clean.endsOn, classes: clean.atcCodes, families: clean.familyIds.length } });
+  return { ok: true };
+}
+
 /** « Arrêter » : la campagne s'arrête tout de suite ; elle reste dans l'historique. */
 export async function stopOverstockCampaign(scope: TenantScope, id: string, now: Date = new Date()): Promise<{ ok: true } | { ok: false; error: string }> {
   const result = await prisma.overstockCampaign.updateMany({ where: { id, pharmacyId: scope.pharmacyId, isActive: true }, data: { isActive: false, endedAt: now, endedReason: "MANUEL" } });

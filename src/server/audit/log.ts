@@ -160,6 +160,7 @@ export type AuditAction =
   | "rule.created"
   | "association.created"
   | "overstock.campaign_created"
+  | "overstock.campaign_updated"
   | "overstock.campaign_stopped"
   | "association.updated"
   | "association.deleted"

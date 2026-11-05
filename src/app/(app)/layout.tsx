@@ -17,6 +17,7 @@ import { PERMISSIONS } from "@/server/rbac/permissions";
 import { NOT_LINKED, thisPcComptoir } from "@/server/services/post-link";
 import { RobotPresenceProvider } from "@/components/robot/robot-presence";
 import { DemoViewSwitch } from "@/components/app/demo-view-switch";
+import { HelixBackdrop } from "@/components/app/helix/helix-backdrop";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const session = await requireSession();
@@ -42,6 +43,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       {/* L'habillage de l'espace pharmacie (globals.css, ESPACE PHARMACIE) : fond menthe, verre dépoli, feuille blanche. */}
       {/* Google Sans Flex, déclarée par le layout racine (--font-gsans), n'est utilisée — donc téléchargée — qu'ici. */}
       <div className="espace-pharmacie espace-fond min-h-dvh">
+        {/* L'hélice d'ADN en fond de TOUTES les rubriques (fondateur, 5 nov. 2026), plus seulement « Nouvelle vente ». */}
+        <HelixBackdrop />
         <a href="#contenu" className="skip-link">
           Aller au contenu principal
         </a>

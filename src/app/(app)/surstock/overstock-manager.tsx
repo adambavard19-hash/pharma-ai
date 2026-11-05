@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Flame, Loader2, Megaphone, Search, Square, X } from "lucide-react";
-import { createOverstockCampaignAction, searchOverstockProductsAction, stopOverstockCampaignAction } from "@/server/actions/overstock";
+import { Flame, Loader2, Megaphone, Pencil, Save, Search, Square, X } from "lucide-react";
+import { createOverstockCampaignAction, searchOverstockProductsAction, stopOverstockCampaignAction, updateOverstockCampaignAction } from "@/server/actions/overstock";
 import type { CampaignView, OverstockProduct } from "@/server/services/overstock";
 import { OVERSTOCK_SENTENCE_MAX } from "@/core/overstock/campaign";
 import { Button } from "@/components/ui/button";
@@ -41,7 +41,7 @@ export function OverstockManager({ canEdit, today, classes, families, suggestion
           <ul className="grid gap-3 lg:grid-cols-2">
             {active.map((campaign) => (
               <li key={campaign.id}>
-                <CampaignCard campaign={campaign} classLabel={classLabel} canEdit={canEdit} />
+                <CampaignCard campaign={campaign} classLabel={classLabel} canEdit={canEdit} today={today} classes={classes} families={families} />
               </li>
             ))}
           </ul>
@@ -101,10 +101,11 @@ export function OverstockManager({ canEdit, today, classes, families, suggestion
   );
 }
 
-function CampaignCard({ campaign, classLabel, canEdit }: { campaign: Campaign; classLabel: Map<string, string>; canEdit: boolean }) {
+function CampaignCard({ campaign, classLabel, canEdit, today, classes, families }: { campaign: Campaign; classLabel: Map<string, string>; canEdit: boolean; today: string; classes: { code: string; label: string }[]; families: Option[] }) {
   const router = useRouter();
   const { push } = useToast();
   const [pending, start] = useTransition();
+  const [editing, setEditing] = useState(false);
   const { product } = campaign;
   const toSell = Math.max(1, campaign.startQuantity - campaign.targetQuantity);
   const done = Math.min(toSell, Math.max(0, campaign.startQuantity - product.quantity));
@@ -151,8 +152,21 @@ function CampaignCard({ campaign, classLabel, canEdit }: { campaign: Campaign; c
           {campaign.families.map((family) => <Badge key={family.id} tone="neutral">{family.name}</Badge>)}
         </div>
         {campaign.sentence && <p className="rounded-lg bg-surface-sunken px-3 py-2 text-[12.5px] text-text-secondary">« {campaign.sentence} »</p>}
-        {canEdit && (
-          <div className="mt-auto flex justify-end pt-1">
+        {canEdit && editing && (
+          <div className="rounded-xl border border-brand-200 bg-brand-50/40 p-4">
+            <CampaignForm
+              product={product}
+              today={today}
+              classes={classes}
+              families={families}
+              edit={{ id: campaign.id, atcCodes: campaign.classes, familyIds: campaign.families.map((family) => family.id), sentence: campaign.sentence ?? "", target: campaign.targetQuantity, endsOn: campaign.endsOn }}
+              onDone={() => setEditing(false)}
+            />
+          </div>
+        )}
+        {canEdit && !editing && (
+          <div className="mt-auto flex justify-end gap-2 pt-1">
+            <Button size="sm" variant="outline" onClick={() => setEditing(true)} leadingIcon={<Pencil className="size-3.5" />}>Modifier</Button>
             <Button size="sm" variant="outline" onClick={stop} disabled={pending} leadingIcon={pending ? <Loader2 className="size-3.5 animate-spin" /> : <Square className="size-3.5" />}>Arrêter</Button>
           </div>
         )}
@@ -222,17 +236,18 @@ function ProductPicker({ product, onPick }: { product: OverstockProduct | null; 
   );
 }
 
-function CampaignForm({ product, today, classes, families, onDone }: { product: OverstockProduct; today: string; classes: { code: string; label: string }[]; families: Option[]; onDone: () => void }) {
+/** Lancer une campagne, ou MODIFIER une campagne en cours (`edit` : ses réglages actuels ; le produit ne change pas). */
+function CampaignForm({ product, today, classes, families, onDone, edit }: { product: OverstockProduct; today: string; classes: { code: string; label: string }[]; families: Option[]; onDone: () => void; edit?: { id: string; atcCodes: string[]; familyIds: string[]; sentence: string; target: number; endsOn: string | null } }) {
   const router = useRouter();
   const { push } = useToast();
   const [pending, start] = useTransition();
-  const [atcCodes, setAtcCodes] = useState<string[]>([]);
-  const [familyIds, setFamilyIds] = useState<string[]>([]);
+  const [atcCodes, setAtcCodes] = useState<string[]>(edit?.atcCodes ?? []);
+  const [familyIds, setFamilyIds] = useState<string[]>(edit?.familyIds ?? []);
   const [familyQuery, setFamilyQuery] = useState("");
-  const [sentence, setSentence] = useState("");
-  const [target, setTarget] = useState("0");
+  const [sentence, setSentence] = useState(edit?.sentence ?? "");
+  const [target, setTarget] = useState(String(edit?.target ?? 0));
   // L'échéance de la facture fournisseur : 60 jours, par défaut.
-  const [endsOn, setEndsOn] = useState(plusDays(today, 60));
+  const [endsOn, setEndsOn] = useState(edit ? (edit.endsOn ?? "") : plusDays(today, 60));
   const [error, setError] = useState<string | null>(null);
 
   const toggle = (list: string[], value: string) => (list.includes(value) ? list.filter((item) => item !== value) : [...list, value]);
@@ -244,12 +259,13 @@ function CampaignForm({ product, today, classes, families, onDone }: { product: 
   const submit = () =>
     start(async () => {
       setError(null);
-      const result = await createOverstockCampaignAction({ productId: product.id, atcCodes, familyIds, sentence, targetQuantity: Number(target), endsOn: endsOn || null });
+      const draft = { atcCodes, familyIds, sentence, targetQuantity: Number(target), endsOn: endsOn || null };
+      const result = edit ? await updateOverstockCampaignAction({ id: edit.id, ...draft }) : await createOverstockCampaignAction({ productId: product.id, ...draft });
       if (!result.ok) {
         setError(result.error);
         return;
       }
-      push({ tone: "success", title: result.message ?? "Campagne lancée." });
+      push({ tone: "success", title: result.message ?? (edit ? "Campagne modifiée." : "Campagne lancée.") });
       onDone();
       router.refresh();
     });
@@ -296,8 +312,13 @@ function CampaignForm({ product, today, classes, families, onDone }: { product: 
       </label>
 
       {error && <p role="alert" className="text-[13px] font-medium text-danger-700">{error}</p>}
-      <div className="flex justify-end">
-        <Button onClick={submit} disabled={pending} leadingIcon={pending ? <Loader2 className="size-4 animate-spin" /> : <Megaphone className="size-4" />}>Lancer la campagne</Button>
+      <div className="flex justify-end gap-2">
+        {edit && (
+          <Button variant="outline" onClick={onDone} disabled={pending}>
+            Annuler
+          </Button>
+        )}
+        <Button onClick={submit} disabled={pending} leadingIcon={pending ? <Loader2 className="size-4 animate-spin" /> : edit ? <Save className="size-4" /> : <Megaphone className="size-4" />}>{edit ? "Enregistrer" : "Lancer la campagne"}</Button>
       </div>
     </div>
   );

@@ -13,7 +13,6 @@ import { countCounterRequestsToday } from "@/server/services/counter-request";
 import { isCommercialDemoPharmacy } from "@/core/demo/identity";
 import { CounterDemoCard } from "../../demo/counter-demo-card";
 import { CounterDashboard } from "./counter-dashboard";
-import { HelixBackdrop } from "@/components/app/helix/helix-backdrop";
 import { NewPrescriptionForm } from "./new-prescription-form";
 import { CounterRequestCard } from "./counter-request";
 import { TIME_ZONE } from "@/config/constants";
@@ -71,7 +70,6 @@ export default async function NewPrescriptionPage({
   return (
     // L'hélice d'ADN en fond de toute la fenêtre (fixe, z-index négatif) : ce conteneur ne doit pas l'isoler.
     <div className="mx-auto max-w-3xl space-y-4">
-      <HelixBackdrop />
 
       {params.lien === "perime" && (
         <p role="status" className="rounded-xl border border-border-subtle bg-surface-card px-4 py-3 text-[13.5px] leading-5 text-text-secondary">

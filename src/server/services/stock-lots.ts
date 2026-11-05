@@ -60,6 +60,10 @@ export type LotView = {
   note: string | null;
   /** Fiche du produit ou du médicament ; null si le produit a été supprimé. */
   href: string | null;
+  /** Le jour où le lot a été repéré (AAAA-MM-JJ) : le début de la barre d'avancement (fondateur, 5 nov. 2026). */
+  trackedSince: string;
+  /** L'argent encore en rayon : boîtes × prix d'achat HT (centimes) ; null sans prix d'achat ou sans quantité. */
+  valueCents: number | null;
 };
 
 export type LotCounts = Record<ExpiryLevel | "ALL", number>;
@@ -176,7 +180,8 @@ export async function listLots(
       expiryPrecision: true,
       source: true,
       note: true,
-      product: { select: { brand: true, deletedAt: true } },
+      createdAt: true,
+      product: { select: { brand: true, deletedAt: true, purchasePriceCents: true } },
     },
   });
   const truncated = rows.length > LIST_LIMIT;
@@ -215,6 +220,8 @@ export async function listLots(
       level,
       source: row.source,
       note: row.note,
+      trackedSince: toIsoDay(row.createdAt),
+      valueCents: row.quantity && row.quantity > 0 && row.product?.purchasePriceCents ? row.quantity * row.product.purchasePriceCents : null,
       href:
         kind === "PRODUCT"
           ? row.product && !row.product.deletedAt

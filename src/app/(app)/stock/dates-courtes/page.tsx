@@ -10,7 +10,7 @@ import { PageHeader } from "@/components/ui/page";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/feedback";
-import { Table, TableWrapper, TBody, TD, TH, THead, TR } from "@/components/ui/table";
+import { formatCents, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { PatientSearchBar } from "../../patients/search-bar";
 import { ExpiryLevelBadge } from "./level-badge";
@@ -124,56 +124,68 @@ export default async function ShortDatesPage({ searchParams }: { searchParams: P
               </p>
             </Card>
           ) : (
-            <TableWrapper>
-              <Table>
-                <THead>
-                  <TR>
-                    <TH>Produit</TH>
-                    <TH>Lot</TH>
-                    <TH numeric>Quantité</TH>
-                    <TH>Péremption</TH>
-                    <TH>Restant</TH>
-                    <TH>Niveau</TH>
-                    {canAdjust && <TH className="text-right">Actions</TH>}
-                  </TR>
-                </THead>
-                <TBody>
-                  {lots.map((lot) => (
-                    <TR key={lot.id}>
-                      <TD className="max-w-[340px]">
-                        <div className="flex min-w-0 items-center gap-3">
-                          <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-surface-sunken text-text-tertiary">
-                            {lot.kind === "DRUG" ? <Pill className="size-4" /> : <Package className="size-4" />}
-                          </span>
-                          <span className="min-w-0">
-                            {lot.href ? (
-                              <Link href={lot.href} className="block truncate text-[14px] font-medium text-text-primary hover:underline">
-                                {lot.label}
-                              </Link>
-                            ) : (
-                              <span className="block truncate text-[14px] font-medium text-text-primary">{lot.label}</span>
-                            )}
-                            {lot.detail && <span className="block truncate text-[12px] text-text-tertiary">{lot.detail}</span>}
-                          </span>
+            // Une carte par lot, comme les campagnes de Surstock (fondateur, 5 nov. 2026) : l'argent encore en rayon, et la
+            // barre du temps écoulé entre le jour où le lot a été repéré et sa date de péremption.
+            <ul className="grid gap-3 lg:grid-cols-2">
+              {lots.map((lot) => {
+                const day = (iso: string) => Date.parse(`${iso}T12:00:00Z`);
+                const span = Math.max(1, day(lot.expiresOn) - day(lot.trackedSince));
+                const percent = Math.min(100, Math.max(0, Math.round(((span - Math.max(0, lot.daysLeft) * 86_400_000) / span) * 100)));
+                const bar = lot.level === "EXPIRED" || lot.level === "URGENT" ? "bg-danger-600" : lot.level === "SOON" ? "bg-warning-500" : "bg-brand-600";
+                return (
+                  <li key={lot.id}>
+                    <Card className="h-full">
+                      <CardContent className="flex h-full flex-col gap-3 p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex min-w-0 items-start gap-3">
+                            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-surface-sunken text-text-tertiary">
+                              {lot.kind === "DRUG" ? <Pill className="size-4" /> : <Package className="size-4" />}
+                            </span>
+                            <div className="min-w-0">
+                              <ExpiryLevelBadge level={lot.level} />
+                              {lot.href ? (
+                                <Link href={lot.href} className="mt-1.5 block text-[15px] leading-5 font-semibold text-text-primary hover:underline">
+                                  {lot.label}
+                                </Link>
+                              ) : (
+                                <p className="mt-1.5 text-[15px] leading-5 font-semibold text-text-primary">{lot.label}</p>
+                              )}
+                              {lot.detail && <p className="truncate text-[12.5px] text-text-tertiary">{lot.detail}</p>}
+                            </div>
+                          </div>
+                          <div className="shrink-0 text-right">
+                            <p className="text-[11px] text-text-tertiary">{lot.valueCents !== null ? "Encore en rayon" : "Boîtes"}</p>
+                            <p className={cn("text-[16px] font-semibold tabular-nums", lot.level === "EXPIRED" || lot.level === "URGENT" ? "text-danger-700" : "text-warning-700")}>
+                              {lot.valueCents !== null ? formatCents(lot.valueCents) : (lot.quantity ?? "—")}
+                            </p>
+                          </div>
                         </div>
-                      </TD>
-                      <TD className="text-text-secondary">{lot.lotNumber ?? "—"}</TD>
-                      <TD numeric>{lot.quantity ?? "—"}</TD>
-                      <TD className="tabular">{formatExpiry(lot.expiresOn, lot.precision)}</TD>
-                      <TD className={cn("whitespace-nowrap tabular", lot.level === "EXPIRED" ? "text-danger-700" : "text-text-secondary")}>{describeDaysLeft(lot.daysLeft)}</TD>
-                      <TD>
-                        <ExpiryLevelBadge level={lot.level} />
-                      </TD>
-                      {canAdjust && (
-                        <TD>
-                          <LotRowActions lot={lot} today={today} thresholds={thresholds} />
-                        </TD>
-                      )}
-                    </TR>
-                  ))}
-                </TBody>
-              </Table>
-            </TableWrapper>
+                        <div className="space-y-1.5">
+                          <div className="flex items-baseline justify-between text-[12.5px] text-text-secondary">
+                            <span>
+                              <span className="font-semibold text-text-primary tabular-nums">{lot.quantity ?? "?"}</span> boîte{(lot.quantity ?? 0) > 1 ? "s" : ""} · périme {formatExpiry(lot.expiresOn, lot.precision)}
+                            </span>
+                            <span className={cn("tabular-nums font-medium", lot.level === "EXPIRED" ? "text-danger-700" : "text-text-primary")}>{describeDaysLeft(lot.daysLeft)}</span>
+                          </div>
+                          <div className="h-2 overflow-hidden rounded-full bg-surface-sunken" role="progressbar" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100} aria-label="Temps écoulé avant la péremption">
+                            <div className={cn("h-full rounded-full transition-all", bar)} style={{ width: `${percent}%` }} />
+                          </div>
+                          <p className="text-[12.5px] text-text-tertiary">
+                            Repéré le {formatDate(lot.trackedSince)}
+                            {lot.lotNumber ? ` · lot ${lot.lotNumber}` : ""} · proposé en priorité au comptoir
+                          </p>
+                        </div>
+                        {canAdjust && (
+                          <div className="mt-auto flex justify-end pt-1">
+                            <LotRowActions lot={lot} today={today} thresholds={thresholds} />
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </li>
+                );
+              })}
+            </ul>
           )}
           {truncated && (
             <p className="flex items-center gap-2 text-[12.5px] text-warning-700">

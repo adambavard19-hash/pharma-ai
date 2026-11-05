@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Trophy } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Euro, Target, TrendingUp, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -15,6 +15,8 @@ export type CounterPeriod = {
   label: string;
   sold: number;
   revenue: string;
+  /** La marge HT générée (prix d'achat connus), pour le titulaire. */
+  margin?: string;
   salesWithAdvice: string;
   sales: number;
   /** Ventes avec au moins un conseil vendu, de 0 à 1 ; null sans vente. */
@@ -50,14 +52,15 @@ export function SoldCounter({ periods, title, subtitle, initial = 1, money = tru
   const goal = 0.1;
   const share = period.share ?? 0;
 
+  // Une carte de verre posée sur l'ADN (fondateur, 5 nov. 2026 : « plus moderne, l'ADN en fond plutôt que le fond vert »).
   return (
-    <section aria-label={title} className="overflow-hidden rounded-3xl border border-brand-200 bg-gradient-to-br from-brand-600 via-brand-700 to-[#0b5560] p-5 text-white shadow-lg sm:p-7 dark:border-brand-800">
+    <section aria-label={title} className="overflow-hidden rounded-[28px] border border-white/70 bg-white/55 p-5 shadow-[0_30px_60px_-40px_rgba(15,43,38,.45)] backdrop-blur-xl sm:p-7 dark:border-white/10 dark:bg-white/5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-[13px] font-semibold tracking-[0.08em] text-white/70 uppercase">{title}</p>
-          <p className="text-[14px] text-white/80">{subtitle}</p>
+          <p className="text-[12.5px] font-semibold tracking-[0.1em] text-brand-700 uppercase dark:text-brand-300">{title}</p>
+          <p className="text-[14px] text-text-secondary">{subtitle}</p>
         </div>
-        <div role="tablist" aria-label="Période" className="flex flex-wrap gap-1 rounded-full bg-white/10 p-1">
+        <div role="tablist" aria-label="Période" className="flex flex-wrap gap-1 rounded-full border border-border-subtle bg-white/70 p-1 dark:bg-white/10">
           {periods.map((entry, i) => (
             <button
               key={entry.key}
@@ -65,7 +68,7 @@ export function SoldCounter({ periods, title, subtitle, initial = 1, money = tru
               role="tab"
               aria-selected={i === index}
               onClick={() => setIndex(i)}
-              className={cn("rounded-full px-3 py-1.5 text-[13px] font-semibold whitespace-nowrap transition-colors", i === index ? "bg-white text-brand-800" : "text-white/80 hover:bg-white/10")}
+              className={cn("rounded-full px-3 py-1.5 text-[13px] font-semibold whitespace-nowrap transition-colors", i === index ? "bg-brand-700 text-white shadow-sm" : "text-text-secondary hover:bg-surface-sunken")}
             >
               {entry.label}
             </button>
@@ -75,31 +78,40 @@ export function SoldCounter({ periods, title, subtitle, initial = 1, money = tru
 
       <div className="mt-5 flex flex-wrap items-end gap-x-6 gap-y-3">
         <p className="flex items-baseline gap-3">
-          <span aria-live="polite" className="text-[72px] leading-none font-bold tracking-[-0.04em] tabular sm:text-[96px]">{shown.toLocaleString("fr-FR")}</span>
-          <span className="text-[18px] font-semibold text-white/85">conseil{period.sold > 1 ? "s" : ""} vendu{period.sold > 1 ? "s" : ""}</span>
+          <span aria-live="polite" className="bg-gradient-to-br from-brand-700 to-[#0b5560] bg-clip-text text-[72px] leading-none font-bold tracking-[-0.04em] text-transparent tabular sm:text-[96px] dark:from-brand-300 dark:to-brand-500">{shown.toLocaleString("fr-FR")}</span>
+          <span className="text-[18px] font-semibold text-text-primary">conseil{period.sold > 1 ? "s" : ""} vendu{period.sold > 1 ? "s" : ""}</span>
         </p>
-        <Trophy className="mb-3 hidden size-10 text-amber-300 sm:block" aria-hidden="true" />
+        <Trophy className="mb-3 hidden size-10 text-amber-400 sm:block" aria-hidden="true" />
       </div>
 
-      <dl className={cn("mt-5 grid grid-cols-1 gap-3", money ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
+      <dl className={cn("mt-5 grid grid-cols-1 gap-3", money ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-2")}>
         {money && (
-          <div className="rounded-2xl bg-white/10 p-3.5">
-            <dt className="text-[12.5px] text-white/70">Chiffre d&apos;affaires ajouté</dt>
-            <dd className="mt-0.5 text-[22px] font-semibold tabular">{period.revenue}</dd>
-          </div>
+          <Tile icon={<Euro className="size-4" />} label="Chiffre d'affaires ajouté" value={period.revenue} />
         )}
-        <div className="rounded-2xl bg-white/10 p-3.5">
-          <dt className="text-[12.5px] text-white/70">Ventes avec un conseil vendu</dt>
-          <dd className="mt-0.5 text-[22px] font-semibold tabular">{period.salesWithAdvice}</dd>
-        </div>
-        <div className="rounded-2xl bg-white/10 p-3.5">
-          <dt className="text-[12.5px] text-white/70">Objectif : 10 % des ventes</dt>
-          <dd className="mt-2 h-2.5 overflow-hidden rounded-full bg-white/15">
-            <span className={cn("block h-full rounded-full transition-[width] duration-700", share >= goal ? "bg-emerald-300" : "bg-amber-300")} style={{ width: `${Math.min(100, (share / goal) * 100)}%` }} />
+        {money && (
+          <Tile icon={<TrendingUp className="size-4" />} label="Marge générée (HT)" value={period.margin ?? "—"} />
+        )}
+        <Tile icon={<Target className="size-4" />} label="Ventes avec un conseil vendu" value={period.salesWithAdvice} />
+        <div className="rounded-2xl border border-border-subtle bg-white/70 p-3.5 dark:bg-white/5">
+          <dt className="text-[12.5px] text-text-secondary">Objectif : 10 % des ventes</dt>
+          <dd className="mt-2 h-2.5 overflow-hidden rounded-full bg-surface-sunken">
+            <span className={cn("block h-full rounded-full transition-[width] duration-700", share >= goal ? "bg-emerald-500" : "bg-amber-400")} style={{ width: `${Math.min(100, (share / goal) * 100)}%` }} />
           </dd>
-          <dd className="mt-1.5 text-[12.5px] text-white/80">{period.share === null ? "Aucune vente terminée sur la période" : share >= goal ? "Objectif atteint" : `${Math.round(share * 100)} % sur 10 %`}</dd>
+          <dd className="mt-1.5 text-[12.5px] text-text-secondary">{period.share === null ? "Aucune vente terminée sur la période" : share >= goal ? "Objectif atteint" : `${Math.round(share * 100)} % sur 10 %`}</dd>
         </div>
       </dl>
     </section>
+  );
+}
+
+function Tile({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-border-subtle bg-white/70 p-3.5 dark:bg-white/5">
+      <dt className="flex items-center gap-1.5 text-[12.5px] text-text-secondary">
+        <span className="text-brand-600">{icon}</span>
+        {label}
+      </dt>
+      <dd className="mt-0.5 text-[22px] font-semibold text-text-primary tabular">{value}</dd>
+    </div>
   );
 }

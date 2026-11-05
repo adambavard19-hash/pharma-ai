@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
-import { createOverstockCampaign, searchOverstockProducts, stopOverstockCampaign, type OverstockProduct } from "@/server/services/overstock";
+import { createOverstockCampaign, searchOverstockProducts, stopOverstockCampaign, updateOverstockCampaign, type OverstockProduct } from "@/server/services/overstock";
 import { OVERSTOCK_SENTENCE_MAX } from "@/core/overstock/campaign";
 import { fail, ok, type ActionResult } from "./types";
 
@@ -31,6 +31,17 @@ export async function createOverstockCampaignAction(payload: z.input<typeof draf
   if (!result.ok) return fail(result.error);
   revalidatePath("/surstock");
   return ok({ id: result.id }, "Campagne lancée : le produit passe en premier au comptoir.");
+}
+
+export async function updateOverstockCampaignAction(payload: { id: string } & Omit<z.input<typeof draftSchema>, "productId">): Promise<ActionResult<null>> {
+  const session = await requirePermission(PERMISSIONS.RECOMMENDATION_RULES_MANAGE);
+  const id = z.string().min(1).max(80).safeParse(payload.id);
+  const parsed = draftSchema.omit({ productId: true }).safeParse(payload);
+  if (!id.success || !parsed.success) return fail("Campagne incomplète.");
+  const result = await updateOverstockCampaign(session.scope, id.data, parsed.data);
+  if (!result.ok) return fail(result.error);
+  revalidatePath("/surstock");
+  return ok(null, "Campagne modifiée.");
 }
 
 export async function stopOverstockCampaignAction(payload: { id: string }): Promise<ActionResult<null>> {
