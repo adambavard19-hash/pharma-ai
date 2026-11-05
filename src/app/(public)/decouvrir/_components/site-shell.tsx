@@ -77,8 +77,10 @@ export function SiteHeader({ island }: { island?: ReactNode }) {
           <Link href="/login" className="hidden rounded-full px-3 py-2 text-[13.5px] font-medium whitespace-nowrap text-text-secondary hover:bg-surface-sunken hover:text-text-primary xl:inline-block">
             Se connecter
           </Link>
-          <Link href="/decouvrir/abonnement" className="hidden rounded-full border border-border-default px-4 py-2 text-[13.5px] font-semibold whitespace-nowrap text-text-primary hover:border-brand-400 md:inline-block">
-            S&apos;abonner
+          {/* « Commencer maintenant », à la place de « S'abonner » (fondateur, 5 nov. 2026) : on s'abonne et on installe tout de suite. */}
+          <Link href="/decouvrir/abonnement" className="hidden items-baseline gap-1.5 rounded-full border border-border-default px-4 py-2 text-[13.5px] font-semibold whitespace-nowrap text-text-primary hover:border-brand-400 md:inline-flex">
+            Commencer maintenant
+            <span className="hidden text-[12px] font-medium text-text-tertiary lg:inline">· installation en 5 min</span>
           </Link>
           <Link href="/decouvrir/demo" className="rounded-full bg-brand-600 px-4 py-2 text-[13.5px] font-semibold whitespace-nowrap text-white shadow-sm hover:bg-brand-700 max-[419px]:px-3 max-[419px]:text-[12.5px]">
             <span className="max-[389px]:sr-only">Réserver une </span>
@@ -91,7 +93,7 @@ export function SiteHeader({ island }: { island?: ReactNode }) {
               </Link>
             ))}
             <div className="my-1.5 h-px bg-border-subtle" />
-            <Link href="/decouvrir/abonnement" className="block rounded-xl px-3.5 py-2.5 text-[15px] font-medium text-text-primary hover:bg-surface-sunken">S&apos;abonner</Link>
+            <Link href="/decouvrir/abonnement" className="block rounded-xl px-3.5 py-2.5 text-[15px] font-medium text-text-primary hover:bg-surface-sunken">Commencer maintenant <span className="text-[13px] text-text-tertiary">· installation en 5 min</span></Link>
             <Link href="/login" className="block rounded-xl px-3.5 py-2.5 text-[15px] font-medium text-text-secondary hover:bg-surface-sunken">Se connecter</Link>
           </MobileMenu>
         </div>
