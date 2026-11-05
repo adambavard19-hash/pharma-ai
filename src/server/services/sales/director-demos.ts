@@ -23,6 +23,8 @@ export type DirectorDemoRow = {
   spaceOpened: boolean;
   /** Abonnement réglé : la démo est allée au bout. */
   wentThrough: boolean;
+  /** La réunion Zoom de la démo, quand Zoom est branché. */
+  meetingUrl: string | null;
 };
 
 export async function listDirectorDemos(directorId: string, now = new Date()): Promise<{ upcoming: DirectorDemoRow[]; past: DirectorDemoRow[] }> {
@@ -41,6 +43,7 @@ export async function listDirectorDemos(directorId: string, now = new Date()): P
       demoAt: true,
       demoDoneAt: true,
       demoDirectorId: true,
+      demoMeetingUrl: true,
       pharmacyId: true,
       salesRep: { select: { firstName: true, lastName: true } },
       pharmacy: { select: { organization: { select: { subscription: { select: { payments: { where: { status: "PAID", amountCents: { gt: 0 } }, take: 1, select: { id: true } } } } } } } },
@@ -60,6 +63,7 @@ export async function listDirectorDemos(directorId: string, now = new Date()): P
       repName: row.salesRep ? `${row.salesRep.firstName} ${row.salesRep.lastName}` : null,
       spaceOpened: row.pharmacyId !== null,
       wentThrough: (row.pharmacy?.organization.subscription?.payments.length ?? 0) > 0,
+      meetingUrl: row.demoMeetingUrl,
     }),
   );
   const hourAgo = now.getTime() - 3600 * 1000;

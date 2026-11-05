@@ -127,14 +127,29 @@ async function recordSiteLead(input: SiteLeadInput & { demoAt: Date | null }): P
 
   const company = await prisma.companyProfile.findUnique({ where: { id: "default" }, select: { representativeEmail: true } });
   const contactEmail = company?.representativeEmail ?? DEFAULT_CONTACT_EMAIL;
-  const summary: SiteLeadSummary = { ...input, salesRepName: repName };
+  // La réunion Zoom de la démo (fondateur, 5 nov. 2026), quand Zoom est branché ; sinon, on appelle comme avant. Jamais bloquant.
+  let meetingUrl: string | null = null;
+  if (input.demoAt) {
+    const { createZoomMeeting, zoomConfigured } = await import("@/server/integrations/zoom");
+    if (zoomConfigured()) {
+      try {
+        const meeting = await createZoomMeeting({ topic: `Démonstration PharmaBoost · ${input.pharmacyName}`, start: input.demoAt, durationMin: DEMO_DURATION_MIN, agenda: `${input.contactName}${input.phone ? ` · ${input.phone}` : ""}` });
+        meetingUrl = meeting.joinUrl;
+        await prisma.prospect.update({ where: { id: prospect.id }, data: { demoMeetingUrl: meeting.joinUrl, demoMeetingId: meeting.id } });
+      } catch (error) {
+        console.error("[démo] réunion Zoom non créée", error);
+        await notifyAdmins({ type: "DEMO_ZOOM_FAILED", title: `Réunion Zoom non créée — ${input.pharmacyName}`, body: `${error instanceof Error ? error.message : "Erreur inconnue."} La démo reste réservée : créez la réunion à la main ou appelez le pharmacien.`, linkUrl: `/admin/dossiers/${prospect.id}`, severity: "WARNING" }).catch(() => undefined);
+      }
+    }
+  }
+  const summary: SiteLeadSummary = { ...input, salesRepName: repName, meetingUrl };
   const messaging = getMessagingProvider();
   const alert = buildSiteLeadAlert({ ...summary, adminUrl });
   // L'invitation d'agenda : un clic l'ajoute au téléphone, avec un rappel un quart d'heure avant (2 nov. 2026).
   const teamEvent = input.demoAt ? demoEvent({ id: prospect.id, name: input.pharmacyName, ownerName: input.contactName, email: input.email, phone: input.phone, city: input.city, demoAt: input.demoAt, demoDoneAt: null }) : null;
   const teamInvite = teamEvent ? [{ filename: "demo-pharmaboost.ics", content: Buffer.from(buildCalendar("PharmaBoost · Démos", [teamEvent]), "utf8"), contentType: "text/calendar; charset=utf-8; method=PUBLISH" }] : undefined;
   const pharmacistInvite = input.demoAt
-    ? [{ filename: "demo-pharmaboost.ics", content: Buffer.from(buildCalendar("PharmaBoost", [{ uid: `demo-${prospect.id}-${input.demoAt.getTime()}-officine@pharmaboost.app`, start: input.demoAt, end: new Date(input.demoAt.getTime() + DEMO_DURATION_MIN * 60 * 1000), title: "Démonstration PharmaBoost", description: `Votre démonstration PharmaBoost, ${formatDemoSlot(input.demoAt)}. Nous vous appelons à l'heure dite.\nUne question : ${contactEmail}`, alarmMinutes: 15 }]), "utf8"), contentType: "text/calendar; charset=utf-8; method=PUBLISH" }]
+    ? [{ filename: "demo-pharmaboost.ics", content: Buffer.from(buildCalendar("PharmaBoost", [{ uid: `demo-${prospect.id}-${input.demoAt.getTime()}-officine@pharmaboost.app`, start: input.demoAt, end: new Date(input.demoAt.getTime() + DEMO_DURATION_MIN * 60 * 1000), title: "Démonstration PharmaBoost", description: meetingUrl ? `Votre démonstration PharmaBoost, ${formatDemoSlot(input.demoAt)}, sur Zoom : ${meetingUrl}\nUne question : ${contactEmail}` : `Votre démonstration PharmaBoost, ${formatDemoSlot(input.demoAt)}. Nous vous appelons à l'heure dite.\nUne question : ${contactEmail}`, alarmMinutes: 15 }]), "utf8"), contentType: "text/calendar; charset=utf-8; method=PUBLISH" }]
     : undefined;
   await messaging.sendEmail({ to: contactEmail, fromName: "PharmaBoost", subject: alert.subject, text: alert.text, html: alert.html, attachments: teamInvite }).catch(() => undefined);
   // Chaque administrateur reçoit l'alerte détaillée par e-mail, démo ou non (fondateur, 17 puis 21 oct. 2026).

@@ -3433,6 +3433,9 @@ model Prospect {
   /// Le directeur commercial qui a mené la démonstration (« Démo faite » depuis son espace, fondateur 5 nov. 2026) : 100 € HT
   /// pour lui quand la pharmacie va au bout (mise en service réglée). Une simple référence, sans relation.
   demoDirectorId      String?
+  /// La réunion Zoom de la démonstration (fondateur, 5 nov. 2026) : le lien envoyé au pharmacien, et son identifiant chez Zoom.
+  demoMeetingUrl      String?
+  demoMeetingId       String?
   /// Notes commerciales courantes (le détail horodaté vit dans les événements).
   notes               String?
   /// Conditions proposées : abonnement mensuel, en centimes.

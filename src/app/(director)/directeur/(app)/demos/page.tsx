@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CalendarCheck, ExternalLink, Phone, Mail } from "lucide-react";
+import { CalendarCheck, ExternalLink, Phone, Mail, Video } from "lucide-react";
 import { requireDirectorSession } from "@/server/auth/director-session";
 import { listDirectorDemos, type DirectorDemoRow } from "@/server/services/sales/director-demos";
 import { DIRECTOR_DEMO_BONUS_CENTS } from "@/core/affiliation/director-terms";
@@ -101,6 +101,11 @@ function Section({ title, rows, empty }: { title: string; rows: DirectorDemoRow[
               <div className="flex flex-wrap items-center gap-2">
                 {row.wentThrough ? <Badge tone="success">Allée au bout</Badge> : row.spaceOpened ? <Badge tone="info">Espace ouvert</Badge> : row.demoDoneAt ? <Badge tone="neutral">Démo faite</Badge> : null}
                 {row.mine && <Badge tone="brand">Votre démo</Badge>}
+                {row.meetingUrl && !row.demoDoneAt && (
+                  <a href={row.meetingUrl} target="_blank" rel="noreferrer" className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#2D8CFF] px-3 text-[13px] font-semibold text-white">
+                    <Video className="size-4" aria-hidden="true" /> Rejoindre sur Zoom
+                  </a>
+                )}
                 <DemoActions prospectId={row.id} done={Boolean(row.demoDoneAt)} mine={row.mine} spaceOpened={row.spaceOpened} />
               </div>
             </li>

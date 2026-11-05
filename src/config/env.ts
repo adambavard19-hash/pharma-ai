@@ -136,6 +136,10 @@ const envSchema = z.object({
   YOUSIGN_ENVIRONMENT: z.enum(["sandbox", "production"]).default("sandbox"),
   YOUSIGN_WEBHOOK_SECRET: z.string().optional(),
   DOCUSEAL_API_KEY: z.string().optional(),
+  /** Zoom (fondateur, 5 nov. 2026) : les démonstrations en réunion Zoom, application « Server-to-Server OAuth ». */
+  ZOOM_ACCOUNT_ID: z.string().optional(),
+  ZOOM_CLIENT_ID: z.string().optional(),
+  ZOOM_CLIENT_SECRET: z.string().optional(),
   /** « eu » : api.docuseal.eu (données en Europe) · « global » : api.docuseal.com. Le compte doit être créé sur le même serveur. */
   DOCUSEAL_REGION: z.enum(["eu", "global"]).default("eu"),
   /** Valeur de l'en-tête x-pharmaboost-secret déclaré sur le webhook DocuSeal. */
