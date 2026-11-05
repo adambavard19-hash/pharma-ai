@@ -15,6 +15,9 @@ import { customRulesFrom, overriddenRulesFrom } from "@/core/ai/central-advice";
 import { patientCardsFor } from "@/server/services/patient-cards";
 import { partnerConsentUrl, universesOf } from "@/server/services/partner-emails";
 import { planCureReminders, scheduleCureReminders, isOptedOut as isCureOptedOut } from "@/server/services/cure-reminders";
+import { SEALED_DOCUMENT_TTL_MS, sealJson } from "@/core/documents/seal";
+import type { BilanContent } from "@/core/documents/bilan";
+import { resolvePublicBaseUrl } from "@/server/public-url";
 import { reminderDay } from "@/core/cure/cure";
 import { buildPatientReport, maskEmail, parsePatientEmail, patientSafeLine, patientSafeReason, type ReportLeaflet } from "@/core/counter/patient-report";
 import { ensureLeaflet, leafletsFor } from "@/server/services/product-leaflets";
@@ -321,6 +324,26 @@ async function sendPatientReport(input: ReportInput): Promise<"SENT" | "SIMULATE
  * déjà lues servent.
  */
 export async function composePatientReport(input: ReportInput) {
+  const { pharmacy, products, universes } = await composeReportParts(input);
+  const mail = buildPatientReport({
+    pharmacy: pharmacy ? { name: pharmacy.name, brandColor: pharmacy.brandColor, logoUrl: pharmacy.logoUrl, phone: pharmacy.phone, addressLine1: pharmacy.addressLine1, addressLine2: pharmacy.addressLine2, postalCode: pharmacy.postalCode, city: pharmacy.city } : { name: "" },
+    products: products.length ? products : input.fallbackNames.map((name) => ({ name, reason: null })),
+    assetBaseUrl: emailAssetBase(),
+    date: new Date(),
+    cures: input.cures,
+    // Les offres partenaires (17 oct. 2026) : le lien d'accord, adresse et univers des produits vendus chiffrés dedans. Rien n'est gardé
+    // tant que le patient ne l'a pas confirmé sur la page. Jamais pour la démonstration.
+    partnerConsentUrl: pharmacy?.isDemo ? null : partnerConsentUrl({ email: input.email, pharmacyId: input.agent.scope.pharmacyId, universes }),
+  });
+  return mail ? { mail, pharmacy } : null;
+}
+
+/**
+ * Ce que dit le bilan, sans le mettre en forme : la pharmacie et les produits vendus, chacun avec sa phrase « patient » validée,
+ * ses points clés, ses précautions et sa notice. Partagé par l'e-mail et le bilan par QR code (fondateur, 5 nov. 2026) ; `fast` :
+ * le QR code s'affiche tout de suite — ni fiche rédigée par le modèle, ni notice cherchée sur Internet, seulement celles déjà lues.
+ */
+export async function composeReportParts(input: Omit<ReportInput, "email"> & { fast?: boolean }) {
   const { agent } = input;
   const pharmacyId = agent.scope.pharmacyId;
   const [pharmacy, recs, validated, lines] = await Promise.all([
@@ -351,7 +374,7 @@ export async function composePatientReport(input: ReportInput) {
       },
     };
   });
-  const cardsJob = patientCardsFor({ organizationId: agent.scope.organizationId, pharmacyId }, cardTargets.filter((target) => target.request.treatment.drug), { demo: pharmacy?.isDemo === true, timeoutMs: 20_000 }).catch(() => []);
+  const cardsJob = input.fast ? Promise.resolve([] as Awaited<ReturnType<typeof patientCardsFor>>) : patientCardsFor({ organizationId: agent.scope.organizationId, pharmacyId }, cardTargets.filter((target) => target.request.treatment.drug), { demo: pharmacy?.isDemo === true, timeoutMs: 20_000 }).catch(() => []);
   const sale = lines.map((line) => ({ names: [line.drugName, line.specialty?.name], substances: line.specialty?.compositions.map((composition) => composition.substanceLabel) ?? [] }));
   const validatedKeys = new Set(recs.map((rec) => rec.opportunity?.ruleKey).filter((key): key is string => Boolean(key) && validated.has(key as string)));
   const templates = validatedKeys.size > 0 ? await patientReasonTemplates(validatedKeys) : new Map<string, { template: string; benefits: string[] }>();
@@ -362,7 +385,7 @@ export async function composePatientReport(input: ReportInput) {
   try {
     leaflets = await leafletsFor(leafletTargets);
     const missing = leafletTargets.filter((target) => { const key = leafletKey(target); return key && !leaflets.has(key); });
-    if (missing.length > 0 && !pharmacy?.isDemo) {
+    if (missing.length > 0 && !pharmacy?.isDemo && !input.fast) {
       await Promise.race([Promise.all(missing.map((target) => ensureLeaflet(target).catch(() => undefined))), new Promise((resolve) => setTimeout(resolve, 20_000))]);
       leaflets = await leafletsFor(leafletTargets);
     }
@@ -390,17 +413,7 @@ export async function composePatientReport(input: ReportInput) {
       card: cards[index] ?? null,
     };
   });
-  const mail = buildPatientReport({
-    pharmacy: pharmacy ? { name: pharmacy.name, brandColor: pharmacy.brandColor, logoUrl: pharmacy.logoUrl, phone: pharmacy.phone, addressLine1: pharmacy.addressLine1, addressLine2: pharmacy.addressLine2, postalCode: pharmacy.postalCode, city: pharmacy.city } : { name: "" },
-    products: products.length ? products : input.fallbackNames.map((name) => ({ name, reason: null })),
-    assetBaseUrl: emailAssetBase(),
-    date: new Date(),
-    cures: input.cures,
-    // Les offres partenaires (17 oct. 2026) : le lien d'accord, adresse et univers des produits vendus chiffrés dedans. Rien n'est gardé
-    // tant que le patient ne l'a pas confirmé sur la page. Jamais pour la démonstration.
-    partnerConsentUrl: pharmacy?.isDemo ? null : partnerConsentUrl({ email: input.email, pharmacyId, universes: universesOf(recs.map((rec) => rec.product?.category)) }),
-  });
-  return mail ? { mail, pharmacy } : null;
+  return { pharmacy, products, universes: universesOf(recs.map((rec) => rec.product?.category)) };
 }
 
 /**
@@ -432,4 +445,48 @@ export async function purgeCounterEmails(now: Date): Promise<{ erased: number; m
     if (count < EMAIL_PURGE_BATCH) return { erased, moreToDo: false };
   }
   return { erased, moreToDo: true };
+}
+
+/**
+ * Le bilan par QR code (fondateur, 5 nov. 2026) : les conseils déclarés vendus de la vente en cours, chiffrés sans identité, et le
+ * lien à montrer en QR code. Le patient le scanne : son bilan s'ouvre sur son téléphone, à garder dans l'appli PharmaBoost.
+ * Aucun e-mail, aucun nom ; la clé n'est que dans le lien, rendu une fois et jamais journalisé. Rien de vendu : pas de bilan.
+ */
+export async function createBilanQr(agent: AgentContext, input: { prescriptionId: string }): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  const sale = await ownedSale(agent, input.prescriptionId);
+  if (!sale) return { ok: false, error: "Vente inconnue pour ce poste." };
+  const now = new Date();
+  const pharmacyId = agent.scope.pharmacyId;
+  const read = await readCounterNotice(pharmacyId, sale.id, now);
+  const sold = (read?.notice.items ?? []).filter((item) => item.outcome === "SOLD");
+  const soldIds = sold.map((item) => item.id).filter((value): value is string => Boolean(value));
+  if (soldIds.length === 0) return { ok: false, error: "Aucun conseil vendu : marquez d'abord ce que le patient prend." };
+  const [parts, cures] = await Promise.all([
+    composeReportParts({ agent, prescriptionId: sale.id, soldIds, fallbackNames: sold.map((item) => item.name), fast: true }),
+    planCureReminders(pharmacyId, soldIds, now).catch(() => []),
+  ]);
+  const { pharmacy, products } = parts;
+  const content: BilanContent = {
+    kind: "bilan",
+    version: 1,
+    date: now.toISOString().slice(0, 10),
+    pharmacy: { name: pharmacy?.name ?? "Votre pharmacie", city: pharmacy?.city ?? null, phone: pharmacy?.phone ?? null, address: [pharmacy?.addressLine1, [pharmacy?.postalCode, pharmacy?.city].filter(Boolean).join(" ")].filter(Boolean).join(", ") || null },
+    products: (products.length ? products : sold.map((item) => ({ name: item.name, reason: null, benefits: [], precautions: [], leaflet: null, imageUrl: null }))).map((product) => ({
+      name: product.name,
+      reason: product.reason ?? null,
+      benefits: product.benefits ?? [],
+      precautions: product.precautions ?? [],
+      posology: product.leaflet?.posology ?? null,
+      imageUrl: product.imageUrl ?? null,
+    })),
+    cures: cures.map((cure) => ({ name: cure.productName, remindOn: cure.sendAt.toISOString().slice(0, 10) })),
+  };
+  const { key, payload } = sealJson(content);
+  const version = (await prisma.sealedDocument.count({ where: { prescriptionId: sale.id } })) + 1;
+  const document = await prisma.sealedDocument.create({
+    data: { pharmacyId, prescriptionId: sale.id, version, ciphertext: new Uint8Array(payload.ciphertext), iv: new Uint8Array(payload.iv), tag: new Uint8Array(payload.tag), expiresAt: new Date(now.getTime() + SEALED_DOCUMENT_TTL_MS), createdByUserId: sale.handledByUserId ?? null, isDemo: pharmacy?.isDemo === true },
+    select: { id: true },
+  });
+  await recordAudit({ action: "document.generated", entityType: "SealedDocument", entityId: document.id, pharmacyId, metadata: { kind: "bilan_qr", prescriptionId: sale.id, products: content.products.length, cures: content.cures.length } });
+  return { ok: true, url: `${resolvePublicBaseUrl().url.replace(/\/$/, "")}/bilan/${document.id}#${key}` };
 }

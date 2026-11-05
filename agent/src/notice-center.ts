@@ -124,6 +124,7 @@ export type HostAction =
   | { kind: "ask"; text: string }
   /** « Aide » : la question du pharmacien sur le conseil affiché, et ce conseil (nom, raison, posologie…). */
   | { kind: "help"; saleId: string; question: string; advice: Record<string, unknown> }
+  | { kind: "bilan_qr"; saleId: string }
   /** Clic sur la carte d'un conseil de l'île (« OUVRIR <adresse> ») : la page de la vente, dans le navigateur du PC — adresse revérifiée par l'agent (sale-link.ts). */
   | { kind: "open_sale"; url: string };
 
@@ -505,6 +506,11 @@ export class NoticeCenter {
     if (this.host && this.banner && this.window === "ile") this.send({ op: "help", id: saleId, question, answer, ...(error ? { error } : {}) });
   }
 
+  /** Le bilan par QR code : seulement l'île sait le montrer. */
+  bilan(saleId: string, url: string, error = ""): void {
+    if (this.host && this.banner && this.window === "ile") this.send({ op: "bilan", id: saleId, url, ...(error ? { error } : {}) });
+  }
+
   /** Le robot de ce comptoir : la bannière en change aussitôt (couleur, accessoire), sans redémarrer. */
   /** Le nom du poste a changé dans PharmaBoost : la bannière (l'île) l'affiche aussitôt. */
   setPostLabel(label: string): void {
@@ -737,6 +743,7 @@ export class NoticeCenter {
       if (email && email.length <= 200 && !/[\r\n\s]/.test(email)) act({ kind: "email", saleId, email });
     } else if (word === "EMAIL_RETIRER") act({ kind: "email_remove", saleId });
     else if (word === "TERMINER") act({ kind: "finish", saleId });
+    else if (word === "BILANQR") act({ kind: "bilan_qr", saleId });
     else if (word === "RETIRER" && argument && /^[\w-]{1,80}$/.test(argument)) act({ kind: "remove_line", saleId, lineId: argument });
     else if (word === "SEPARER" && argument && /^[\w-]{1,80}$/.test(argument)) act({ kind: "split_line", saleId, lineId: argument });
     else if (word === "REPONSE" && argument) {

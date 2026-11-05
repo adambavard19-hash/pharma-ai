@@ -6024,6 +6024,10 @@ var NoticeCenter = class {
   help(saleId, question, answer, error = "") {
     if (this.host && this.banner && this.window === "ile") this.send({ op: "help", id: saleId, question, answer, ...error ? { error } : {} });
   }
+  /** Le bilan par QR code : seulement l'île sait le montrer. */
+  bilan(saleId, url, error = "") {
+    if (this.host && this.banner && this.window === "ile") this.send({ op: "bilan", id: saleId, url, ...error ? { error } : {} });
+  }
   /** Le robot de ce comptoir : la bannière en change aussitôt (couleur, accessoire), sans redémarrer. */
   /** Le nom du poste a changé dans PharmaBoost : la bannière (l'île) l'affiche aussitôt. */
   setPostLabel(label) {
@@ -6239,6 +6243,7 @@ var NoticeCenter = class {
       if (email && email.length <= 200 && !/[\r\n\s]/.test(email)) act({ kind: "email", saleId, email });
     } else if (word === "EMAIL_RETIRER") act({ kind: "email_remove", saleId });
     else if (word === "TERMINER") act({ kind: "finish", saleId });
+    else if (word === "BILANQR") act({ kind: "bilan_qr", saleId });
     else if (word === "RETIRER" && argument && /^[\w-]{1,80}$/.test(argument)) act({ kind: "remove_line", saleId, lineId: argument });
     else if (word === "SEPARER" && argument && /^[\w-]{1,80}$/.test(argument)) act({ kind: "split_line", saleId, lineId: argument });
     else if (word === "REPONSE" && argument) {
@@ -6952,7 +6957,7 @@ function shouldGreet(state) {
 var import_node_fs12 = require("node:fs");
 var import_node_os = require("node:os");
 var import_node_path11 = require("node:path");
-var VERSION = "0.10.32";
+var VERSION = "0.10.33";
 var CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? (0, import_node_path11.join)(process.cwd(), "pharmaboost-connect.json");
 var LOG_PATH = (0, import_node_path11.join)((0, import_node_path11.dirname)(CONFIG_PATH), "pharmaboost-connect.log");
 var LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -7290,7 +7295,18 @@ async function handleAction(action) {
     }
     return;
   }
-  if (!config || action.kind === "view" || action.kind === "open_space" || action.kind === "open_sale" || action.kind === "ask" || action.kind === "help") return;
+  if (config && action.kind === "bilan_qr") {
+    try {
+      const result = await postJson(config, "/api/agent/conseil/bilan-qr", { prescription: action.saleId });
+      if (result.body?.ok && result.body.url) notices.bilan(action.saleId, result.body.url);
+      else notices.bilan(action.saleId, "", result.body?.error ?? "Le bilan n'a pas pu \xEAtre pr\xE9par\xE9.");
+    } catch (error) {
+      notices.bilan(action.saleId, "", "Le bilan n'a pas pu \xEAtre pr\xE9par\xE9 (r\xE9seau).");
+      log(`Bilan QR impossible : ${error instanceof Error ? error.message : String(error)}.`);
+    }
+    return;
+  }
+  if (!config || action.kind === "view" || action.kind === "open_space" || action.kind === "open_sale" || action.kind === "ask" || action.kind === "help" || action.kind === "bilan_qr") return;
   if (watched) watched.lastChange = Date.now();
   try {
     if (action.kind === "sold" || action.kind === "not_sold" || action.kind === "undo") {

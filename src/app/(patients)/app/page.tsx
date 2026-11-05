@@ -34,11 +34,11 @@ export default function PatientHome() {
         </div>
 
         <SectionTitle>Je viens de ma pharmacie</SectionTitle>
-        <Link href="/app/ma-pharmacie" className="flex items-center gap-3 rounded-[20px] p-4 text-white shadow-lg" style={{ background: GRAD }}>
+        <Link href="/app/bilans" className="flex items-center gap-3 rounded-[20px] p-4 text-white shadow-lg" style={{ background: GRAD }}>
           <Mail className="size-6 shrink-0" aria-hidden="true" />
           <span className="flex-1">
-            <span className="block text-[16px] font-bold">Mon bilan et mes cures</span>
-            <span className="block text-[12.5px] text-white/80">Le lien reçu par e-mail de ma pharmacie</span>
+            <span className="block text-[16px] font-bold">Mes bilans et mes cures</span>
+            <span className="block text-[12.5px] text-white/80">Le QR code scanné à ma pharmacie</span>
           </span>
           <ChevronRight className="size-5" aria-hidden="true" />
         </Link>

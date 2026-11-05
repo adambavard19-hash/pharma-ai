@@ -32,6 +32,8 @@ export type HostCommand =
   | { op: "validated"; id: string }
   /** La réponse de l'« Aide » à une question du pharmacien sur un conseil (agent 0.10.30 et suivants). Vide : l'aide n'a pas pu répondre. */
   | { op: "help"; id: string; question: string; answer: string; error?: string }
+  /** Le bilan par QR code (agent 0.10.33 et suivants, fondateur 5 nov. 2026) : le lien à montrer au patient, ou pourquoi il manque. */
+  | { op: "bilan"; id: string; url: string; error?: string }
   | { op: "quit" };
 
 /** Les quatre places possibles : en haut (par défaut), en bas, ou debout contre le bord gauche ou droit de l'écran. */
@@ -252,7 +254,8 @@ function onHost(view: PosteView, command: HostCommand, now: number): PosteView {
     case "done":
       return { ...view, done: command.info, emailPending: false, greeting: null, island: { ...view.island, stage: "done" } };
     case "help":
-      // Les réponses de l'Aide vivent dans la page (poste-island), pas dans l'état de la vente.
+    case "bilan":
+      // Les réponses de l'Aide et le lien du bilan vivent dans la page (poste-island), pas dans l'état de la vente.
       return view;
     case "remove":
       if (view.entry && view.entry.id !== command.id) return view;
@@ -314,6 +317,11 @@ export function emailWord(saleId: string, value: string): string | null {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return `EMAIL ${saleId} ${btoa(binary)}`;
+}
+
+/** « BILANQR <vente> » : le pharmacien veut montrer le bilan en QR code (agent 0.10.33 et suivants). */
+export function bilanQrWord(saleId: string): string | null {
+  return ID.test(saleId) ? `BILANQR ${saleId}` : null;
 }
 
 /** « RETIRER <vente> <boîte> » : le patient a reposé cette boîte, elle quitte la vente. */
@@ -429,6 +437,12 @@ export function parseCommand(raw: unknown): HostCommand | null {
       const answer = text(command.answer, 1400);
       const error = text(command.error, 200);
       return question && (answer || error) ? { op: "help", id: command.id, question, answer, ...(error ? { error } : {}) } : null;
+    }
+    case "bilan": {
+      if (typeof command.id !== "string" || !ID.test(command.id)) return null;
+      const url = typeof command.url === "string" && command.url.length <= 400 && /^https?:\/\/[^\s]+\/bilan\/[\w-]+#[\w-]+$/.test(command.url) ? command.url : "";
+      const error = typeof command.error === "string" ? command.error.replace(/\s+/g, " ").trim().slice(0, 200) : "";
+      return url || error ? { op: "bilan", id: command.id, url, ...(error ? { error } : {}) } : null;
     }
     case "done":
       return isDone(command.info) ? { op: "done", info: command.info } : null;

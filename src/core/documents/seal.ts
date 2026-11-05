@@ -38,6 +38,11 @@ export function sealContent(content: DocumentContent): { key: string; payload: S
   return { key: toBase64Url(key), payload: { ciphertext, iv, tag: cipher.getAuthTag() } };
 }
 
+/** Chiffre n'importe quel contenu (le bilan par QR code) ; même algorithme, même lecture côté navigateur que le plan. */
+export function sealJson(value: unknown): { key: string; payload: SealedPayload } {
+  return sealContent(value as DocumentContent);
+}
+
 /** Le chemin inverse, utilisé par les tests : le navigateur fait la même chose en WebCrypto. */
 export function unsealContent(payload: SealedPayload, key: string): DocumentContent {
   const decipher = createDecipheriv(SEAL_ALGORITHM, fromBase64Url(key), payload.iv);

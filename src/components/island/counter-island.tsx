@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ExternalLink, FileText, GripVertical, Mail, Maximize2, Minimize2, PartyPopper, Pill, ScanLine, Send, TriangleAlert, Trophy, X } from "lucide-react";
+import { Check, QrCode as QrIcon, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ExternalLink, FileText, GripVertical, Mail, Maximize2, Minimize2, PartyPopper, Pill, ScanLine, Send, TriangleAlert, Trophy, X } from "lucide-react";
 import { islandTheme, PHARMABOOST_GREEN } from "./island-theme";
 import { BANNER } from "../../../agent/src/banner-design";
 import { SHEET_MISSING, SHEET_PATIENT_LABELS, type CounterSheet, type CounterSheetLine } from "../../../agent/src/counter-sheet";
 import { Robot } from "@/components/robot";
+import { QrCode } from "@/components/document/qr-code";
 import { HelixBackdrop } from "@/components/app/helix/helix-backdrop";
 import { GreenCross, ScanCapsule, SCAN_CSS, SCAN_STEPS, WHITE_PILL_WIDTH, WhitePill, shortAdviceName, whiteFoundWidth, type ScanLook, type WhiteFound } from "./scan-capsule";
 import { eurosOf, possibleMargin } from "./mix-island";
@@ -115,6 +116,13 @@ export type CounterIslandProps = {
   /** L'e-mail demandé au moment de « Vente terminée » (poste) : « Envoyer et terminer », ou « Terminer sans e-mail » ici. */
   onFinishWithoutEmail?: () => void;
   onFinish: () => void;
+  /**
+   * Le bilan par QR code (fondateur, 5 nov. 2026) : demandé (`loading`), prêt (`url`) ou en échec (`error`). Le patient le scanne,
+   * son bilan s'ouvre sur son téléphone, à garder dans l'appli PharmaBoost. Absent : pas de bouton « QR code ».
+   */
+  bilanQr?: { loading: boolean; url: string; error?: string } | null;
+  onShowBilanQr?: () => void;
+  onCloseBilanQr?: () => void;
   /** Les boîtes bipées de la vente : chacune se retire (le patient l'a reposée). Absent : pas de « Retirer ». */
   boxes?: { id: string; name: string; challenge?: string; reward?: string }[];
   onRemoveBox?: (id: string) => void;
@@ -835,6 +843,33 @@ export function CounterIsland(props: CounterIslandProps) {
         );
         break;
       case "email":
+        if (props.bilanQr) {
+          // Le bilan par QR code : le patient scanne l'écran, son bilan s'ouvre sur son téléphone (fondateur, 5 nov. 2026).
+          const qr = props.bilanQr;
+          const finish = props.onFinishWithoutEmail ?? props.onFinish;
+          body = (
+            <LightPanel>
+              <div className="px-3 py-2.5 text-center" data-ile-bilan-qr="">
+                <p className="text-[12.5px] font-bold text-[#0F2B26]">Le bilan sur le téléphone du patient</p>
+                <div className="mx-auto mt-2 flex size-[150px] items-center justify-center rounded-xl bg-white p-1.5 shadow-sm">
+                  {qr.url ? <QrCode value={qr.url} size={138} label="QR code du bilan conseil" /> : qr.error ? <p className="px-2 text-[11.5px] text-[#B42318]">{qr.error}</p> : <span className="text-[11.5px] text-[#5B6B66]">Préparation…</span>}
+                </div>
+                <p className="mt-1.5 text-[11px] leading-4 text-[#5B6B66]">Il scanne avec son appareil photo : ses conseils s&apos;ouvrent, à garder dans l&apos;appli PharmaBoost.</p>
+                <div className="mt-2 flex items-center justify-center gap-1.5">
+                  {props.onCloseBilanQr && (
+                    <button type="button" onClick={props.onCloseBilanQr} className="h-8 rounded-full px-3 text-[11.5px] font-semibold text-[#5B6B66] hover:text-[#0F2B26]">
+                      Retour
+                    </button>
+                  )}
+                  <button type="button" onClick={finish} className="inline-flex h-8 items-center gap-1 rounded-full bg-[#0E8A7B] px-3.5 text-[12px] font-bold text-white">
+                    <Check className="size-3.5" strokeWidth={3} aria-hidden="true" /> Terminer
+                  </button>
+                </div>
+              </div>
+            </LightPanel>
+          );
+          break;
+        }
         if (props.compactEnd) {
           // Fin 3 (fondateur, 29 oct. 2026) : une ligne — l'adresse, Envoyer, Passer —, le compte à rebours dessous.
           const skip = props.onFinishWithoutEmail ?? props.onCloseEmail;
@@ -865,6 +900,11 @@ export function CounterIsland(props: CounterIslandProps) {
                 <button type="submit" aria-label="Envoyer" className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-[#0E8A7B] text-white">
                   <Send className="size-3.5" aria-hidden="true" />
                 </button>
+                {props.onShowBilanQr && (
+                  <button type="button" onClick={props.onShowBilanQr} aria-label="Bilan par QR code" title="Bilan par QR code" data-ile-qr="" className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-[#D5E3DD] bg-white text-[#0E8A7B] hover:border-[#0E8A7B]">
+                    <QrIcon className="size-4" aria-hidden="true" />
+                  </button>
+                )}
                 {skip && (
                   <button type="button" onClick={skip} data-ile-sans-email="" className="h-8 shrink-0 rounded-full px-2.5 text-[11.5px] font-semibold text-[#5B6B66] hover:text-[#0F2B26]">
                     Passer
@@ -909,6 +949,11 @@ export function CounterIsland(props: CounterIslandProps) {
               <button type="submit" aria-label={props.onFinishWithoutEmail ? "Envoyer et terminer" : "Envoyer"} className="inline-flex h-8 items-center gap-1 rounded-lg px-2.5 text-[12px] font-bold" style={{ background: C.accent, color: "#04261A" }}>
                 <Send className="size-3.5" aria-hidden="true" /> Envoyer
               </button>
+              {props.onShowBilanQr && (
+                <button type="button" onClick={props.onShowBilanQr} aria-label="Bilan par QR code" title="Bilan par QR code" data-ile-qr="" className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.08] text-white/90 hover:bg-white/[0.14]">
+                  <QrIcon className="size-4" aria-hidden="true" />
+                </button>
+              )}
               {props.onCloseEmail && (
                 <button type="button" onClick={props.onCloseEmail} aria-label="Annuler l'e-mail" title="Annuler" className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.08] text-white/80 hover:bg-white/[0.14] hover:text-white">
                   <X className="size-3.5" aria-hidden="true" />

@@ -16,6 +16,7 @@ import {
   canReloadNow,
   answerWord,
   emailWord,
+  bilanQrWord,
   finishWord,
   removeBoxWord,
   askWord,
@@ -218,6 +219,8 @@ export function PosteIsland() {
   const [view, dispatch] = useReducer(posteReducer, INITIAL_POSTE);
   // Les questions à l'« Aide » et leurs réponses, pour la vente à l'écran (la réponse arrive de l'agent : commande « help »).
   const [helpLog, setHelpLog] = useState<{ sale: string; log: HelpExchange[] }>({ sale: "", log: [] });
+  // Le bilan par QR code de la vente à l'écran (fondateur, 5 nov. 2026) : demandé à l'agent, rendu par lui (op « bilan »).
+  const [bilanQr, setBilanQr] = useState<{ sale: string; loading: boolean; url: string; error?: string } | null>(null);
   const receiveHelp = useCallback((sale: string, question: string, answer: string, error?: string) => {
     setHelpLog((current) => {
       if (current.sale !== sale) return current;
@@ -232,6 +235,7 @@ export function PosteIsland() {
     useCallback(
       (command: HostCommand) => {
         if (command.op === "help") receiveHelp(command.id, command.question, command.answer, command.error);
+        else if (command.op === "bilan") setBilanQr((current) => (current && current.sale === command.id ? { sale: command.id, loading: false, url: command.url, error: command.error } : current));
         else dispatch({ type: "host", command, now: Date.now() });
       },
       [receiveHelp],
@@ -655,6 +659,18 @@ export function PosteIsland() {
     },
     onAddEmail: () => dispatch({ type: "openEmail" }),
     onFinish: finish,
+    // Le bilan par QR code : seulement pour une vente (pas une demande du comptoir), et pour la vente encore à l'écran.
+    bilanQr: bilanQr && entry && bilanQr.sale === entry.id && island.stage === "email" ? bilanQr : null,
+    onShowBilanQr: entry && !entry.id.startsWith("demande-")
+      ? () => {
+          setBilanQr({ sale: entry.id, loading: true, url: "" });
+          word(bilanQrWord(entry.id));
+          // Un agent d'avant 0.10.33 ne répond pas : on le dit au lieu d'attendre.
+          const sale = entry.id;
+          setTimeout(() => setBilanQr((current) => (current && current.sale === sale && current.loading ? { ...current, loading: false, error: "Mettez PharmaBoost à jour sur ce poste pour le QR code." } : current)), 15_000);
+        }
+      : undefined,
+    onCloseBilanQr: () => setBilanQr(null),
     // Les boîtes de la vente (agent récent seulement) : le patient en repose une, elle quitte la vente et la bannière.
     boxes: entry?.boxes ?? [],
     onRemoveBox: (lineId) => { if (entry) word(removeBoxWord(entry.id, lineId)); },

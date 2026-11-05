@@ -49,7 +49,7 @@ import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, stat
 import { hostname } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
-const VERSION = "0.10.32";
+const VERSION = "0.10.33";
 const CONFIG_PATH = process.env.PHARMABOOST_CONNECT_CONFIG ?? join(process.cwd(), "pharmaboost-connect.json");
 const LOG_PATH = join(dirname(CONFIG_PATH), "pharmaboost-connect.log");
 const LOG_MAX_BYTES = 2 * 1024 * 1024;
@@ -516,7 +516,19 @@ async function handleAction(action: HostAction): Promise<void> {
     }
     return;
   }
-  if (!config || action.kind === "view" || action.kind === "open_space" || action.kind === "open_sale" || action.kind === "ask" || action.kind === "help") return;
+  if (config && action.kind === "bilan_qr") {
+    // Le bilan par QR code (fondateur, 5 nov. 2026) : le serveur chiffre le bilan et rend le lien, que l'île montre en QR code.
+    try {
+      const result = await postJson<{ ok: boolean; url?: string; error?: string }>(config, "/api/agent/conseil/bilan-qr", { prescription: action.saleId });
+      if (result.body?.ok && result.body.url) notices.bilan(action.saleId, result.body.url);
+      else notices.bilan(action.saleId, "", result.body?.error ?? "Le bilan n'a pas pu être préparé.");
+    } catch (error) {
+      notices.bilan(action.saleId, "", "Le bilan n'a pas pu être préparé (réseau).");
+      log(`Bilan QR impossible : ${error instanceof Error ? error.message : String(error)}.`);
+    }
+    return;
+  }
+  if (!config || action.kind === "view" || action.kind === "open_space" || action.kind === "open_sale" || action.kind === "ask" || action.kind === "help" || action.kind === "bilan_qr") return;
   if (watched) watched.lastChange = Date.now();
   try {
     if (action.kind === "sold" || action.kind === "not_sold" || action.kind === "undo") {
