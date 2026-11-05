@@ -5,6 +5,7 @@ import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { listPharmacyTrainings, listTrainings, teamProgress } from "@/server/services/training";
 import { PageHeader } from "@/components/ui/page";
+import { SectionTabs } from "@/components/app/section-tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState, Progress } from "@/components/ui/feedback";
 import { LinkTabs } from "@/components/ui/tabs";
@@ -40,6 +41,7 @@ export default async function FormationPage({
 
   return (
     <div className="space-y-6">
+      <SectionTabs section="aide" active="/formation" permissions={session.permissions} />
       <PageHeader
         title="Formations"
         description="Vidéos, fiches courtes et liens officiels des laboratoires pour bien connaître les produits de l'officine. À son rythme, entre deux patients."

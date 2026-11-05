@@ -83,6 +83,8 @@ export type CampaignView = {
   endsOn: string | null;
   isActive: boolean;
   endedReason: string | null;
+  /** Le jour où elle s'est arrêtée (objectif, date ou à la main). */
+  endedAt: Date | null;
   createdAt: Date;
   /** Conseils de ce produit vendus au comptoir depuis le lancement (déclarés « Vendu » ou bipés). */
   soldByAdvice: number;
@@ -109,7 +111,7 @@ export async function loadOverstockScreen(scope: TenantScope, now: Date = new Da
       where: { pharmacyId: scope.pharmacyId },
       orderBy: [{ isActive: "desc" }, { createdAt: "desc" }],
       take: 60,
-      select: { id: true, triggerAtcCodes: true, familyIds: true, sentence: true, startQuantity: true, targetQuantity: true, endsOn: true, isActive: true, endedReason: true, createdAt: true, product: { select: productSelect } },
+      select: { id: true, triggerAtcCodes: true, familyIds: true, sentence: true, startQuantity: true, targetQuantity: true, endsOn: true, isActive: true, endedReason: true, endedAt: true, createdAt: true, product: { select: productSelect } },
     }),
     prisma.triggerFamily.findMany({ where: { status: { not: "REMOVED" } }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
@@ -130,6 +132,7 @@ export async function loadOverstockScreen(scope: TenantScope, now: Date = new Da
     endsOn: dayKey(row.endsOn),
     isActive: row.isActive,
     endedReason: row.endedReason,
+    endedAt: row.endedAt,
     createdAt: row.createdAt,
     soldByAdvice: sold[index],
   }));

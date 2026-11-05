@@ -93,7 +93,7 @@ describe("la page « Performances » — onglet « Classement de l'équipe »", 
     const html = await render();
     expect(html.match(/href="\/resultats"/g)).toHaveLength(1);
     expect(html.match(/href="\/resultats\?periode=month"/g)).toHaveLength(1);
-    expect(html).toMatch(/<a(?=[^>]*href="\/pilotage")(?=[^>]*aria-selected="true")/);
+    expect(html).toMatch(/<a(?=[^>]*href="\/pilotage")(?=[^>]*aria-current="page")/);
   });
 
   it("le titulaire voit en tête le compteur de toute l'officine, le sien (lui et son poste), et qui vend le plus", async () => {

@@ -6,6 +6,7 @@ import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { getPharmacyOffersOverview } from "@/server/services/patient-offers";
 import { PageHeader } from "@/components/ui/page";
+import { SectionTabs } from "@/components/app/section-tabs";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/feedback";
@@ -33,6 +34,7 @@ export default async function PatientOffersPage() {
   const redeemed = overview.offers.reduce((sum, offer) => sum + offer.stats.redeemed, 0);
   return (
     <div className="space-y-6">
+      <SectionTabs section="patients" active="/offres-patients" permissions={session.permissions} />
       <PageHeader title="Offres patients" description="Vos remises dans l'appli PharmaBoost : vos patients abonnés reviennent chez vous pour en profiter." />
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard label="Patients inscrits chez vous" value={overview.members.total} icon={<Smartphone className="size-4" />} sublabel="ont choisi votre pharmacie dans l'appli" />

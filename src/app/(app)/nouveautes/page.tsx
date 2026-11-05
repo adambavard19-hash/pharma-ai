@@ -4,6 +4,7 @@ import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { getNewsOverview, type NewsOverview } from "@/server/services/patient-news";
 import { PageHeader } from "@/components/ui/page";
+import { SectionTabs } from "@/components/app/section-tabs";
 import { Alert } from "@/components/ui/feedback";
 import { NewsStateCard } from "./news-state-card";
 import { AnnouncementComposer } from "./announcement-composer";
@@ -45,6 +46,7 @@ export default async function NewsPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
+      <SectionTabs section="patients" active="/nouveautes" permissions={session.permissions} />
       <PageHeader
         title="Actualités pour vos patients"
         description={

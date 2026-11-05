@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LifeBuoy, MessageCircle, X } from "lucide-react";
-import { NAVIGATION, groupNavigation, isNavItemActive, type NavItem } from "@/config/navigation";
+import { NAVIGATION, collapseMerged, groupNavigation, isNavItemActive, type NavItem } from "@/config/navigation";
 import { cn } from "@/lib/utils";
 import { Robot } from "@/components/robot";
 import { useCounterLook } from "@/components/robot/counter-look-context";
@@ -37,7 +37,7 @@ export function Sidebar({
   const granted = new Set(permissions);
   // La phrase de l'entrée survolée (ou atteinte au clavier), en bulle à droite du menu, sur grand écran.
 
-  const items = NAVIGATION.filter((item) => granted.has(item.permission) && !hiddenHrefs.includes(item.href));
+  const items = collapseMerged(NAVIGATION.filter((item) => granted.has(item.permission) && !hiddenHrefs.includes(item.href)));
   const primary = items.find((item) => item.primary);
   const groups = groupNavigation(items);
 

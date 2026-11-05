@@ -1,4 +1,4 @@
-import { BadgePercent, BarChart3, Box, CalendarClock, Flame, FlaskConical, GraduationCap, Handshake, History, Link2, MailCheck, Megaphone, PackageSearch, PlayCircle, ScanLine, Settings, UsersRound, type LucideIcon } from "lucide-react";
+import { BadgePercent, BarChart3, Box, LayoutDashboard, CalendarClock, Flame, FlaskConical, GraduationCap, Handshake, History, Link2, MailCheck, Megaphone, PackageSearch, PlayCircle, ScanLine, Settings, UsersRound, type LucideIcon } from "lucide-react";
 import { PERMISSIONS, type Permission } from "@/server/rbac/permissions";
 import { PATIENT_APP_LIVE } from "@/core/patient-app/offers";
 
@@ -73,6 +73,12 @@ export type NavItem = {
   primary?: boolean;
   /** Le groupe du menu ; absent pour l'action principale. */
   group?: NavGroupKey;
+  /**
+   * L'entrée qui l'accueille (fondateur, 5 nov. 2026 : un menu plus court) : quand la personne voit cette entrée-là, celle-ci
+   * quitte le menu et devient un onglet de sa rubrique (`SECTIONS`). Sinon (un préparateur sans Résultats garde
+   * « Historique »), elle reste au menu. La page ne change pas d'adresse.
+   */
+  mergedInto?: string;
 };
 
 export const NAVIGATION: NavItem[] = [
@@ -88,11 +94,50 @@ export const NAVIGATION: NavItem[] = [
 
   // --- Ma pharmacie
   {
+    href: "/tableau-de-bord",
+    label: "Vue d'ensemble",
+    subtitle: "Toute la pharmacie en un écran",
+    icon: LayoutDashboard,
+    // Le titulaire seul (fondateur, 5 nov. 2026) : le taux de conseil, le classement, le surstock, les dates courtes, les produits
+    // manquants et les alertes, sans ouvrir cinq rubriques.
+    permission: PERMISSIONS.MANAGEMENT_MENU,
+    match: ["/tableau-de-bord"],
+    description: "Le taux de conseil, le classement de l'équipe, le surstock, les dates courtes, les produits manquants et ce qui demande votre attention",
+    group: "pharmacie",
+  },
+  {
+    href: "/pilotage",
+    label: "Résultats",
+    subtitle: "Performances et historique des ventes",
+    icon: BarChart3,
+    // Le titulaire y voit toute l'officine ; le pharmacien adjoint (ANALYTICS_VIEW, fondateur, 23 oct. 2026) seulement SES
+    // conseils vendus et sa place dans l'équipe. Le préparateur et l'étudiant ne voient ni l'entrée ni la page. Pour le titulaire,
+    // deux pages, une entrée : on arrive sur « Mon équipe » (les compteurs, le classement de chacun et les challenges), qui mène à
+    // « Ce que PharmaBoost vous rapporte » (les ventes confirmées), qui y renvoie.
+    permission: PERMISSIONS.ANALYTICS_VIEW,
+    match: ["/resultats", "/pilotage", "/performance", "/analytics", "/ventes", "/historique"],
+    description: "Le taux de conseil, le classement de l'équipe, les challenges, ce que les conseils PharmaBoost ont rapporté et chaque vente terminée",
+    group: "pharmacie",
+  },
+  {
+    href: "/historique",
+    label: "Historique",
+    subtitle: "Les ventes terminées",
+    icon: History,
+    // Chaque vente terminée au comptoir, une par une : toute l'équipe l'a (fondateur, 15 oct. 2026) — le titulaire voit toutes les
+    // ventes, un membre de l'équipe seulement les siennes (la page filtre).
+    permission: PERMISSIONS.PRESCRIPTION_CREATE,
+    match: ["/historique"],
+    mergedInto: "/pilotage",
+    description: "Chaque vente terminée au comptoir : les boîtes scannées, les conseils proposés et vendus, le chiffre d'affaires ajouté",
+    group: "pharmacie",
+  },
+  {
     href: "/associations",
     label: "Mes associations",
     subtitle: "Conseils et associations personnalisés",
     icon: Link2,
-    // Deuxième entrée du menu, juste après « Au comptoir » (consigne du fondateur, 13 oct. 2026 : rubrique importante).
+    // Après « Vue d'ensemble » et « Résultats » (ordre du fondateur, 5 nov. 2026 ; avant : juste après « Au comptoir », 13 oct.).
     // Ouverte à toute l'équipe (consigne du 13 oct. 2026) : la voir demande ASSOCIATIONS_VIEW, l'écrire ASSOCIATIONS_MANAGE
     // (pharmacien, préparateur, titulaire) — une permission à part, qui n'ouvre pas les règles de conseil de l'officine.
     permission: PERMISSIONS.ASSOCIATIONS_VIEW,
@@ -138,68 +183,6 @@ export const NAVIGATION: NavItem[] = [
     group: "pharmacie",
   },
   {
-    href: "/pilotage",
-    label: "Performances",
-    subtitle: "Conseils vendus et résultats",
-    icon: BarChart3,
-    // Le titulaire y voit toute l'officine ; le pharmacien adjoint (ANALYTICS_VIEW, fondateur, 23 oct. 2026) seulement SES
-    // conseils vendus et sa place dans l'équipe. Le préparateur et l'étudiant ne voient ni l'entrée ni la page. Pour le titulaire,
-    // deux pages, une entrée : on arrive sur « Mon équipe » (les compteurs, le classement de chacun et les challenges), qui mène à
-    // « Ce que PharmaBoost vous rapporte » (les ventes confirmées), qui y renvoie.
-    permission: PERMISSIONS.ANALYTICS_VIEW,
-    match: ["/resultats", "/pilotage", "/performance", "/analytics", "/ventes"],
-    description: "Le classement de l'équipe, les challenges, et ce que les conseils PharmaBoost ont rapporté",
-    group: "pharmacie",
-  },
-  {
-    href: "/historique",
-    label: "Historique",
-    subtitle: "Les ventes terminées",
-    icon: History,
-    // Chaque vente terminée au comptoir, une par une : toute l'équipe l'a (fondateur, 15 oct. 2026) — le titulaire voit toutes les
-    // ventes, un membre de l'équipe seulement les siennes (la page filtre).
-    permission: PERMISSIONS.PRESCRIPTION_CREATE,
-    match: ["/historique"],
-    description: "Chaque vente terminée au comptoir : les boîtes scannées, les conseils proposés et vendus, le chiffre d'affaires ajouté",
-    group: "pharmacie",
-  },
-  {
-    href: "/equipe",
-    label: "Mon équipe",
-    subtitle: "Collaborateurs et challenges",
-    icon: UsersRound,
-    // Gérer l'équipe est un acte de titulaire. Un pharmacien adjoint garde
-    // TEAM_VIEW ailleurs, mais n'a rien à faire dans cet écran au comptoir.
-    permission: PERMISSIONS.TEAM_MANAGE,
-    match: ["/equipe"],
-    description: "Inviter vos collaborateurs, approuver leurs demandes, voir qui travaille à quel comptoir",
-    group: "pharmacie",
-  },
-  {
-    href: "/emails-patients",
-    label: "E-mails aux patients",
-    subtitle: "Suivis et communications",
-    icon: MailCheck,
-    // Ouverte à l'équipe (consigne du 13 oct. 2026) : un collaborateur voit les bilans de SES ventes ; le titulaire
-    // (ANALYTICS_VIEW_TEAM_PERFORMANCE) voit toute l'officine, tous comptoirs confondus.
-    permission: PERMISSIONS.PATIENT_EMAILS_VIEW,
-    match: ["/emails-patients"],
-    description: "Les bilans envoyés par e-mail depuis le comptoir : quand, par qui, quels produits, envoyé ou non",
-    group: "pharmacie",
-  },
-  {
-    href: "/parametres/laboratoires/gammes",
-    label: "Laboratoires & gammes",
-    subtitle: "Catalogues et partenaires commerciaux",
-    icon: FlaskConical,
-    // Les gammes privilégiées, les challenges et les marques : des choix de titulaire, en entrée directe (retour du
-    // fondateur du 13 oct. 2026 : « pas dans les paramètres »). Seul le titulaire a LAB_PROGRAMS_MANAGE.
-    permission: PERMISSIONS.LAB_PROGRAMS_MANAGE,
-    match: ["/parametres/laboratoires"],
-    description: "Vos gammes privilégiées, les challenges des laboratoires, les marques mises en avant",
-    group: "pharmacie",
-  },
-  {
     href: "/assortiment",
     label: "Produits manquants",
     subtitle: "Besoins et ruptures",
@@ -211,15 +194,51 @@ export const NAVIGATION: NavItem[] = [
     description: "Les conseils que PharmaBoost n'a pas pu proposer faute de produit en stock : ce qu'il faudrait référencer",
     group: "pharmacie",
   },
+  {
+    href: "/emails-patients",
+    label: "Patients",
+    subtitle: "Bilans envoyés et communications",
+    icon: MailCheck,
+    // Ouverte à l'équipe (consigne du 13 oct. 2026) : un collaborateur voit les bilans de SES ventes ; le titulaire
+    // (ANALYTICS_VIEW_TEAM_PERFORMANCE) voit toute l'officine, tous comptoirs confondus.
+    permission: PERMISSIONS.PATIENT_EMAILS_VIEW,
+    match: ["/emails-patients", "/nouveautes", "/offres-patients"],
+    description: "Les bilans envoyés par e-mail depuis le comptoir : quand, par qui, quels produits, envoyé ou non",
+    group: "pharmacie",
+  },
+  {
+    href: "/parametres/laboratoires/gammes",
+    label: "Laboratoires & partenaires",
+    subtitle: "Gammes, challenges et partenaires",
+    icon: FlaskConical,
+    // Les gammes privilégiées, les challenges et les marques : des choix de titulaire, en entrée directe (retour du
+    // fondateur du 13 oct. 2026 : « pas dans les paramètres »). Seul le titulaire a LAB_PROGRAMS_MANAGE.
+    permission: PERMISSIONS.LAB_PROGRAMS_MANAGE,
+    match: ["/parametres/laboratoires", "/partenaires"],
+    description: "Vos gammes privilégiées, les challenges des laboratoires, les marques mises en avant et les laboratoires partenaires",
+    group: "pharmacie",
+  },
+  {
+    href: "/equipe",
+    label: "Mon équipe",
+    subtitle: "Collaborateurs et comptoirs",
+    icon: UsersRound,
+    // Gérer l'équipe est un acte de titulaire. Un pharmacien adjoint garde
+    // TEAM_VIEW ailleurs, mais n'a rien à faire dans cet écran au comptoir.
+    permission: PERMISSIONS.TEAM_MANAGE,
+    match: ["/equipe"],
+    description: "Inviter vos collaborateurs, approuver leurs demandes, voir qui travaille à quel comptoir",
+    group: "pharmacie",
+  },
 
   // --- Découvrir
   {
     href: "/prise-en-main",
-    label: "Prise en main",
+    label: "Aide & formations",
     icon: PlayCircle,
     permission: PERMISSIONS.TRAINING_VIEW,
-    match: ["/prise-en-main"],
-    description: "Les vidéos pour bien démarrer : votre espace et le comptoir",
+    match: ["/prise-en-main", "/formation"],
+    description: "Les vidéos pour bien démarrer, puis les formations sur les produits et les gammes",
     group: "decouvrir",
   },
   {
@@ -228,6 +247,7 @@ export const NAVIGATION: NavItem[] = [
     icon: GraduationCap,
     permission: PERMISSIONS.TRAINING_VIEW,
     match: ["/formation"],
+    mergedInto: "/prise-en-main",
     description: "Vidéos et fiches courtes pour bien connaître les produits et les gammes de l'officine",
     group: "decouvrir",
   },
@@ -238,6 +258,7 @@ export const NAVIGATION: NavItem[] = [
     // Titulaires seulement (fondateur, 15 oct. 2026) : l'équipe garde les gammes partenaires sur la page de la vente, pas l'onglet.
     permission: PERMISSIONS.PARTNERS_MANAGE,
     match: ["/partenaires"],
+    mergedInto: "/parametres/laboratoires/gammes",
     description: "Les gammes des laboratoires partenaires : présentation, conditions, contact",
     group: "decouvrir",
   },
@@ -251,6 +272,7 @@ export const NAVIGATION: NavItem[] = [
           // Un acte du titulaire : publier une remise pour sa pharmacie (NEWS_MANAGE, rejoué par le serveur). L'équipe n'a pas l'entrée.
           permission: PERMISSIONS.NEWS_MANAGE,
           match: ["/offres-patients"],
+          mergedInto: "/emails-patients",
           description: "Les remises de votre pharmacie dans l'appli PharmaBoost : vos patients abonnés reviennent en profiter",
           group: "decouvrir" as const,
         },
@@ -264,6 +286,7 @@ export const NAVIGATION: NavItem[] = [
     // (NEWS_MANAGE), boutons masqués à l'écran et refusés par le serveur.
     permission: PERMISSIONS.NEWS_VIEW,
     match: ["/nouveautes"],
+    mergedInto: "/emails-patients",
     description: "Prévenir vos patients abonnés des nouvelles gammes de la pharmacie",
     group: "decouvrir",
   },
@@ -299,7 +322,48 @@ export const COLLABORATOR_MENU: readonly string[] = ["/vente/nouvelle", "/pilota
 export function navigationFor(permissions: Iterable<string>): NavItem[] {
   const granted = new Set(permissions);
   const owner = granted.has(PERMISSIONS.MANAGEMENT_MENU);
-  return NAVIGATION.filter((item) => granted.has(item.permission) && (owner || COLLABORATOR_MENU.includes(item.href)));
+  return collapseMerged(NAVIGATION.filter((item) => granted.has(item.permission) && (owner || COLLABORATOR_MENU.includes(item.href))));
+}
+
+/** Retire du menu les entrées devenues un onglet d'une rubrique que la personne voit déjà (`mergedInto`). */
+export function collapseMerged(items: NavItem[]): NavItem[] {
+  const shown = new Set(items.map((item) => item.href));
+  return items.filter((item) => !item.mergedInto || !shown.has(item.mergedInto));
+}
+
+export type SectionKey = "resultats" | "patients" | "aide" | "laboratoires";
+
+/**
+ * Les onglets de chaque rubrique regroupée (fondateur, 5 nov. 2026) : une entrée de menu, plusieurs pages. Chaque onglet n'est
+ * montré qu'à qui détient sa permission (celles des pages du titulaire, aucun rôle de l'équipe ne les a) ; une rubrique
+ * réduite à un seul onglet n'en montre aucun.
+ */
+export const SECTIONS: Record<SectionKey, { href: string; label: string; permission: Permission }[]> = {
+  resultats: [
+    { href: "/pilotage", label: "Performances", permission: PERMISSIONS.ANALYTICS_VIEW },
+    { href: "/resultats", label: "Ce que PharmaBoost rapporte", permission: PERMISSIONS.ANALYTICS_VIEW_TEAM_PERFORMANCE },
+    { href: "/historique", label: "Historique des ventes", permission: PERMISSIONS.PRESCRIPTION_CREATE },
+  ],
+  patients: [
+    { href: "/emails-patients", label: "Bilans envoyés", permission: PERMISSIONS.PATIENT_EMAILS_VIEW },
+    { href: "/nouveautes", label: "Actualités aux patients", permission: PERMISSIONS.NEWS_VIEW },
+    ...(PATIENT_APP_LIVE ? [{ href: "/offres-patients", label: "Offres patients", permission: PERMISSIONS.NEWS_MANAGE }] : []),
+  ],
+  aide: [
+    { href: "/prise-en-main", label: "Prise en main", permission: PERMISSIONS.TRAINING_VIEW },
+    { href: "/formation", label: "Formations", permission: PERMISSIONS.TRAINING_VIEW },
+  ],
+  laboratoires: [
+    { href: "/parametres/laboratoires/gammes", label: "Gammes & challenges", permission: PERMISSIONS.LAB_PROGRAMS_MANAGE },
+    { href: "/partenaires", label: "Partenaires", permission: PERMISSIONS.PARTNERS_MANAGE },
+  ],
+};
+
+/** Les onglets d'une rubrique que voit une personne (aucun s'il n'en reste qu'un). */
+export function sectionTabsFor(section: SectionKey, permissions: Iterable<string>): { href: string; label: string }[] {
+  const granted = new Set(permissions);
+  const tabs = SECTIONS[section].filter((tab) => granted.has(tab.permission));
+  return tabs.length > 1 ? tabs.map(({ href, label }) => ({ href, label })) : [];
 }
 
 /** Les entrées visibles, rangées par groupe (dans l'ordre du menu) ; un groupe vide n'est pas rendu. */

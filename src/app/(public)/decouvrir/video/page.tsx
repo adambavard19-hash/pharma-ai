@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { AutoVideo } from "../_components/auto-video";
 import { PRESENTATION_VIDEO_POSTER, PRESENTATION_VIDEO_SRC } from "@/core/platform/presentation-video";
 
 export const metadata: Metadata = { title: "Vidéo de présentation", description: "La scène de tous les jours au comptoir, puis la même avec PharmaBoost." };
@@ -27,11 +28,7 @@ export default async function PresentationVideoPage({ searchParams }: { searchPa
       <p className="font-mono text-[12px] tracking-[0.14em] text-brand-700 uppercase">{film.eyebrow}</p>
       <h1 className="mt-2 text-[30px] leading-[1.1] font-bold tracking-[-0.03em] text-balance text-text-primary md:text-[38px]">{film.title}</h1>
       <p className="mt-3 max-w-2xl text-[16px] leading-7 text-text-secondary">{film.text}</p>
-      <div className="mt-8 overflow-hidden rounded-2xl border border-border-subtle bg-black shadow-sm">
-        <video className="aspect-video w-full" key={film.src} src={film.src} poster={film.poster} controls playsInline preload="metadata" aria-label={film.title}>
-          Votre navigateur ne lit pas cette vidéo. <a href={film.src}>Télécharger le film</a>.
-        </video>
-      </div>
+      <AutoVideo key={film.src} src={film.src} poster={film.poster} className="mt-8 max-w-none" frameClassName="rounded-2xl" />
       <div className="mt-8 flex flex-wrap gap-3">
         <Link href="/decouvrir" className="inline-flex h-11 items-center rounded-xl border border-border-default px-5 text-[14.5px] font-medium text-text-primary hover:bg-surface-sunken">
           Découvrir PharmaBoost

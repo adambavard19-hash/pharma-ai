@@ -3,6 +3,7 @@ import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { brandSuggestions, listPreferredRanges } from "@/server/services/preferred-ranges";
 import { PageHeader, SectionHeader } from "@/components/ui/page";
+import { SectionTabs } from "@/components/app/section-tabs";
 import { LabTabs } from "../lab-tabs";
 import { RangesManager } from "./ranges-manager";
 
@@ -21,6 +22,7 @@ export default async function GammesPage() {
 
   return (
     <div className="space-y-6">
+      <SectionTabs section="laboratoires" active="/parametres/laboratoires/gammes" permissions={session.permissions} />
       <PageHeader title="Laboratoires & gammes" description="Vos gammes privilégiées, les challenges des laboratoires et les marques que PharmaBoost met en avant ou écarte." />
       <LabTabs canManagePrograms canManageBrands={session.permissions.has(PERMISSIONS.RECOMMENDATION_RULES_MANAGE)} />
       <SectionHeader

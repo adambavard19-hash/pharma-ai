@@ -6,6 +6,7 @@ import { PERMISSIONS } from "@/server/rbac/permissions";
 import { partnerCatalog, type CatalogBrand } from "@/server/services/partners/pharmacy-partners";
 import { universeLabel } from "@/config/universes";
 import { PageHeader, SectionHeader } from "@/components/ui/page";
+import { SectionTabs } from "@/components/app/section-tabs";
 import { Card } from "@/components/ui/card";
 import { Alert, EmptyState } from "@/components/ui/feedback";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +35,7 @@ export default async function PartnersPage() {
 
   return (
     <div className="space-y-6">
+      <SectionTabs section="laboratoires" active="/partenaires" permissions={session.permissions} />
       <PageHeader
         title="Partenaires"
         description="Présentation, conditions professionnelles, documentation et contact des laboratoires partenaires qui proposent leurs gammes à votre officine."

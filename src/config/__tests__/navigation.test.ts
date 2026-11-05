@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { Megaphone } from "lucide-react";
-import { COLLABORATOR_MENU, NAVIGATION, NAV_GROUPS, OFF_MENU_DESTINATIONS, groupNavigation, isNavItemActive, navigationFor } from "../navigation";
+import { COLLABORATOR_MENU, NAVIGATION, NAV_GROUPS, OFF_MENU_DESTINATIONS, collapseMerged, groupNavigation, isNavItemActive, navigationFor, sectionTabsFor } from "../navigation";
 import { PERMISSIONS, ROLE_PERMISSIONS, resolvePermissions, type Role } from "@/server/rbac/permissions";
 
 /** Le menu que voit chaque rôle : exactement les entrées dont il détient la permission, comme le fait la barre latérale. */
-const visibleFor = (role: Role) => NAVIGATION.filter((item) => ROLE_PERMISSIONS[role].includes(item.permission));
+// Les entrées devenues onglets d'une rubrique visible quittent le menu (fondateur, 5 nov. 2026), comme dans la barre latérale.
+const visibleFor = (role: Role) => collapseMerged(NAVIGATION.filter((item) => ROLE_PERMISSIONS[role].includes(item.permission)));
 const menuOf = (role: Role) => visibleFor(role).map((item) => item.label);
 const TEAM_ROLES = ["PHARMACIST", "TECHNICIAN", "STUDENT", "VIEWER"] as const;
 
@@ -15,10 +16,9 @@ describe("le menu, en trois groupes", () => {
     expect(NAV_GROUPS.map((group) => group.label)).toEqual(["Ma pharmacie", "Découvrir", "Configuration"]);
   });
 
-  it("« Mes associations » vient tout de suite après « Au comptoir » (rubrique importante)", () => {
-    expect(NAVIGATION.slice(0, 2).map((item) => item.label)).toEqual(["Au comptoir", "Mes associations"]);
-    expect(menuOf("OWNER").slice(0, 2)).toEqual(["Au comptoir", "Mes associations"]);
-    expect(menuOf("PHARMACIST").slice(0, 2)).toEqual(["Au comptoir", "Mes associations"]);
+  it("l'ordre du fondateur (5 nov. 2026) : Vue d'ensemble, Résultats, Mes associations, le stock, Patients, Laboratoires & partenaires, Mon équipe à la fin", () => {
+    expect(menuOf("OWNER").slice(0, 4)).toEqual(["Au comptoir", "Vue d'ensemble", "Résultats", "Mes associations"]);
+    expect(menuOf("PHARMACIST").slice(0, 3)).toEqual(["Au comptoir", "Résultats", "Mes associations"]);
   });
 
   it("jamais deux fois le même nom : aucun groupe ne porte le nom d'une entrée", () => {
@@ -36,8 +36,8 @@ describe("le menu, en trois groupes", () => {
 
   it("chaque groupe contient les entrées prévues, dans cet ordre", () => {
     const labels = (key: string) => NAVIGATION.filter((item) => item.group === key).map((item) => item.label);
-    expect(labels("pharmacie")).toEqual(["Mes associations", "Mon stock", "Dates courtes", "Surstock", "Performances", "Historique", "Mon équipe", "E-mails aux patients", "Laboratoires & gammes", "Produits manquants"]);
-    expect(labels("decouvrir")).toEqual(["Prise en main", "Formations", "Partenaires", "Offres patients", "Actualités"]);
+    expect(labels("pharmacie")).toEqual(["Vue d'ensemble", "Résultats", "Historique", "Mes associations", "Mon stock", "Dates courtes", "Surstock", "Produits manquants", "Patients", "Laboratoires & partenaires", "Mon équipe"]);
+    expect(labels("decouvrir")).toEqual(["Aide & formations", "Formations", "Partenaires", "Offres patients", "Actualités"]);
     expect(labels("configuration")).toEqual(["Paramètres"]);
   });
 
@@ -63,7 +63,7 @@ describe("le menu, en trois groupes", () => {
     for (const href of ["/patients", "/suivis", "/parametres/postes", "/reglementation"]) expect(offMenu.has(href), href).toBe(true);
     for (const href of ["/patients", "/suivis", "/connexion", "/reglementation"]) expect(hrefs.has(href), href).toBe(false);
     // « Ce que PharmaBoost vous rapporte » a quitté le menu : on y va depuis Performances (qui s'ouvre sur « Mon équipe »), et l'entrée s'allume pour elle.
-    const performances = NAVIGATION.find((item) => item.label === "Performances");
+    const performances = NAVIGATION.find((item) => item.label === "Résultats");
     if (!performances) throw new Error("entrée absente");
     expect(isNavItemActive(performances, "/resultats")).toBe(true);
     expect(OFF_MENU_DESTINATIONS.some((destination) => destination.href === "/resultats")).toBe(true);
@@ -72,26 +72,29 @@ describe("le menu, en trois groupes", () => {
 
 /** Le menu d'un collaborateur, mot pour mot (consigne du fondateur du 13 oct. 2026) ; « Contact support » est le lien du bas, hors tableau. */
 // Historique pour toute l'équipe, Partenaires pour les titulaires seulement (fondateur, 15 oct. 2026).
-const COLLABORATOR_LABELS = ["Au comptoir", "Mes associations", "Dates courtes", "Surstock", "Performances", "Historique", "E-mails aux patients", "Prise en main", "Formations", "Actualités"];
-/** Performances (SES conseils vendus) est au pharmacien adjoint et au remplaçant, pas au préparateur ni à l'étudiant (23 oct. 2026). */
-const WITHOUT_PERFORMANCES = COLLABORATOR_LABELS.filter((label) => label !== "Performances");
+// Menu regroupé (fondateur, 5 nov. 2026) : Historique, Formations et Actualités deviennent des onglets de Résultats, Aide & formations et Patients.
+const COLLABORATOR_LABELS = ["Au comptoir", "Résultats", "Historique", "Mes associations", "Dates courtes", "Surstock", "Patients", "Aide & formations", "Formations", "Actualités"];
+/** Ce qu'affiche le menu d'un pharmacien adjoint : Historique est un onglet de Résultats. */
+const PHARMACIST_MENU = ["Au comptoir", "Résultats", "Mes associations", "Dates courtes", "Surstock", "Patients", "Aide & formations"];
+/** Résultats (SES conseils vendus) est au pharmacien adjoint et au remplaçant, pas au préparateur ni à l'étudiant (23 oct. 2026) : eux gardent « Historique ». */
+const WITHOUT_PERFORMANCES = ["Au comptoir", "Historique", "Mes associations", "Dates courtes", "Surstock", "Patients", "Aide & formations"];
 
 describe("le menu de chaque rôle : un groupe sans entrée visible n'est pas affiché", () => {
   it("le titulaire voit les trois groupes et tout son menu, inchangé", () => {
     expect(groupNavigation(visibleFor("OWNER")).map((group) => group.label)).toEqual(["Ma pharmacie", "Découvrir", "Configuration"]);
-    expect(menuOf("OWNER")).toEqual(["Au comptoir", "Mes associations", "Mon stock", "Dates courtes", "Surstock", "Performances", "Historique", "Mon équipe", "E-mails aux patients", "Laboratoires & gammes", "Produits manquants", "Prise en main", "Formations", "Partenaires", "Offres patients", "Actualités", "Paramètres"]);
+    expect(menuOf("OWNER")).toEqual(["Au comptoir", "Vue d'ensemble", "Résultats", "Mes associations", "Mon stock", "Dates courtes", "Surstock", "Produits manquants", "Patients", "Laboratoires & partenaires", "Mon équipe", "Aide & formations", "Paramètres"]);
     expect(navigationFor(resolvePermissions("OWNER")).map((item) => item.label)).toEqual(menuOf("OWNER"));
   });
 
   it("pharmacien adjoint et remplaçant : Au comptoir, Mes associations, Dates courtes, Performances, Historique, E-mails aux patients et Découvrir ; préparateur et étudiant : la même chose sans Performances", () => {
     for (const role of ["PHARMACIST", "TECHNICIAN", "STUDENT", "SUBSTITUTE"] as const) {
-      expect(menuOf(role), role).toEqual(role === "PHARMACIST" || role === "SUBSTITUTE" ? COLLABORATOR_LABELS : WITHOUT_PERFORMANCES);
+      expect(menuOf(role), role).toEqual(role === "PHARMACIST" || role === "SUBSTITUTE" ? PHARMACIST_MENU : WITHOUT_PERFORMANCES);
       expect(groupNavigation(visibleFor(role)).map((group) => group.label), role).toEqual(["Ma pharmacie", "Découvrir"]);
     }
   });
 
   it("le rôle « Consultation » (lecture seule, il ne vend pas) n'a que la part lisible du même menu : ni comptoir ni bilans", () => {
-    expect(menuOf("VIEWER")).toEqual(["Mes associations", "Dates courtes", "Surstock", "Prise en main", "Formations", "Actualités"]);
+    expect(menuOf("VIEWER")).toEqual(["Mes associations", "Dates courtes", "Surstock", "Aide & formations", "Actualités"]);
   });
 
   it("la liste blanche du collaborateur est explicite, et le filtre par permission du menu (barre latérale) y aboutit pour chaque rôle", () => {
@@ -117,8 +120,8 @@ describe("le menu de chaque rôle : un groupe sans entrée visible n'est pas aff
   it("l'équipe au comptoir ne voit aucune entrée de gestion : ni Mon stock, ni Partenaires, ni Mon équipe, ni Laboratoires & gammes, ni Produits manquants, ni Paramètres (Performances : seulement le pharmacien)", () => {
     for (const role of TEAM_ROLES) {
       const menu = menuOf(role);
-      if (role !== "PHARMACIST") expect(menu, `${role} : Performances`).not.toContain("Performances");
-      for (const gone of ["Mon stock", "Partenaires", "Produits manquants", "Mon équipe", "Laboratoires & gammes", "Paramètres"]) {
+      if (role !== "PHARMACIST") expect(menu, `${role} : Résultats`).not.toContain("Résultats");
+      for (const gone of ["Vue d'ensemble", "Mon stock", "Partenaires", "Produits manquants", "Mon équipe", "Laboratoires & partenaires", "Paramètres"]) {
         expect(menu, `${role} : ${gone}`).not.toContain(gone);
       }
     }
@@ -153,15 +156,15 @@ describe("les intitulés", () => {
     expect(byHref("/stock")).toBe("Mon stock");
     expect(byHref("/equipe")).toBe("Mon équipe");
     expect(byHref("/assortiment")).toBe("Produits manquants");
-    expect(byHref("/emails-patients")).toBe("E-mails aux patients");
+    expect(byHref("/emails-patients")).toBe("Patients");
     expect(byHref("/formation")).toBe("Formations");
-    expect(byHref("/pilotage")).toBe("Performances");
+    expect(byHref("/pilotage")).toBe("Résultats");
   });
 
   it("« E-mails aux patients » s'ouvre à l'équipe (ses propres bilans), « Produits manquants » reste une vue de titulaire", () => {
     expect(NAVIGATION.find((item) => item.href === "/emails-patients")?.permission).toBe(PERMISSIONS.PATIENT_EMAILS_VIEW);
     expect(NAVIGATION.find((item) => item.href === "/assortiment")?.permission).toBe(PERMISSIONS.PARTNERS_MANAGE);
-    expect(menuOf("OWNER")).toEqual(expect.arrayContaining(["E-mails aux patients", "Produits manquants"]));
+    expect(menuOf("OWNER")).toEqual(expect.arrayContaining(["Patients", "Produits manquants"]));
   });
 });
 
@@ -170,14 +173,14 @@ describe("l'entrée « Performances » (ex « Ce que ça rapporte » et « Pilot
 
   it("est ouverte au titulaire et au pharmacien adjoint (ANALYTICS_VIEW) ; la page ne montre toute l'équipe qu'au titulaire", () => {
     expect(entry?.permission).toBe(PERMISSIONS.ANALYTICS_VIEW);
-    expect(menuOf("OWNER")).toContain("Performances");
-    expect(menuOf("PHARMACIST")).toContain("Performances");
-    expect(menuOf("TECHNICIAN")).not.toContain("Performances");
+    expect(menuOf("OWNER")).toContain("Résultats");
+    expect(menuOf("PHARMACIST")).toContain("Résultats");
+    expect(menuOf("TECHNICIAN")).not.toContain("Résultats");
   });
 
   it("s'allume sur les deux pages, et sur les adresses du pilotage", () => {
     if (!entry) throw new Error("entrée absente");
-    for (const path of ["/resultats", "/resultats/archives", "/pilotage", "/performance", "/analytics", "/ventes"]) expect(isNavItemActive(entry, path), path).toBe(true);
+    for (const path of ["/resultats", "/resultats/archives", "/pilotage", "/performance", "/analytics", "/ventes", "/historique"]) expect(isNavItemActive(entry, path), path).toBe(true);
   });
 
   it("ne déborde pas sur une adresse voisine ni sur la vente", () => {
@@ -211,5 +214,31 @@ describe("reste active sur sa page et ses sous-adresses, sans déborder", () => 
     expect(isNavItemActive(entry, "/nouveautes/archives")).toBe(true);
     expect(isNavItemActive(entry, "/nouveautes-patients")).toBe(false);
     expect(isNavItemActive(entry, "/partenaires")).toBe(false);
+  });
+});
+
+describe("les rubriques regroupées (fondateur, 5 nov. 2026)", () => {
+  it("le titulaire a trois onglets dans Résultats, le pharmacien deux, le préparateur aucun (il garde « Historique » au menu)", () => {
+    expect(sectionTabsFor("resultats", resolvePermissions("OWNER")).map((tab) => tab.label)).toEqual(["Performances", "Ce que PharmaBoost rapporte", "Historique des ventes"]);
+    expect(sectionTabsFor("resultats", resolvePermissions("PHARMACIST")).map((tab) => tab.label)).toEqual(["Performances", "Historique des ventes"]);
+    expect(sectionTabsFor("resultats", resolvePermissions("TECHNICIAN"))).toEqual([]);
+    expect(menuOf("TECHNICIAN")).toContain("Historique");
+  });
+
+  it("Aide & formations réunit Prise en main et Formations ; Laboratoires & partenaires réunit les gammes et les partenaires, pour le titulaire seul", () => {
+    expect(sectionTabsFor("aide", resolvePermissions("PHARMACIST")).map((tab) => tab.href)).toEqual(["/prise-en-main", "/formation"]);
+    expect(sectionTabsFor("laboratoires", resolvePermissions("OWNER")).map((tab) => tab.href)).toEqual(["/parametres/laboratoires/gammes", "/partenaires"]);
+    expect(sectionTabsFor("laboratoires", resolvePermissions("PHARMACIST"))).toEqual([]);
+  });
+
+  it("l'entrée qui accueille s'allume sur les pages devenues ses onglets", () => {
+    const at = (href: string) => NAVIGATION.find((item) => item.href === href);
+    const labs = at("/parametres/laboratoires/gammes");
+    const aide = at("/prise-en-main");
+    const patients = at("/emails-patients");
+    if (!labs || !aide || !patients) throw new Error("entrée absente");
+    expect(isNavItemActive(labs, "/partenaires")).toBe(true);
+    expect(isNavItemActive(aide, "/formation")).toBe(true);
+    expect(isNavItemActive(patients, "/nouveautes")).toBe(true);
   });
 });

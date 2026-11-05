@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { PageHeader } from "@/components/ui/page";
+import { SectionTabs } from "@/components/app/section-tabs";
 import { Card, CardContent } from "@/components/ui/card";
 
 export const metadata: Metadata = { title: "Prise en main" };
@@ -20,6 +21,7 @@ export default async function PriseEnMainPage() {
   const films = session.role === "OWNER" ? [FILMS.titulaire, FILMS.pharmacien] : [FILMS.pharmacien];
   return (
     <div className="space-y-6">
+      <SectionTabs section="aide" active="/prise-en-main" permissions={session.permissions} />
       <PageHeader title="Prise en main" description="PharmaBoost en quelques minutes : regardez la vidéo, puis faites votre première vente au comptoir." />
       <div className="grid gap-6 xl:grid-cols-2">
         {films.map((film) => (

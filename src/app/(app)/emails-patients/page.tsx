@@ -6,6 +6,7 @@ import { PERMISSIONS } from "@/server/rbac/permissions";
 import { listPatientEmails } from "@/server/services/patient-emails";
 import { EMAIL_PERIODS, EMAIL_STATE_FILTERS, PATIENT_EMAIL_STATES, resolveEmailFilters } from "@/core/counter/patient-emails";
 import { PageHeader } from "@/components/ui/page";
+import { SectionTabs } from "@/components/app/section-tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/feedback";
@@ -35,6 +36,7 @@ export default async function PatientEmailsPage({ searchParams }: { searchParams
 
   return (
     <div className="space-y-6">
+      <SectionTabs section="patients" active="/emails-patients" permissions={session.permissions} />
       <PageHeader
         title="E-mails aux patients"
         description={

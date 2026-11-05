@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Play, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AutoVideo } from "./auto-video";
 
 /**
  * Les films, fabriqués dans video/ (Remotion) et exportés pour le web dans
@@ -71,12 +72,10 @@ export function VideoButton({ film = "presentation", className, label = "Voir la
       {open && (
         <div role="dialog" aria-modal="true" aria-label={video.title} className="fixed inset-0 z-[60] flex items-center justify-center bg-ink-950/85 p-4 backdrop-blur-sm" onClick={() => setOpen(false)}>
           <div className="relative w-full max-w-5xl" onClick={(e) => e.stopPropagation()}>
-            <button ref={closeRef} type="button" onClick={() => setOpen(false)} aria-label="Fermer la vidéo" className="absolute -top-12 right-0 flex size-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20">
+            <button ref={closeRef} type="button" onClick={() => setOpen(false)} aria-label="Fermer la vidéo" className="absolute -top-12 left-0 flex size-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20">
               <X className="size-5" />
             </button>
-            <video src={video.src} poster={video.poster} controls autoPlay playsInline preload="auto" className="aspect-video w-full rounded-2xl bg-black shadow-2xl">
-              La lecture vidéo n&apos;est pas prise en charge par ce navigateur.
-            </video>
+            <AutoVideo src={video.src} poster={video.poster} autoStart className="mt-0 max-w-none" frameClassName="rounded-2xl border-white/10 shadow-2xl" />
           </div>
         </div>
       )}

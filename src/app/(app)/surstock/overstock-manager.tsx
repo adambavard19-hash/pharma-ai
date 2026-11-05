@@ -13,7 +13,7 @@ import { useToast } from "@/components/ui/toast";
 import { formatCents, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-type Campaign = Omit<CampaignView, "createdAt"> & { createdAt: string };
+type Campaign = Omit<CampaignView, "createdAt" | "endedAt"> & { createdAt: string; endedAt: string | null };
 type Option = { id: string; name: string };
 
 /** La date du jour + n jours, au format AAAA-MM-JJ. */

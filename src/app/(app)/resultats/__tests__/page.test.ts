@@ -76,7 +76,7 @@ const render = async (params: Params = {}) =>
 function connectedAs(role: Role) {
   mocks.requirePermission.mockImplementation(async (permission: string) => {
     if (!(ROLE_PERMISSIONS[role] as string[]).includes(permission)) throw new Error("NEXT_HTTP_ERROR_FALLBACK;403");
-    return { role, scope: { pharmacyId: "ph_a", organizationId: "org_1", userId: "user_a" } };
+    return { role, permissions: new Set<string>(ROLE_PERMISSIONS[role]), scope: { pharmacyId: "ph_a", organizationId: "org_1", userId: "user_a" } };
   });
 }
 
@@ -239,7 +239,7 @@ describe("ce qui part vers l'écran", () => {
   it("le titre et le sous-titre de la page, sans chiffre ni collaborateur", async () => {
     const html = await render();
     expect(html).toMatch(/<h1[^>]*>Performances<\/h1>/);
-    expect(html).toMatch(/<a(?=[^>]*href="\/resultats")(?=[^>]*aria-selected="true")/);
+    expect(html).toMatch(/<a(?=[^>]*href="\/resultats")(?=[^>]*aria-current="page")/);
     const shown = html.replace(/<[^>]+>/g, " ").replace(/&#x27;/g, "'");
     expect(shown).toContain("ventes confirmées");
     expect(shown).not.toMatch(/\d/);

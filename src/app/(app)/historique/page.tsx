@@ -9,6 +9,7 @@ import { buildSalesReport, euros, parisMidnight, periodFromParam, reportWindow, 
 import { saleTitle } from "@/core/counter/sale-title";
 import { TIME_ZONE } from "@/config/constants";
 import { PageHeader } from "@/components/ui/page";
+import { SectionTabs } from "@/components/app/section-tabs";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/feedback";
@@ -68,6 +69,7 @@ export default async function HistoriquePage({ searchParams }: { searchParams: P
 
   return (
     <div className="space-y-6">
+      <SectionTabs section="resultats" active="/historique" permissions={session.permissions} />
       <PageHeader title="Historique" description={everyone ? "Toutes les ventes terminées au comptoir, une par une : les boîtes scannées, les conseils proposés et vendus, et ce qu'ils ont rapporté." : "Vos ventes terminées au comptoir, une par une : les boîtes scannées, les conseils proposés et vendus, et ce qu'ils ont rapporté."} />
 
       <CounterSalesReport

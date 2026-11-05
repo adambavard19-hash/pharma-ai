@@ -10,7 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/feedback";
 import { formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { PerformanceTabs } from "./performance-tabs";
+import { SectionTabs } from "@/components/app/section-tabs";
 import { myComptoirs } from "@/server/services/comptoirs";
 import { loadSoldCounter } from "@/server/services/sold-counter";
 import { SoldCounter } from "@/components/performance/sold-counter";
@@ -47,6 +47,7 @@ export default async function PilotagePage({ searchParams }: { searchParams: Pro
     const [mine, team] = await Promise.all([loadSoldCounter({ pharmacyId, now, onlyFor: onlyMe }), loadSoldCounter({ pharmacyId, now })]);
     return (
       <div className="space-y-6">
+        <SectionTabs section="resultats" active="/pilotage" permissions={session.permissions} />
         <PageHeader title="Mes performances" description={`${session.user.firstName}, voici les conseils que vous avez vendus au comptoir.`} />
         <SoldCounter periods={mine.periods} title="Mes conseils vendus" subtitle="Vos ventes terminées, déclarées « Vendu »" initial={2} money={false} />
         <MyPlaceAndProducts me={session.user.fullName} ranking={team.reports[2].byPerson} products={mine.reports[2].topProducts} />
@@ -69,8 +70,8 @@ export default async function PilotagePage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="space-y-6">
+      <SectionTabs section="resultats" active="/pilotage" permissions={session.permissions} />
       <PageHeader title="Performances" description="Les conseils vendus par toute l'officine et par vous, le classement de chacun et les challenges. Ces chiffres ne sont visibles que de vous." />
-      <PerformanceTabs active="equipe" />
 
       <SoldCounter periods={officine.periods} title="Toute l'officine" subtitle="Conseils vendus au comptoir, déclarés « Vendu »" initial={2} />
       <SoldCounter periods={mine.periods} title="Mes ventes et mon poste" subtitle={`${session.user.firstName}, vos ventes et celles de vos comptoirs`} initial={2} rateLabel="Votre taux de conseil" />

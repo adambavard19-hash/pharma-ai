@@ -1,5 +1,5 @@
 import { Flame, Medal, Target } from "lucide-react";
-import { euros, type SalesReport } from "@/core/counter/sales-report";
+import { euros, percent, type SalesReport } from "@/core/counter/sales-report";
 import { cn } from "@/lib/utils";
 
 /**
@@ -119,8 +119,13 @@ export function TeamSoldBoard({ people: unsorted, products }: { people: Person[]
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline justify-between gap-2">
                     <span className="truncate text-[14.5px] font-medium text-text-primary">{person.who}</span>
-                    <span className="text-[14.5px] font-semibold tabular text-brand-700 dark:text-brand-400">
-                      {person.sold} vendu{person.sold > 1 ? "s" : ""}
+                    <span className="flex shrink-0 items-baseline gap-2">
+                      <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[12px] font-semibold tabular text-brand-800 dark:bg-brand-950/40 dark:text-brand-300" title="Clients repartis avec au moins un conseil vendu">
+                        {person.sales > 0 ? percent(person.withAdvice / person.sales) : "—"} de taux
+                      </span>
+                      <span className="text-[14.5px] font-semibold tabular text-brand-700 dark:text-brand-400">
+                        {person.sold} vendu{person.sold > 1 ? "s" : ""}
+                      </span>
                     </span>
                   </div>
                   <div className="mt-1 h-1.5 rounded-full bg-surface-sunken">
@@ -132,8 +137,7 @@ export function TeamSoldBoard({ people: unsorted, products }: { people: Person[]
                     />
                   </div>
                   <p className="mt-0.5 text-[12px] text-text-tertiary">
-                    {euros(person.revenueCents)} de chiffre d&apos;affaires · {person.marginCents > 0 ? euros(person.marginCents) : "—"} de marge HT · {person.sales} vente
-                    {person.sales > 1 ? "s" : ""}
+                    {euros(person.revenueCents)} de chiffre d&apos;affaires · {person.marginCents > 0 ? euros(person.marginCents) : "—"} de marge HT · {person.withAdvice} client{person.withAdvice > 1 ? "s" : ""} conseillé{person.withAdvice > 1 ? "s" : ""} sur {person.sales}
                   </p>
                 </div>
               </li>

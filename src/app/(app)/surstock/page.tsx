@@ -34,7 +34,7 @@ export default async function OverstockPage() {
         classes={OVERSTOCK_DRUG_CLASSES.map((item) => ({ ...item }))}
         families={screen.families}
         suggestions={screen.suggestions}
-        campaigns={screen.campaigns.map((campaign) => ({ ...campaign, createdAt: campaign.createdAt.toISOString() }))}
+        campaigns={screen.campaigns.map((campaign) => ({ ...campaign, createdAt: campaign.createdAt.toISOString(), endedAt: campaign.endedAt?.toISOString() ?? null }))}
       />
     </div>
   );

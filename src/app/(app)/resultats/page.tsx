@@ -4,7 +4,7 @@ import { PERMISSIONS } from "@/server/rbac/permissions";
 import { loadPerformanceReport, loadSubscriptionReturn } from "@/server/services/performance";
 import { parsePeriodParams } from "@/core/performance/periods";
 import { TIME_ZONE } from "@/config/constants";
-import { PerformanceTabs } from "../pilotage/performance-tabs";
+import { SectionTabs } from "@/components/app/section-tabs";
 import { PageHeader } from "@/components/ui/page";
 import { PerformanceDashboard } from "@/components/performance/performance-dashboard";
 import { CounterResultsCard } from "@/components/performance/counter-results-card";
@@ -62,11 +62,11 @@ export default async function ResultatsPage({
 
   return (
     <div className="space-y-6">
+      <SectionTabs section="resultats" active="/resultats" permissions={session.permissions} />
       <PageHeader
         title="Performances"
         description="Les conseils proposés à votre équipe, ceux qu'elle a retenus, et les ventes confirmées qui en découlent. Ces chiffres sont réservés au titulaire de l'officine et à l'équipe PharmaBoost qui vous accompagne."
       />
-      <PerformanceTabs active="rapporte" />
 
       <CounterSalesReport
         report={toSalesReportView(sales)}
