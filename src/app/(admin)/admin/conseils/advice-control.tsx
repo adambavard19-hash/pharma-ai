@@ -15,6 +15,7 @@ import { useToast } from "@/components/ui/toast";
 import { formatDate } from "@/lib/format";
 import { moduleLabel } from "@/core/ai/advice-modules";
 import { cn } from "@/lib/utils";
+import { GammePicker } from "./gamme-picker";
 import { AssociationEditForm, EditHistory, MedicineTriggerPicker, RevertButton, RuleEditForm, type HistoryLine } from "./edit-forms";
 
 /**
@@ -523,7 +524,8 @@ export function NewAssociationForm({ onDone, families = [], initialFamilyId = nu
   const [atcLabel, setAtcLabel] = useState("");
   const [familyId, setFamilyId] = useState<string>(initialFamilyId ?? "");
   const [medicines, setMedicines] = useState<Medicine[]>([]);
-  const [product, setProduct] = useState<KnownProduct | null>(null);
+  // Plusieurs produits déclencheurs (toute une gamme de shampoings anti-chute, fondateur 5 nov. 2026).
+  const [triggerProducts, setTriggerProducts] = useState<KnownProduct[]>([]);
   // Plusieurs produits conseillés pour le même déclencheur : une association par produit, la même phrase pour tous.
   const [advices, setAdvices] = useState<KnownProduct[]>([]);
   const [sentence, setSentence] = useState("");
@@ -551,9 +553,7 @@ export function NewAssociationForm({ onDone, families = [], initialFamilyId = nu
             : []
           : mode === "ATC"
             ? codes.map((code) => ({ kind: "ATC", code, label: atcLabel.trim() || null }) as const)
-          : product
-            ? [{ kind: "PRODUCT", ean: product.ean, name: product.name } as const]
-            : [];
+          : triggerProducts.map((item) => ({ kind: "PRODUCT", ean: item.ean, name: item.name }) as const);
     if (triggers.length === 0 || advices.length === 0) {
       setError("Choisissez ce qui déclenche l'association et au moins un produit à conseiller.");
       return;
@@ -579,7 +579,8 @@ export function NewAssociationForm({ onDone, families = [], initialFamilyId = nu
     });
   };
 
-  const triggerCount = mode === "MEDICINE" ? medicines.length : mode === "ATC" ? new Set([...atcCodes, ...splitAtcCodes(atcCode)]).size : 1;
+  const triggerCount = mode === "MEDICINE" ? medicines.length : mode === "ATC" ? new Set([...atcCodes, ...splitAtcCodes(atcCode)]).size : mode === "PRODUCT" ? triggerProducts.length : 1;
+  const mergeProducts = (list: KnownProduct[], added: KnownProduct[]) => [...list, ...added.filter((item) => !list.some((known) => known.ean === item.ean))];
   const total = Math.max(1, triggerCount) * advices.length;
 
   return (
@@ -661,23 +662,28 @@ export function NewAssociationForm({ onDone, families = [], initialFamilyId = nu
               />
             </div>
           ) : (
-            <SearchField<KnownProduct>
-              label="Quand ce produit est dans la vente"
-              endpoint="/api/admin/conseils/produits"
-              minLength={2}
-              placeholder="Nom, marque ou code-barres…"
-              value={product}
-              onChange={setProduct}
-              keyOf={(item) => item.ean}
-              title={(item) => item.name}
-              subtitle={(item) => [item.brand, item.ean].filter(Boolean).join(" · ")}
-            />
+            <div className="space-y-2">
+              <GammePicker label="Toute une gamme déclenche (ex. shampoings anti-chute)" exclude={triggerProducts.map((item) => item.ean)} suggestFrom={triggerProducts.at(-1)?.name ?? null} onAdd={(items) => setTriggerProducts((list) => mergeProducts(list, items))} />
+              <SearchField<KnownProduct>
+                label={triggerProducts.length === 0 ? "Ou un produit précis dans la vente" : "Ajouter un autre produit"}
+                endpoint="/api/admin/conseils/produits"
+                minLength={2}
+                placeholder="Nom, marque ou code-barres…"
+                value={null}
+                onChange={(item) => item && setTriggerProducts((list) => mergeProducts(list, [item]))}
+                keyOf={(item) => item.ean}
+                title={(item) => item.name}
+                subtitle={(item) => [item.brand, item.ean].filter(Boolean).join(" · ")}
+              />
+              <ChosenList items={triggerProducts.map((item) => ({ key: item.ean, title: item.name, subtitle: [item.brand, item.ean].filter(Boolean).join(" · ") || null }))} onRemove={(key) => setTriggerProducts((list) => list.filter((item) => item.ean !== key))} label="Produits déclencheurs choisis" />
+            </div>
           )}
         </div>
         <ArrowRight className="mt-16 hidden size-5 shrink-0 text-text-tertiary md:block" aria-hidden />
-        <div className="md:pt-[3.1rem]">
+        <div className="space-y-2 md:pt-[3.1rem]">
+          <GammePicker label="Toute une gamme à proposer (ex. réhydratation)" exclude={advices.map((item) => item.ean)} suggestFrom={advices.at(-1)?.name ?? null} onAdd={(items) => setAdvices((list) => mergeProducts(list, items))} />
           <SearchField<KnownProduct>
-            label={advices.length === 0 ? "PharmaBoost propose ce produit" : "Ajouter un autre produit"}
+            label={advices.length === 0 ? "Ou un produit précis à proposer" : "Ajouter un autre produit"}
             endpoint="/api/admin/conseils/produits"
             minLength={2}
             placeholder="Nom, marque ou code-barres…"

@@ -644,3 +644,46 @@ export async function listRoutines(): Promise<RoutineView[]> {
   }));
   return [...fromConsole, ...builtIn];
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// Toute une gamme d'un coup (fondateur, 5 nov. 2026)
+// ---------------------------------------------------------------------------------------------------------------
+
+export type GammeHit = { key: string; label: string; products: (ProductHit & { inStock: boolean })[] };
+
+/**
+ * Les gammes qui répondent à ce qu'on tape (« réhydratation », « chute de cheveux », « Hydratis »), avec TOUS les produits
+ * connus des pharmacies clientes qui en sont (un par code-barres), ceux en stock quelque part d'abord. La personne décoche
+ * ce qu'elle ne veut pas : rien n'est ajouté sans elle.
+ */
+export async function searchGammes(query: string): Promise<GammeHit[]> {
+  const { gammesFor, inGamme } = await import("@/core/catalog/gammes");
+  const gammes = gammesFor(query.slice(0, 80));
+  if (gammes.length === 0) return [];
+  const rows = await prisma.product.findMany({
+    where: { deletedAt: null, ean: { not: null }, pharmacy: { isDemo: false } },
+    select: { ean: true, name: true, brand: true, category: true, stockItem: { select: { quantity: true } } },
+    orderBy: { name: "asc" },
+    take: 60_000,
+  });
+  const byEan = new Map<string, { ean: string; name: string; brand: string | null; category: string; inStock: boolean }>();
+  for (const row of rows) {
+    if (!row.ean) continue;
+    const known = byEan.get(row.ean);
+    const inStock = (row.stockItem?.quantity ?? 0) > 0;
+    if (known) known.inStock ||= inStock;
+    else byEan.set(row.ean, { ean: row.ean, name: row.name, brand: row.brand, category: row.category, inStock });
+  }
+  const products = [...byEan.values()];
+  return gammes
+    .map((gamme) => ({
+      key: gamme.key,
+      label: gamme.label,
+      products: products
+        .filter((product) => inGamme(gamme, `${product.name} ${product.brand ?? ""}`))
+        .sort((a, b) => Number(b.inStock) - Number(a.inStock) || a.name.localeCompare(b.name, "fr"))
+        .slice(0, 300)
+        .map((product) => ({ ean: product.ean, name: product.name, brand: product.brand, category: product.category, tags: [], inStock: product.inStock })),
+    }))
+    .filter((gamme) => gamme.products.length > 0);
+}
