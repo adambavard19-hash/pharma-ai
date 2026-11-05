@@ -161,7 +161,7 @@ describe("une marque de probiotiques qui fait aussi des soins de peau (fondateur
 
   it("un probiotique de la bouche ou intime n'est jamais « flore intestinale » : pas de Lactibiane Buccodentaire avec un Macrogol (fondateur, 5 nov. 2026)", async () => {
     const { classifyProductByName } = await import("../product-vocabulary");
-    for (const name of ["LACTIBIANE BUCCODENTAIRE 30 CPR A SUCER", "LACTIBIANE BUCCO DENTAIRE CPR", "PROBIOTIQUE BUCCAL BLIS K12", "LACTIBIANE CND 10M GELULES"]) {
+    for (const name of ["LACTIBIANE BUCCODENTAIRE 30 CPR A SUCER", "LACTIBIANE BUCCODENTAL Cpr suc B/30", "LACTIBIANE BUCCO DENTAIRE CPR", "PROBIOTIQUE BUCCAL BLIS K12", "LACTIBIANE CND 10M GELULES"]) {
       const result = classifyProductByName(name);
       expect(result?.category, name).not.toBe("PROBIOTIQUES");
       expect(result?.tags ?? [], name).not.toContain("flore intestinale");
