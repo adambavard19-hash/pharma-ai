@@ -1,4 +1,5 @@
 import "server-only";
+import { unlockSoftwareAfterPayment } from "@/server/services/software-gate";
 import type Stripe from "stripe";
 import { prisma } from "@/server/db/client";
 import { Prisma } from "@/generated/prisma";
@@ -111,6 +112,8 @@ async function recordInvoiceObject(invoice: unknown, eventType: string, createdS
     for (const repId of repIds) await syncProgressiveCommissionsSafely(repId, "paiement reçu");
     // Un filleul qui paie (son premier prélèvement SEPA confirmé, par exemple) fait baisser le prix de son parrain.
     await syncReferrerOfOrganization(subscription.organizationId, "paiement du filleul");
+    // Payé : le logiciel attendait peut-être ce paiement (fondateur, 5 nov. 2026). Jamais bloquant.
+    await unlockSoftwareAfterPayment(subscription.organizationId).catch((error) => console.error("[logiciel] déblocage impossible", error));
   }
   if (failed) {
     await prisma.subscription.update({ where: { id: subscription.id }, data: { lastPaymentFailedAt: new Date(createdSeconds * 1000) } });

@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Souscription depuis le site avec l'abonnement unique : le prix figé est celui que
- * le visiteur a VU, le contrat ne part JAMAIS tout seul (la mise en service de 200 €
- * n'existe pas dans le contrat automatique), et le confrère à parrainer est enregistré
+ * le visiteur a VU, le contrat part tout seul (mise en service comprise) sauf doute
+ * sur le dossier, et le confrère à parrainer est enregistré
  * sans qu'aucun message ne lui soit envoyé. Ni base, ni envoi réel : le fournisseur de
  * messagerie est simulé.
  */
@@ -57,38 +57,42 @@ beforeEach(() => {
   db.referralOffer.findMany.mockResolvedValue([]);
   db.companyProfile.findUnique.mockResolvedValue(null);
   db.emailTemplate.findUnique.mockResolvedValue(null);
+  contracts.startContracting.mockResolvedValue({ ok: true, outcome: "SENT", contractId: "c-1", message: "Contrat envoyé à marc@port.fr." });
 });
 
 const createdData = () => (db.prospect.create.mock.calls[0]?.[0] as { data: Record<string, unknown> }).data;
-const summaries = () => vi.mocked(events.recordProspectEvent).mock.calls.map((call) => (call[0] as { summary: string }).summary);
+// Les montants s'écrivent avec des espaces insécables (« 126 € ») : on les compare en espaces simples.
+const summaries = () => vi.mocked(events.recordProspectEvent).mock.calls.map((call) => (call[0] as { summary: string }).summary.replace(/[\u00a0\u202f]/g, " "));
 const adminNotices = () => notifications.notifyAdmins.mock.calls.map((call) => call[0] as { type: string; title: string; body: string; linkUrl?: string });
 const sentTo = () => messaging.sendEmail.mock.calls.map((call) => (call[0] as { to: string }).to);
 
-describe("souscription depuis le site : un seul abonnement, le contrat ne part jamais tout seul", () => {
+describe("souscription depuis le site : le contrat part tout seul (fondateur, 5 nov. 2026)", () => {
   it("le dossier fige 126 € HT par mois (ce que le visiteur a vu), sans formule, et l'événement dit les conditions", async () => {
     const result = await subscriptions.requestSubscription({ ...request });
 
     expect(result).toMatchObject({ ok: true, outcome: { status: "RECEIVED", prospectId: "p-new" } });
     expect(createdData()).toMatchObject({ monthlyPriceCents: 12_600, origin: "SELF_SERVICE_SITE" });
     expect(createdData()).not.toHaveProperty("subscriptionFormula");
-    expect(summaries().join(" ")).toContain("abonnement à 126 € HT / mois, engagement 12 mois, mise en service 200 € HT");
+    expect(summaries().join(" ")).toContain("abonnement à 126 € HT / mois, engagement 12 mois, mise en service 200 € HT");
   });
 
-  it("le contrat est RETENU : aucun lien de confirmation, aucun contrat lancé, l'équipe est invitée à fixer les conditions", async () => {
-    await subscriptions.requestSubscription({ ...request });
+  it("un nouveau dossier sans doute : le contrat part aussitôt (mise en service comprise), l'équipe est prévenue, pas d'accusé de réception en plus", async () => {
+    const result = await subscriptions.requestSubscription({ ...request });
 
+    expect(result).toMatchObject({ ok: true, outcome: { status: "RECEIVED", reason: "contrat envoyé" } });
+    expect(contracts.startContracting).toHaveBeenCalledWith("p-new", expect.objectContaining({ type: "SYSTEM" }));
     expect(tokens.signPayload).not.toHaveBeenCalled();
-    expect(contracts.startContracting).not.toHaveBeenCalled();
-    const blocked = adminNotices().find((n) => n.type === "DOSSIER_BLOCKED");
-    expect(blocked).toMatchObject({ title: "Contrat retenu — Pharmacie du Port", linkUrl: "/admin/dossiers/p-new" });
-    expect(blocked?.body).toContain("la mise en service de 200 € HT n'est pas prévue au contrat automatique");
-    expect(blocked?.body).toContain("« Envoyer le contrat »");
-    expect(blocked?.body).toContain("engagement de 12 mois");
+    expect(adminNotices().find((n) => n.type === "CONTRACT_SENT")).toMatchObject({ title: "Contrat envoyé tout seul — Pharmacie du Port", linkUrl: "/admin/dossiers/p-new" });
+    expect(adminNotices().some((n) => n.type === "DOSSIER_BLOCKED")).toBe(false);
+    // Le contrat (envoyé par le service des contrats, simulé ici) est la réponse : aucun autre e-mail.
+    expect(messaging.sendEmail).not.toHaveBeenCalled();
   });
 
-  it("le seul message qui part est l'accusé de réception au signataire : pas de confirmation d'adresse, pas de contrat", async () => {
-    await subscriptions.requestSubscription({ ...request });
-    expect(messaging.sendEmail).toHaveBeenCalledTimes(1);
+  it("l'envoi automatique échoue (dossier incomplet…) : l'équipe est prévenue avec la raison, le signataire reçoit l'accusé de réception", async () => {
+    contracts.startContracting.mockResolvedValueOnce({ ok: false, error: "Informations manquantes pour le contrat : SIRET." });
+    const result = await subscriptions.requestSubscription({ ...request });
+    expect(result).toMatchObject({ ok: true, outcome: { status: "RECEIVED", reason: "contrat à envoyer par l'équipe" } });
+    expect(adminNotices().find((n) => n.type === "DOSSIER_BLOCKED")?.body).toContain("Informations manquantes pour le contrat : SIRET.");
     expect(sentTo()).toEqual(["marc@port.fr"]);
     expect((messaging.sendEmail.mock.calls[0][0] as { subject: string }).subject).not.toMatch(/confirm/i);
   });
@@ -100,30 +104,24 @@ describe("souscription depuis le site : un seul abonnement, le contrat ne part j
     expect(createdData().monthlyPriceCents).toBe(12_600);
   });
 
-  it("une offre de la console COMPLÈTE est celle qui s'affiche : son prix est figé, et la retenue cite SA mise en service", async () => {
+  it("une offre de la console COMPLÈTE est celle qui s'affiche : son prix est figé et dit au dossier", async () => {
     db.plan.findFirst.mockResolvedValue({ id: "plan-1", name: "Offre d'automne", monthlyPriceCents: 13_900, setupFeeCents: 31_000, trialDays: 0, isActive: true });
     await subscriptions.requestSubscription({ ...request });
     expect(createdData()).toMatchObject({ monthlyPriceCents: 13_900, planId: "plan-1" });
-    const blocked = adminNotices().find((n) => n.type === "DOSSIER_BLOCKED");
-    expect(blocked?.body).toContain("mise en service de 310 € HT");
-    expect(summaries().join(" ")).toContain("139 € HT / mois");
-    expect(summaries().join(" ")).toContain("mise en service 310 € HT");
+    expect(summaries().join(" ")).toContain("139 € HT / mois");
+    expect(summaries().join(" ")).toContain("mise en service 310 € HT");
   });
 
-  it("la retenue vaut pour TOUTE nouvelle demande, même si la console publie une mise en service à 0 €", async () => {
-    db.plan.findFirst.mockResolvedValue({ id: "plan-2", name: "Sans frais", monthlyPriceCents: 12_600, setupFeeCents: 0, trialDays: 0, isActive: true });
-    const result = await subscriptions.requestSubscription({ ...request });
-    expect(result).toMatchObject({ ok: true, outcome: { status: "RECEIVED" } });
-    expect(tokens.signPayload).not.toHaveBeenCalled();
-    expect(adminNotices().some((n) => n.type === "DOSSIER_BLOCKED")).toBe(true);
-  });
-
-  it("un dossier proche qui a déjà un contrat en cours est signalé dans la retenue", async () => {
+  it("un dossier proche qui a déjà un contrat en cours : le contrat est RETENU, l'équipe vérifie", async () => {
     // Première lecture : les dossiers de ce SIRET (aucun) ; seconde : les dossiers proches (même e-mail).
     db.prospect.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([{ id: "p-old", name: "Pharmacie du Port", email: "marc@port.fr", siret: null, postalCode: "13002", contracts: [{ status: "SENT" }] }]);
     await subscriptions.requestSubscription({ ...request });
+    expect(contracts.startContracting).not.toHaveBeenCalled();
     expect(adminNotices().some((n) => n.type === "DUPLICATE_SUSPECTED")).toBe(true);
-    expect(adminNotices().find((n) => n.type === "DOSSIER_BLOCKED")?.body).toContain("contrat en cours ou signé");
+    const blocked = adminNotices().find((n) => n.type === "DOSSIER_BLOCKED");
+    expect(blocked?.title).toBe("Contrat retenu — Pharmacie du Port");
+    expect(blocked?.body).toContain("contrat en cours ou signé");
+    expect(blocked?.body).toContain("« Envoyer le contrat »");
   });
 
   it("une offre cochée qui n'est plus proposée : retenue, avec son propre message", async () => {
@@ -131,6 +129,7 @@ describe("souscription depuis le site : un seul abonnement, le contrat ne part j
     const result = await subscriptions.requestSubscription({ ...request, planId: "plan-disparu" });
     expect(result).toMatchObject({ ok: true, outcome: { status: "RECEIVED", reason: "offre indisponible" } });
     expect(adminNotices().find((n) => n.type === "DOSSIER_BLOCKED")?.body).toContain("n'est plus proposée");
+    expect(contracts.startContracting).not.toHaveBeenCalled();
   });
 
   it("un SIRET déjà connu : rien n'est créé ni modifié, aucun contrat", async () => {
@@ -183,7 +182,6 @@ describe("le confrère à parrainer, saisi à l'inscription", () => {
     await subscriptions.requestSubscription({ ...request, referee });
     expect(sentTo()).not.toContain("confrere@pharmacie-durand.fr");
     expect(sentTo().every((to) => to === "marc@port.fr")).toBe(true);
-    expect(sentTo()).toHaveLength(1);
   });
 
   it("sans confrère indiqué : aucune fiche, aucune notification de parrainage", async () => {
@@ -209,9 +207,8 @@ describe("le confrère à parrainer, saisi à l'inscription", () => {
     const result = await subscriptions.requestSubscription({ ...request, referee });
     expect(result).toMatchObject({ ok: true, outcome: { status: "RECEIVED", prospectId: "p-new" } });
     expect(adminNotices().find((n) => n.title.startsWith("Confrère à enregistrer à la main"))?.body).toContain("confrere@pharmacie-durand.fr");
-    // L'accusé de réception et la retenue du contrat suivent leur cours.
-    expect(adminNotices().some((n) => n.type === "DOSSIER_BLOCKED")).toBe(true);
-    expect(sentTo()).toEqual(["marc@port.fr"]);
+    // Le contrat part quand même.
+    expect(contracts.startContracting).toHaveBeenCalledWith("p-new", expect.objectContaining({ type: "SYSTEM" }));
     spy.mockRestore();
   });
 

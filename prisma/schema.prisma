@@ -126,6 +126,12 @@ model Pharmacy {
   onboardingCompletedAt DateTime?
   /// La mise en service payée avec le premier mois : à planifier, planifiée, faite. Vide : rien à suivre (officine d'avant).
   setupStatus           SetupStatus?
+  /// Le logiciel (installateur des postes, liaison du stock) n'est donné qu'une fois l'abonnement PAYÉ (fondateur, 5 nov. 2026) :
+  /// vrai pour les officines nées des nouveaux parcours (souscription du site, lien de bienvenue après une démo). Les autres ne
+  /// sont jamais bloquées.
+  softwareGate          Boolean   @default(false)
+  /// Le jour où le logiciel a été débloqué : première facture payée, ou décision du fondateur dans la console.
+  softwareUnlockedAt    DateTime?
   setupScheduledAt      DateTime?
   setupDoneAt           DateTime?
   /// Dernière synchronisation du stock qui a abouti (import de fichier, ou

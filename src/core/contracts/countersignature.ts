@@ -180,3 +180,39 @@ export function resolveCountersigner(stored: unknown, envEmail: string | null | 
   if (isValidSignerEmail(envEmail)) return { name, email: envEmail.trim().toLowerCase(), source: "ENV" };
   return { name, email: DEFAULT_COUNTERSIGNER_EMAIL, source: "DEFAULT" };
 }
+
+// ---------------------------------------------------------------------------
+// La signature automatique de la société (fondateur, 5 nov. 2026)
+// ---------------------------------------------------------------------------
+
+/**
+ * La clé du réglage : `{ image, uploadedAt }`. L'image (PNG ou JPEG en data URL) est déposée une fois dans
+ * Console → Contrats : la signature du représentant légal, tampon compris. PharmaBoost la pose alors lui-même,
+ * chez le prestataire de signature (trace et horodatage), dès l'envoi de chaque contrat : il n'y a plus de
+ * contresignature à faire, le contrat est complet dès que le titulaire signe.
+ */
+export const COMPANY_SIGNATURE_SETTING_KEY = "contracts.companySignature";
+/** 600 Ko d'image au plus (une signature scannée pèse quelques dizaines de Ko). */
+export const COMPANY_SIGNATURE_MAX_BYTES = 600 * 1024;
+
+const IMAGE_DATA_URL = /^data:image\/(png|jpeg);base64,([A-Za-z0-9+/]+=*)$/;
+
+/** L'image de signature, vérifiée : une data URL PNG ou JPEG, pas trop lourde ; sinon `null`. */
+export function parseSignatureImage(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const match = IMAGE_DATA_URL.exec(value.trim());
+  if (!match) return null;
+  const bytes = Math.floor((match[2].length * 3) / 4);
+  if (bytes === 0 || bytes > COMPANY_SIGNATURE_MAX_BYTES) return null;
+  return value.trim();
+}
+
+export type CompanySignature = { image: string; uploadedAt: string };
+
+/** Le réglage relu : l'image valide et sa date, ou `null` (pas de signature automatique). */
+export function readCompanySignature(stored: unknown): CompanySignature | null {
+  const row = stored && typeof stored === "object" ? (stored as { image?: unknown; uploadedAt?: unknown }) : {};
+  const image = parseSignatureImage(row.image);
+  if (!image) return null;
+  return { image, uploadedAt: typeof row.uploadedAt === "string" ? row.uploadedAt : "" };
+}

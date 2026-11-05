@@ -58,6 +58,7 @@ export function CounterDashboard({
   manualOpen,
   notice,
   children,
+  softwareLocked = false,
 }: {
   dateLabel: string;
   /** L'état des comptoirs (pastille Connecté / Hors ligne). */
@@ -72,6 +73,8 @@ export function CounterDashboard({
   notice?: ReactNode;
   /** La saisie à la main : ordonnance, médicament, demande sans ordonnance. */
   children?: ReactNode;
+  /** Le logiciel attend le paiement de l'abonnement (fondateur, 5 nov. 2026) : pas de bouton de téléchargement. */
+  softwareLocked?: boolean;
 }) {
   const [data, setData] = useState(initial);
   const [sales, setSales] = useState(initialSales);
@@ -196,7 +199,7 @@ export function CounterDashboard({
               ))}
             </ul>
           ) : (
-            <NothingLive status={status} canConfigure={canConfigure} />
+            <NothingLive status={status} canConfigure={canConfigure} softwareLocked={softwareLocked} />
           )}
         </div>
       </section>
@@ -236,7 +239,7 @@ export function CounterDashboard({
             Un nouvel ordinateur au comptoir ?
           </p>
           <div className="px-1">
-            <InstallComptoirButton />
+            <InstallComptoirButton locked={softwareLocked} />
           </div>
         </section>
       )}
@@ -308,7 +311,8 @@ function LiveSaleCard({ sale }: { sale: LiveSale }) {
  * Le fichier d'installation de PharmaBoost pour l'ordinateur du comptoir : chacun le télécharge pour le sien (le comptoir lui est
  * attribué dès le départ), le titulaire pour n'importe lequel. Le jeton voyage dans le nom du fichier : rien à copier.
  */
-function InstallComptoirButton() {
+function InstallComptoirButton({ locked }: { locked: boolean }) {
+  if (locked) return <p className="mt-3 text-[13.5px] text-text-secondary">PharmaBoost se télécharge dès que votre abonnement est réglé : le lien vous arrive par e-mail juste après le paiement.</p>;
   return (
     <form method="post" action="/api/connexion/installateur" className="mt-3 flex flex-wrap items-center gap-3" data-installer-comptoir="">
       <button type="submit" className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand-600 px-4 text-[14px] font-semibold text-white transition-colors hover:bg-brand-700">
@@ -321,7 +325,7 @@ function InstallComptoirButton() {
 }
 
 /** Rien en cours : ce que fait le comptoir — et, honnêtement, ce qui l'empêche de voir arriver les délivrances. */
-function NothingLive({ status, canConfigure }: { status: CounterDashboardData["status"]; canConfigure: boolean }) {
+function NothingLive({ status, canConfigure, softwareLocked = false }: { status: CounterDashboardData["status"]; canConfigure: boolean; softwareLocked?: boolean }) {
   const text =
     status.state === "READY"
       ? "Aucune vente en cours. Elles apparaissent ici dès qu'une boîte est scannée au comptoir."
@@ -346,7 +350,7 @@ function NothingLive({ status, canConfigure }: { status: CounterDashboardData["s
       )}
       {(status.state === "UNASSIGNED" || status.state === "NOT_CONNECTED") && (
         // Un nouvel ordinateur au comptoir : chacun télécharge PharmaBoost pour LE SIEN, sans passer par le titulaire.
-        <InstallComptoirButton />
+        <InstallComptoirButton locked={softwareLocked} />
       )}
       {(status.state === "UNASSIGNED" || status.state === "NOT_CONNECTED") && canConfigure && (
         <Link href="/connexion" className="mt-3 inline-flex items-center gap-1.5 text-[14px] font-medium text-brand-700 underline-offset-2 hover:underline dark:text-brand-400">

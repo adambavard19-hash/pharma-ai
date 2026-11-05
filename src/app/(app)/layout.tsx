@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { SubscriptionPendingBanner } from "@/components/app/subscription-pending-banner";
 import { requireSession } from "@/server/auth/session";
 import { patientDataEnabled } from "@/config/env";
 import { countPharmacyUnread } from "@/server/services/support";
@@ -83,6 +84,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
               id="contenu"
               className="mx-auto max-w-[1400px] px-4 py-6 lg:px-10 lg:py-10 print:max-w-none print:p-0"
             >
+              <SubscriptionPendingBanner pharmacyId={session.scope.pharmacyId} owner={session.role === "OWNER"} />
               {children}
             </main>
           </div>

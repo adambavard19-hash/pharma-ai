@@ -161,6 +161,7 @@ export type AuditAction =
   | "association.created"
   | "overstock.campaign_created"
   | "overstock.campaign_updated"
+  | "pharmacy.software_unlocked"
   | "overstock.campaign_stopped"
   | "association.updated"
   | "association.deleted"

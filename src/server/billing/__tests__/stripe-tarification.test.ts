@@ -126,7 +126,7 @@ describe("la souscription en ligne crée l'espace une seule fois", () => {
     prisma.prospect.findUnique.mockResolvedValue({ id: "p_1", name: "Pharmacie du Port", pharmacyId: null, termsAcceptedAt: new Date("2026-10-11T10:00:00Z"), selfCheckoutSessionId: "cs_1" });
     mocks.createPharmacyFromProspect.mockResolvedValue({ ok: true, pharmacyId: "ph_new", welcome: { status: "SENT", detail: "" } });
     expect(await completeSelfServiceCheckout(selfSession())).toEqual({ pharmacyId: "ph_new", created: true });
-    expect(mocks.createPharmacyFromProspect).toHaveBeenCalledWith("p_1", expect.objectContaining({ type: "SYSTEM" }), { paidCheckout: true });
+    expect(mocks.createPharmacyFromProspect).toHaveBeenCalledWith("p_1", expect.objectContaining({ type: "SYSTEM" }), { paidCheckout: true, softwareGate: true });
     expect(mocks.recordAudit.mock.calls[0][0]).toMatchObject({ action: "billing.self_checkout_completed", entityId: "ph_new", metadata: { paymentStatus: "unpaid", termsVersion: "v1" } });
   });
 

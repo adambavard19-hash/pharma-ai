@@ -22,10 +22,11 @@ const OUTCOMES: Record<string, Outcome> = {
   received: {
     kicker: "Abonnement",
     title: "Votre demande d'abonnement est reçue.",
-    body: "Un accusé de réception vient de partir à l'adresse indiquée.",
+    body: "Votre contrat prérempli part à l'adresse indiquée (pensez à regarder vos courriers indésirables).",
     steps: [
-      { title: "Notre équipe prépare votre contrat", body: "Abonnement, engagement de 12 mois et mise en service : nous vérifions les informations de votre officine avant tout envoi." },
-      { title: "Vous le recevez sous un jour ouvré", body: "Par e-mail, à signer en ligne. Rien n'est prélevé avant l'activation." },
+      { title: "Signez votre contrat en ligne", body: "Abonnement, engagement de 12 mois et mise en service : tout est écrit, vous signez en un clic." },
+      { title: "Réglez votre abonnement", body: "Le lien de paiement arrive juste après la signature : prélèvement SEPA ou carte." },
+      { title: "Installez PharmaBoost", body: "Dès le paiement reçu, vous recevez votre accès et le logiciel à installer." },
     ],
   },
 };

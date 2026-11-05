@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({ requireSession: vi.fn(), thisPcComptoir: vi.fn
 vi.mock("server-only", () => ({}));
 vi.mock("@/server/auth/session", () => ({ requireSession: mocks.requireSession }));
 vi.mock("@/config/env", () => ({ patientDataEnabled: () => true }));
+vi.mock("@/components/app/subscription-pending-banner", () => ({ SubscriptionPendingBanner: () => null }));
 vi.mock("@/server/services/notifications", () => ({ countUnreadNotifications: async () => 0 }));
 vi.mock("@/server/services/support", () => ({ countPharmacyUnread: async () => 0 }));
 vi.mock("@/server/services/pharmacy-assistant/viewer", () => ({ viewersOf: () => ({ viewer: {} }) }));

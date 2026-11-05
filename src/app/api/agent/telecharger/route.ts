@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { getSession } from "@/server/auth/session";
+import { SOFTWARE_LOCKED_MESSAGE, softwareAvailable } from "@/server/services/software-gate";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +16,9 @@ export async function GET() {
   const session = await getSession();
   if (!session || !session.permissions.has(PERMISSIONS.PRODUCT_IMPORT)) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
+  }
+  if (!(await softwareAvailable(session.scope.pharmacyId))) {
+    return new Response(SOFTWARE_LOCKED_MESSAGE, { status: 402, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
   }
   const dir = join(process.cwd(), "agent");
   const [program, installer, posteInstaller, readme] = await Promise.all([

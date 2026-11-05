@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 vi.mock("@/server/auth/session", () => ({ getSession: mocks.getSession }));
 vi.mock("@/server/http/rate-limit", () => ({ rateLimited: mocks.rateLimited }));
+vi.mock("@/server/services/software-gate", () => ({ softwareAvailable: async () => true, SOFTWARE_LOCKED_MESSAGE: "bloqué" }));
 vi.mock("@/server/services/stock-sync", () => ({ createPostInstallLink: mocks.createLink, listCounterPosts: mocks.listPosts }));
 vi.mock("@/server/services/installer-file", async () => {
   const actual = await vi.importActual<typeof import("@/server/services/installer-file")>("@/server/services/installer-file");

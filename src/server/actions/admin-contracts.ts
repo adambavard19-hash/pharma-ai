@@ -6,7 +6,7 @@ import { prisma } from "@/server/db/client";
 import { requirePlatformSession } from "@/server/auth/platform-session";
 import { remindContractNow, sendContract, upsertCompanyProfile } from "@/server/services/sales/contracts";
 import { normalizeEmail } from "@/core/contracts/identity";
-import { saveCountersigner } from "@/server/services/sales/countersigner";
+import { saveCompanySignature, saveCountersigner } from "@/server/services/sales/countersigner";
 import { refreshAffiliateContract, sendAffiliateContract } from "@/server/services/sales/affiliate-contracts";
 import { fail, ok, zodFieldErrors, type ActionResult } from "./types";
 
@@ -138,4 +138,15 @@ export async function refreshAffiliateContractAction(payload: { contractId: stri
   if (!result.ok) return fail(result.error);
   revalidatePath("/admin/contrats");
   return ok(null, result.changed ? "Statut mis à jour." : "Statut inchangé chez le prestataire.");
+}
+
+/** Déposer l'image de signature de la société (signature automatique des contrats), ou la retirer (`image: null`). */
+export async function saveCompanySignatureAction(payload: { image: string | null }): Promise<ActionResult<null>> {
+  const session = await requirePlatformSession();
+  const image = payload?.image ?? null;
+  if (image !== null && (typeof image !== "string" || image.length > 900_000)) return fail("Image refusée : une photo PNG ou JPEG de 600 Ko au plus.");
+  const result = await saveCompanySignature(image, session.admin.id);
+  if (!result.ok) return fail(result.error);
+  revalidatePath("/admin/contrats");
+  return ok(null, image ? "Signature enregistrée : les prochains contrats seront signés d'office par PharmaBoost." : "Signature retirée : les prochains contrats seront à contresigner à la main.");
 }

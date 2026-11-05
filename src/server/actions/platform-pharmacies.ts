@@ -355,3 +355,31 @@ export async function deletePharmacyMemberAction(payload: { pharmacyId: string; 
   return ok(null, result.accountDeleted ? `Le compte de ${result.name} est supprimé. Son adresse e-mail est de nouveau disponible.` : `${result.name} est retiré de cette officine ; son compte reste actif dans l'autre.`);
 }
 
+
+/**
+ * « Débloquer le logiciel maintenant » (fondateur, 5 nov. 2026) : le logiciel attendait le paiement ; le fondateur décide de
+ * le donner tout de suite. Le guide d'installation (le lien du logiciel) part au titulaire.
+ */
+export async function unlockSoftwareAction(payload: { pharmacyId: string }): Promise<ActionResult<null>> {
+  const session = await requirePlatformSession();
+  if (typeof payload?.pharmacyId !== "string" || !payload.pharmacyId) return fail("Officine introuvable.");
+  const { unlockSoftware } = await import("@/server/services/software-gate");
+  const done = await unlockSoftware(payload.pharmacyId, { reason: "ADMIN", adminId: session.admin.id });
+  revalidatePath(`/admin/abonnements/${payload.pharmacyId}`);
+  revalidatePath(`/admin/pharmacies/${payload.pharmacyId}`);
+  return done ? ok(null, "Logiciel débloqué : le lien d'installation est parti au titulaire.") : fail("Le logiciel de cette officine n'était pas bloqué.");
+}
+
+/**
+ * Après une démo (fondateur, 5 nov. 2026) : « Envoyer le lien de bienvenue ». L'espace du titulaire s'ouvre avant le
+ * contrat ; il y signe, puis paie ; le logiciel n'arrive qu'après le paiement.
+ */
+export async function sendWelcomeAfterDemoAction(payload: { prospectId: string }): Promise<ActionResult<{ pharmacyId: string }>> {
+  const session = await requirePlatformSession();
+  if (typeof payload?.prospectId !== "string" || !payload.prospectId) return fail("Dossier introuvable.");
+  const { createPharmacyFromProspect } = await import("@/server/services/sales/client-pharmacies");
+  const result = await createPharmacyFromProspect(payload.prospectId, { type: "ADMIN", id: session.admin.id, label: session.admin.fullName }, { beforeContract: true, softwareGate: true });
+  if (!result.ok) return fail(result.error);
+  revalidatePath(`/admin/dossiers/${payload.prospectId}`);
+  return ok({ pharmacyId: result.pharmacyId }, result.welcome.status === "SENT" ? "Lien de bienvenue envoyé : le titulaire crée son accès, signe puis paie dans son espace." : `Espace créé, mais le lien de bienvenue n'est pas parti : ${result.welcome.detail}`);
+}

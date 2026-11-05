@@ -111,7 +111,7 @@ export async function completeSelfServiceCheckout(session: CheckoutSessionShape)
     if (!prospect) return null;
     if (prospect.pharmacyId) return { pharmacyId: prospect.pharmacyId, created: false };
     const system = { type: "SYSTEM" as const, label: "Souscription en ligne" };
-    const created = await createPharmacyFromProspect(prospect.id, system, { paidCheckout: true });
+    const created = await createPharmacyFromProspect(prospect.id, system, { paidCheckout: true, softwareGate: true });
     if (!created.ok) {
       // Paiement validé mais espace non créé (adresse prise entre-temps…) : l'équipe le fait à la main, rien n'est perdu.
       await recordProspectEvent({ prospectId: prospect.id, type: "NOTE", summary: `Paiement en ligne validé, mais l'espace n'a pas pu être créé : ${created.error}`, actor: system });

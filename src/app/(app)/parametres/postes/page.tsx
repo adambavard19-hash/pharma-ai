@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { softwareAvailable } from "@/server/services/software-gate";
 import { requirePermission } from "@/server/auth/session";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { loadConnectionOverview } from "@/server/services/connection-overview";
@@ -19,7 +20,7 @@ export const metadata: Metadata = { title: "Postes du comptoir" };
  */
 export default async function PostsPage() {
   const session = await requirePermission(PERMISSIONS.PRODUCT_IMPORT);
-  const [loaded, installer, comptoirs, members] = await Promise.all([loadConnectionOverview(session.scope.pharmacyId), installerStatus(), listComptoirs(session.scope.pharmacyId), listMembers(session.scope.pharmacyId)]);
+  const [loaded, installer, comptoirs, members, software] = await Promise.all([loadConnectionOverview(session.scope.pharmacyId), installerStatus(), listComptoirs(session.scope.pharmacyId), listMembers(session.scope.pharmacyId), softwareAvailable(session.scope.pharmacyId)]);
   const assignments = Object.fromEntries(comptoirs.map((post) => [post.id, post.assignedUserId]));
   const snapshot = JSON.parse(JSON.stringify({ overview: loaded.overview, lgo: loaded.lgo })) as OverviewSnapshot;
 
@@ -33,7 +34,7 @@ export default async function PostsPage() {
         canSeePosts
       />
       <div className="max-w-3xl">
-        <PostsPanel initial={snapshot} installerAvailable={installer.available} members={members.map((member) => ({ id: member.id, name: member.name }))} assignments={assignments} />
+        <PostsPanel initial={snapshot} installerAvailable={installer.available} softwareLocked={!software} members={members.map((member) => ({ id: member.id, name: member.name }))} assignments={assignments} />
       </div>
     </div>
   );

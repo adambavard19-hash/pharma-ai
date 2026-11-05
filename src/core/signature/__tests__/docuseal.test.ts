@@ -60,6 +60,31 @@ describe("signature électronique — DocuSeal", () => {
     expect(company.areas[0].x).toBeGreaterThan(area.x + area.w);
   });
 
+  it("la société signée d'office (fondateur, 5 nov. 2026) : marquée signée par l'API, avec son image, sans e-mail, et en tête de l'ordre", async () => {
+    let body: { submitters: Record<string, unknown>[] } | null = null;
+    const fetchImpl = async (_url: string, init?: RequestInit) => {
+      body = JSON.parse(String(init?.body));
+      return new Response(JSON.stringify({ id: 7, submitters: [{ role: "Pharmacie", embed_src: "https://docuseal.eu/s/abc" }] }), { status: 200 });
+    };
+    const provider = new DocusealSignatureProvider({ apiKey: "k", region: "eu" }, fetchImpl as never);
+    const image = "data:image/png;base64,iVBORw0KGgo=";
+    await provider.createEnvelope({
+      reference: "PB-2",
+      title: "Contrat",
+      pdf: await a4Pdf(1),
+      signers: [
+        { role: "PHARMACY", firstName: "Claire", lastName: "Dumont", email: "c@x.fr", field: signatureFieldPlacement(0, 2, 1), notify: false },
+        { role: "COMPANY", firstName: "Adam", lastName: "Bavard", email: "a@x.fr", field: signatureFieldPlacement(1, 2, 1), autoSign: { image }, notify: false },
+      ],
+      expiresAt: new Date("2026-11-20T12:00:00.000Z"),
+    });
+    const submitters = (body as unknown as { submitters: Record<string, unknown>[] }).submitters;
+    expect(submitters.map((s) => s.role)).toEqual(["PharmaBoost", "Pharmacie"]);
+    expect(submitters[0]).toMatchObject({ completed: true, send_email: false, values: { "Signature PharmaBoost": image } });
+    expect(submitters[1]).toMatchObject({ send_email: false });
+    expect(submitters[1]).not.toHaveProperty("completed");
+  });
+
   it("rapporte un refus de l'API tel quel", async () => {
     const provider = new DocusealSignatureProvider({ apiKey: "k", region: "global" }, (async () => new Response("Unauthorized", { status: 401 })) as never);
     await expect(provider.getStatus("42")).rejects.toThrow(/DocuSeal a refusé \/submissions\/42 \(HTTP 401\)/);

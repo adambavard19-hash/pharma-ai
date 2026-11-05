@@ -189,7 +189,7 @@ export function SubscriptionForm({ planId, offer, offerLabel, referral, referral
         id: "email",
         section: "Le signataire",
         question: (v) => (payOnline ? (first(v) ? `Votre adresse e-mail, ${first(v)} ?` : "Votre adresse e-mail ?") : first(v) ? `À quelle adresse envoyer le contrat, ${first(v)} ?` : "À quelle adresse envoyer le contrat ?"),
-        help: payOnline ? "Elle sera votre identifiant PharmaBoost : vous y recevrez vos factures et le lien pour choisir votre mot de passe." : "Vous y recevrez d'abord un lien pour confirmer votre adresse, puis le contrat prérempli à signer.",
+        help: payOnline ? "Elle sera votre identifiant PharmaBoost : vous y recevrez vos factures et le lien pour choisir votre mot de passe." : "Vous y recevrez aussitôt le contrat prérempli à signer, puis le lien de paiement.",
         fields: ["ownerEmail"],
         seconds: 10,
         validate: (v) => validate(v, ["ownerEmail"]),
@@ -315,7 +315,7 @@ export function SubscriptionForm({ planId, offer, offerLabel, referral, referral
       }
       canSubmit={(v) => v.confirm && (!payOnline || v.acceptTerms)}
       submitLabel={payOnline ? "Continuer vers le paiement" : "Recevoir mon contrat à signer"}
-      submitHint={payOnline ? "Paiement sécurisé par Stripe : prélèvement SEPA ou carte. Votre espace PharmaBoost s'ouvre dès le paiement validé." : "Notre équipe prépare votre contrat et vous l'envoie sous un jour ouvré. Rien n'est prélevé à cette étape."}
+      submitHint={payOnline ? "Paiement sécurisé par Stripe : prélèvement SEPA ou carte. Votre espace PharmaBoost s'ouvre dès le paiement validé." : "Votre contrat part aussitôt par e-mail. Rien n'est prélevé à cette étape : le paiement vient après la signature."}
       onSubmit={async (v) => {
         const result = await submitSubscriptionRequestAction({ ...toRequest(v), planId: planId ?? "", confirm: v.confirm as true, website: v.website, payOnline: Boolean(payOnline), acceptTerms: v.acceptTerms });
         if (!result.ok) {

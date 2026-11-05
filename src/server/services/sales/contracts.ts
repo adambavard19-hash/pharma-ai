@@ -30,7 +30,7 @@ import type { DeliveryOutcome } from "@/core/ai/ports";
 import { recordProspectEvent, type SalesActor } from "./events";
 import { notifyAdmins, notifySalesRep } from "./notifications";
 import { upsertCommissionForContract } from "./commissions";
-import { loadCountersigner } from "./countersigner";
+import { loadCompanySignature, loadCountersigner } from "./countersigner";
 import { handleAffiliateSignatureEvent } from "./affiliate-contracts";
 
 const CONTRACT_LINK_TTL_MS = 1000 * 60 * 60 * 24 * 30;
@@ -315,8 +315,11 @@ async function sendContractLocked(contractId: string, actor: SalesActor): Promis
   let signatureNote = "";
   let providerEnvelopeId = contract.providerEnvelopeId;
   const signature = getSignatureProvider();
+  // La société signe d'office (fondateur, 5 nov. 2026) quand sa signature est déposée et que le prestataire sait le faire.
+  let companyAutoSigned = false;
   if (signature.info.capability === "LIVE" && !providerEnvelopeId) {
     try {
+      const companySignature = signature.info.id === "docuseal" ? await loadCompanySignature() : null;
       const pdf = await getStorageProvider().read(contract.fileKey);
       if (!pdf) return { ok: false, error: "Le PDF du contrat est introuvable dans le stockage." };
       const [pFirst, ...pRest] = contract.pharmacySignerName.split(/\s+/);
@@ -330,16 +333,18 @@ async function sendContractLocked(contractId: string, actor: SalesActor): Promis
         signers: [
           // Le titulaire reçoit le lien dans l'e-mail PharmaBoost : un seul message, pas deux.
           { role: "PHARMACY", firstName: pFirst, lastName: pRest.join(" ") || pFirst, email: contract.pharmacySignerEmail, phone: contract.prospect.phone, field: signatureFieldPlacement(0, 2, pageCount), notify: false },
-          { role: "COMPANY", firstName: cFirst, lastName: cRest.join(" ") || cFirst, email: contract.companySignerEmail, field: signatureFieldPlacement(1, 2, pageCount) },
+          { role: "COMPANY", firstName: cFirst, lastName: cRest.join(" ") || cFirst, email: contract.companySignerEmail, field: signatureFieldPlacement(1, 2, pageCount), ...(companySignature ? { autoSign: { image: companySignature.image }, notify: false } : {}) },
         ],
         expiresAt,
       });
       providerEnvelopeId = envelope.envelopeId;
       signingUrl = envelope.signingUrls.PHARMACY ?? null;
-      companySigningUrl = envelope.signingUrls.COMPANY ?? null;
-      // Enregistré aussitôt : si l'e-mail échoue, la demande n'est ni perdue ni recréée.
-      await prisma.contract.update({ where: { id: contract.id }, data: { providerEnvelopeId, pharmacySigningUrl: signingUrl, companySigningUrl, signatureProvider: signature.info.id, expiresAt } });
-      signatureNote = `envoyé pour signature via ${signature.info.label}`;
+      companySigningUrl = companySignature ? null : (envelope.signingUrls.COMPANY ?? null);
+      companyAutoSigned = Boolean(companySignature);
+      // Enregistré aussitôt : si l'e-mail échoue, la demande n'est ni perdue ni recréée. Signée d'office, la part de la
+      // société est notée tout de suite : la signature du titulaire suffira à finaliser le contrat.
+      await prisma.contract.update({ where: { id: contract.id }, data: { providerEnvelopeId, pharmacySigningUrl: signingUrl, companySigningUrl, signatureProvider: signature.info.id, expiresAt, ...(companyAutoSigned ? { companySignedAt: new Date() } : {}) } });
+      signatureNote = `envoyé pour signature via ${signature.info.label}${companyAutoSigned ? ", signé d'office par PharmaBoost" : ""}`;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Le prestataire de signature a refusé la demande.";
       await recordProspectEvent({ prospectId: contract.prospectId, type: "SIGNATURE_ERROR", summary: `Demande de signature NON créée : ${message}`, actor, metadata: { contractId: contract.id, signatureProvider: signature.info.id } });
@@ -458,6 +463,9 @@ export async function applySignatureStatus(contractId: string, announced: Signat
     if (rep) await notifySalesRep({ salesRepId: rep, type: "CONTRACT_FINALIZED", title: `${contract.prospect.name} : contrat finalisé`, body: "Abonnement à activer.", linkUrl: repLink, severity: "SUCCESS" });
     await notifyAdmins({ type: "CONTRACT_FINALIZED", title: `Contrat finalisé — ${contract.prospect.name}`, body: `Contrat v${contract.version} signé par les deux parties${archived ? ", PDF signé archivé" : " — PDF signé NON archivé (Actualiser chez le prestataire)"}. Dossier prêt pour l'activation de l'abonnement.`, linkUrl: adminLink, severity: "SUCCESS" });
     await sendClientEmail(contractId, "FINALIZED");
+    // Puis, sans attendre personne : l'espace et le lien de paiement (fondateur, 5 nov. 2026). Jamais bloquant.
+    const { afterContractFinalized } = await import("./auto-activation");
+    await afterContractFinalized(contractId).catch((error) => console.error("[contrat] suite automatique impossible", error));
   }
   if (status === "REFUSED" || status === "EXPIRED") {
     if (rep) await notifySalesRep({ salesRepId: rep, type: `CONTRACT_${status}`, title: `${contract.prospect.name} : contrat ${CONTRACT_STATUS_LABELS[status].toLowerCase()}`, body: reason ?? "Votre intervention est nécessaire.", linkUrl: repLink, severity: "WARNING" });

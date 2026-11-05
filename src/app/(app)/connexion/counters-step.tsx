@@ -28,7 +28,7 @@ type Counter = OverviewSnapshot["overview"]["counters"][number];
 
 const COOLDOWN_MS = 4000;
 
-export function CountersStep({ counters, installerAvailable, members, assignments, onChanged }: { counters: Counter[]; installerAvailable: boolean; members: { id: string; name: string }[]; assignments: Record<string, string | null>; onChanged: () => void }) {
+export function CountersStep({ counters, installerAvailable, members, assignments, onChanged, softwareLocked = false }: { counters: Counter[]; installerAvailable: boolean; /** Le logiciel attend le paiement de l'abonnement (fondateur, 5 nov. 2026). */ softwareLocked?: boolean; members: { id: string; name: string }[]; assignments: Record<string, string | null>; onChanged: () => void }) {
   const [started, setStarted] = useState(false);
   const [locked, setLocked] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
@@ -176,7 +176,11 @@ export function CountersStep({ counters, installerAvailable, members, assignment
         </ul>
       )}
 
-      {installerAvailable ? (
+      {softwareLocked ? (
+        <Alert tone="info" title="PharmaBoost arrive juste après le paiement">
+          Le logiciel se télécharge dès que votre abonnement est réglé : le lien vous arrive aussitôt par e-mail.
+        </Alert>
+      ) : installerAvailable ? (
         <form
           method="post"
           action="/api/connexion/installateur"

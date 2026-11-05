@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { UnlockSoftwareButton } from "../../pharmacies/software-gate-buttons";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Building2, ExternalLink, FileText, History, ReceiptText } from "lucide-react";
@@ -43,6 +44,7 @@ export default async function SubscriptionDetailPage({ params }: { params: Promi
   await requirePlatformSession();
   const { pharmacyId } = await params;
   const row = await getPharmacyBilling(pharmacyId);
+  const software = await prisma.pharmacy.findUnique({ where: { id: pharmacyId }, select: { softwareGate: true, softwareUnlockedAt: true } });
   if (!row) notFound();
 
   const [detail, plans, templates] = await Promise.all([
@@ -320,6 +322,19 @@ export default async function SubscriptionDetailPage({ params }: { params: Promi
               inviteSetupLabel={inviteSetupLabel}
             />
           </AdminSection>
+
+          {software?.softwareGate && (
+            <AdminSection title="Logiciel" description="Le logiciel PharmaBoost n'est donné qu'une fois l'abonnement payé, sauf décision de votre part.">
+              {software.softwareUnlockedAt ? (
+                <p className="text-[13.5px] text-text-secondary">Débloqué le {formatFrenchDate(software.softwareUnlockedAt)} : le titulaire a reçu le lien d&apos;installation.</p>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-[13.5px] text-text-secondary">En attente du paiement : il partira tout seul à la première facture payée.</p>
+                  <UnlockSoftwareButton pharmacyId={row.id} />
+                </div>
+              )}
+            </AdminSection>
+          )}
 
           <AdminSection title="Mise en service" description="Installation des postes, paramétrage, import du stock et formation : payée avec le premier mois.">
             <div className="space-y-3">

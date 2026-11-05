@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/field";
 import { Alert } from "@/components/ui/feedback";
 import { useToast } from "@/components/ui/toast";
-import { refreshAffiliateContractAction, saveCountersignerAction, sendAffiliateContractAction } from "@/server/actions/admin-contracts";
+import { refreshAffiliateContractAction, saveCompanySignatureAction, saveCountersignerAction, sendAffiliateContractAction } from "@/server/actions/admin-contracts";
 
 /** Le signataire PharmaBoost des prochains contrats : une adresse, un nom facultatif. */
 export function CountersignerForm({ initial, source }: { initial: { name: string; email: string }; source: "CONSOLE" | "ENV" | "DEFAULT" }) {
@@ -47,6 +47,73 @@ export function CountersignerForm({ initial, source }: { initial: { name: string
         Enregistrer
       </Button>
     </form>
+  );
+}
+
+/**
+ * La signature de la société (fondateur, 5 nov. 2026) : une photo de la signature du représentant légal (tampon compris),
+ * déposée une fois. PharmaBoost signe alors d'office chaque contrat à l'envoi ; le titulaire signe, le contrat est complet.
+ */
+export function CompanySignatureForm({ current }: { current: { image: string; uploadedAt: string } | null }) {
+  const [preview, setPreview] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const { push } = useToast();
+  const router = useRouter();
+  const save = (image: string | null) =>
+    startTransition(async () => {
+      const result = await saveCompanySignatureAction({ image });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setError(null);
+      setPreview(null);
+      push({ tone: "success", title: result.message ?? "Enregistré." });
+      router.refresh();
+    });
+  const shown = preview ?? current?.image ?? null;
+  return (
+    <div className="space-y-3">
+      {shown ? (
+        // eslint-disable-next-line @next/next/no-img-element -- une data URL déposée par l'admin, jamais une image distante
+        <img src={shown} alt="Signature de la société" className="h-24 max-w-xs rounded-lg border border-border-subtle bg-white object-contain p-2" />
+      ) : (
+        <p className="text-[13px] text-text-secondary">Aucune signature déposée : chaque contrat signé par le titulaire attend votre contresignature (« À contresigner par moi »).</p>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="inline-flex h-9 cursor-pointer items-center rounded-lg border border-border-default px-3 text-[13px] font-semibold text-text-primary hover:border-brand-400">
+          {current ? "Remplacer l'image" : "Choisir l'image (PNG ou JPEG)"}
+          <input
+            type="file"
+            accept="image/png,image/jpeg"
+            className="sr-only"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (!file) return;
+              if (file.size > 600 * 1024) {
+                setError("Image trop lourde : 600 Ko au plus.");
+                return;
+              }
+              const reader = new FileReader();
+              reader.onload = () => setPreview(typeof reader.result === "string" ? reader.result : null);
+              reader.readAsDataURL(file);
+            }}
+          />
+        </label>
+        {preview && (
+          <Button size="sm" loading={pending} onClick={() => save(preview)}>
+            Enregistrer cette signature
+          </Button>
+        )}
+        {current && !preview && (
+          <Button size="sm" variant="secondary" loading={pending} onClick={() => save(null)}>
+            Retirer
+          </Button>
+        )}
+      </div>
+      {error && <Alert tone="danger">{error}</Alert>}
+    </div>
   );
 }
 

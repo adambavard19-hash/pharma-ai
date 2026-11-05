@@ -27,7 +27,22 @@ import { isLgoId } from "@/server/services/stock-sync";
  * accepté les conditions d'abonnement et validé son paiement chez Stripe : c'est ce
  * qui tient lieu de contrat signé. Rien d'autre ne lève cette règle.
  */
-export async function createPharmacyFromProspect(prospectId: string, actor: SalesActor, options: { paidCheckout?: boolean } = {}): Promise<{ ok: true; pharmacyId: string; welcome: { status: string; detail: string } } | { ok: false; error: string }> {
+export async function createPharmacyFromProspect(
+  prospectId: string,
+  actor: SalesActor,
+  options: {
+    paidCheckout?: boolean;
+    /**
+     * Après une démo (fondateur, 5 nov. 2026) : l'espace s'ouvre AVANT le contrat, par le lien de bienvenue envoyé depuis la
+     * console ; le titulaire y signe puis paie. Réservé à la console (acteur ADMIN).
+     */
+    beforeContract?: boolean;
+    /** L'e-mail d'accueil attend le paiement (souscription du site : contrat signé, lien de paiement d'abord). */
+    deferWelcome?: boolean;
+    /** Le logiciel attend le paiement de l'abonnement (voir software-gate). */
+    softwareGate?: boolean;
+  } = {},
+): Promise<{ ok: true; pharmacyId: string; welcome: { status: string; detail: string } } | { ok: false; error: string }> {
   const prospect = await prisma.prospect.findUnique({
     where: { id: prospectId },
     include: { contracts: { orderBy: { version: "desc" }, take: 1 }, salesRep: { select: { id: true, firstName: true, lastName: true } } },
@@ -37,7 +52,8 @@ export async function createPharmacyFromProspect(prospectId: string, actor: Sale
   if (prospect.blockedAt) return { ok: false, error: "Ce dossier est suspendu par l'administrateur." };
   const contract = prospect.contracts[0];
   const paidOnline = options.paidCheckout === true && Boolean(prospect.termsAcceptedAt);
-  if (!paidOnline && (!contract || contract.status !== "FINALIZED")) {
+  const welcomeFirst = options.beforeContract === true && actor.type === "ADMIN";
+  if (!paidOnline && !welcomeFirst && (!contract || contract.status !== "FINALIZED")) {
     return { ok: false, error: "Le contrat doit être signé par les deux parties (statut « Finalisé ») avant de créer l'espace pharmacie." };
   }
   if (!prospect.email || !prospect.ownerName) return { ok: false, error: "L'e-mail et le nom du titulaire sont requis sur le dossier." };
@@ -80,6 +96,7 @@ export async function createPharmacyFromProspect(prospectId: string, actor: Sale
         isActive: true,
         referredById: referrer?.id ?? null,
         referralAmountCents,
+        softwareGate: options.softwareGate === true,
       },
     });
     if (prospect.postCount) await tx.pharmacyPostCountChange.create({ data: { pharmacyId: pharmacy.id, previous: null, next: prospect.postCount, actorType: actor.type, actorLabel: actor.label } });
@@ -90,9 +107,11 @@ export async function createPharmacyFromProspect(prospectId: string, actor: Sale
     return { pharmacy, ownerId: owner.id };
   });
 
-  const welcome = await sendUserPasswordLink(ownerId, "welcome").catch((error: unknown) => ({ status: "FAILED", detail: error instanceof Error ? error.message : "envoi impossible", url: "" }));
+  const welcome = options.deferWelcome
+    ? { status: "DEFERRED", detail: "envoyé après le paiement", url: "" }
+    : await sendUserPasswordLink(ownerId, "welcome").catch((error: unknown) => ({ status: "FAILED", detail: error instanceof Error ? error.message : "envoi impossible", url: "" }));
 
-  await recordProspectEvent({ prospectId, type: "PHARMACY_CREATED", summary: `Espace pharmacie créé (${pharmacy.name}) ; e-mail d'accueil du titulaire : ${welcome.status === "SENT" ? "envoyé" : `non envoyé (${welcome.detail})`}.`, actor, metadata: { pharmacyId: pharmacy.id } });
+  await recordProspectEvent({ prospectId, type: "PHARMACY_CREATED", summary: `Espace pharmacie créé (${pharmacy.name}) ; e-mail d'accueil du titulaire : ${welcome.status === "SENT" ? "envoyé" : welcome.status === "DEFERRED" ? "il partira après le paiement" : `non envoyé (${welcome.detail})`}.`, actor, metadata: { pharmacyId: pharmacy.id } });
   await recordAudit({ action: "sales.pharmacy_created", entityType: "Pharmacy", entityId: pharmacy.id, salesRepId: actor.type === "SALES" ? actor.id : null, platformAdminId: actor.type === "ADMIN" ? actor.id : null, metadata: { prospectId } });
   if (leadReferrer) await recordLeadAttachment({ referredProspectId: prospect.id, referredName: pharmacy.name, referrer: leadReferrer, actor });
   await notifyAdmins({ type: "PHARMACY_CREATED", title: `${pharmacy.name} : espace créé`, body: `Dossier de ${prospect.salesRep ? `${prospect.salesRep.firstName} ${prospect.salesRep.lastName}` : "la console"}.`, linkUrl: `/admin/pharmacies/${pharmacy.id}`, severity: "SUCCESS" });

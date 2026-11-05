@@ -75,12 +75,16 @@ export class DocusealSignatureProvider implements SignatureProvider {
         order: "preserved",
         expire_at: input.expiresAt.toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC"),
         documents: [{ name: input.reference, file: Buffer.from(input.pdf).toString("base64"), fields }],
-        submitters: input.signers.map((signer) => ({
+        // Les signataires signés d'office passent en tête : avec l'ordre imposé, le titulaire n'attend personne après eux.
+        submitters: [...input.signers].sort((a, b) => Number(Boolean(b.autoSign)) - Number(Boolean(a.autoSign))).map((signer) => ({
           role: DOCUSEAL_ROLES[signer.role],
           name: `${signer.firstName} ${signer.lastName}`.trim(),
           email: signer.email,
           external_id: `${input.reference}:${signer.role}`,
-          send_email: signer.notify !== false,
+          // Signé d'office par l'API (la société) : aucun e-mail, la signature déposée remplit sa case.
+          ...(signer.autoSign
+            ? { send_email: false, completed: true, values: { [`Signature ${DOCUSEAL_ROLES[signer.role]}`]: signer.autoSign.image } }
+            : { send_email: signer.notify !== false }),
         })),
       }),
     });

@@ -26,6 +26,11 @@ export type SignatureSigner = {
    * Par défaut, le prestataire notifie.
    */
   notify?: boolean;
+  /**
+   * Signature posée d'office par PharmaBoost (la société, fondateur 5 nov. 2026) : l'image de la signature, en data URL.
+   * Le prestataire marque ce signataire comme ayant signé à l'envoi, avec sa trace. Seul DocuSeal la prend en charge.
+   */
+  autoSign?: { image: string };
 };
 
 export type SignatureEnvelope = {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/server/auth/session";
+import { SOFTWARE_LOCKED_MESSAGE, softwareAvailable } from "@/server/services/software-gate";
 import { PERMISSIONS } from "@/server/rbac/permissions";
 import { rateLimited } from "@/server/http/rate-limit";
 import { createPostInstallLink, listCounterPosts } from "@/server/services/stock-sync";
@@ -36,6 +37,10 @@ export async function POST(request: Request) {
   }
   if (rateLimited(`installer-download:${session.scope.pharmacyId}`, 20, 60 * 60 * 1000)) {
     return new Response("Trop de téléchargements pour le moment. Réessayez dans une heure.", { status: 429, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+  }
+  // Le logiciel attend le paiement de l'abonnement (fondateur, 5 nov. 2026), sauf déblocage depuis la console.
+  if (!(await softwareAvailable(session.scope.pharmacyId))) {
+    return new Response(SOFTWARE_LOCKED_MESSAGE, { status: 402, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
   }
   const installer = await loadInstaller();
   if (!installer.status.available || !installer.bytes) {

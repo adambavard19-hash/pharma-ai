@@ -7,18 +7,22 @@ import { traceDispatch } from "@/server/services/email-dispatch";
 import { buildInstallationGuideEmail } from "@/core/platform/onboarding-emails";
 import { DEFAULT_CONTACT_EMAIL } from "@/server/services/site-leads";
 import { LGO_DEFINITIONS } from "@/core/stock/connectors";
+import { softwareAvailable } from "@/server/services/software-gate";
 
 /**
  * Le guide d'installation, envoyé au titulaire : automatiquement quand son
  * abonnement démarre, et à la demande depuis la console. C'est ce qui remplace
  * la visite d'un commercial : cinq étapes, faites par le titulaire lui-même.
  */
-export async function sendInstallationGuide(pharmacyId: string, actor: { adminId?: string | null; reason: "SUBSCRIPTION_STARTED" | "OWNER_CREATED" | "ADMIN" }): Promise<{ status: string; detail: string; sentTo: string | null }> {
+export async function sendInstallationGuide(pharmacyId: string, actor: { adminId?: string | null; reason: "SUBSCRIPTION_STARTED" | "SUBSCRIPTION_PAID" | "OWNER_CREATED" | "ADMIN" }): Promise<{ status: string; detail: string; sentTo: string | null }> {
   const pharmacy = await prisma.pharmacy.findUnique({
     where: { id: pharmacyId },
     select: { id: true, name: true, email: true, organizationId: true, memberships: { where: { role: "OWNER", isActive: true }, orderBy: [{ isPrincipal: "desc" }, { createdAt: "asc" }], take: 1, select: { user: { select: { firstName: true, lastName: true, email: true } } } } },
   });
   if (!pharmacy) return { status: "FAILED", detail: "Officine introuvable.", sentTo: null };
+  // Le logiciel n'est donné qu'une fois l'abonnement payé (fondateur, 5 nov. 2026) : envoyé tout seul, le guide attend le
+  // déblocage. Le bouton de la console reste une décision du fondateur.
+  if (actor.reason !== "ADMIN" && !(await softwareAvailable(pharmacyId))) return { status: "SKIPPED", detail: "Logiciel en attente du paiement.", sentTo: null };
   // Envoyé tout seul (titulaire créé, abonnement démarré) : une seule fois — le bouton de la console, lui, renvoie toujours.
   if (actor.reason !== "ADMIN") {
     const already = await prisma.emailDispatch.findFirst({ where: { pharmacyId, kind: "INSTALL_GUIDE", status: { not: "FAILED" } }, select: { id: true } });

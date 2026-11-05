@@ -1,4 +1,5 @@
 import { activityScope } from "@/server/db/demo-scope";
+import { softwareAvailable } from "@/server/services/software-gate";
 import type { Metadata } from "next";
 import { prisma } from "@/server/db/client";
 import { requirePermission } from "@/server/auth/session";
@@ -83,6 +84,7 @@ export default async function NewPrescriptionPage({
         initialSales={liveSales}
         initialFinished={finished}
         canConfigure={canUpdateStock}
+        softwareLocked={!(await softwareAvailable(session.scope.pharmacyId))}
         manualOpen={Boolean(params.patient || params.demande)}
         // Le rappel du stock : seulement pour le titulaire, jamais pour l'équipe au comptoir.
         notice={<StockReminderBanner stockSyncedAt={pharmacy?.stockSyncedAt ?? null} canImport={canUpdateStock} isDemo={session.pharmacy.isDemo} />}

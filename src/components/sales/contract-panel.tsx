@@ -1,5 +1,6 @@
 "use client";
 
+import { WelcomeAfterDemoButton } from "@/app/(admin)/admin/pharmacies/software-gate-buttons";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Building2, FileText, RefreshCw, Send } from "lucide-react";
@@ -132,6 +133,12 @@ export function ContractPanel({ mode, data }: { mode: "admin" | "sales"; data: C
                   {contract?.status === "DRAFT" && <Button asChild variant="outline"><a href={`/api/contrats/apercu/${contract.id}`} target="_blank" rel="noreferrer">Relire le brouillon</a></Button>}
                   <span className="text-[12.5px] text-text-tertiary">Le contrat est généré, soumis à la signature électronique et adressé au titulaire en une fois.</span>
                 </div>
+                {mode === "admin" && !data.pharmacyId && (
+                  <div className="flex flex-wrap items-center gap-2 border-t border-border-subtle pt-3">
+                    <WelcomeAfterDemoButton prospectId={data.id} />
+                    <span className="text-[12.5px] text-text-tertiary">Après la démo : le titulaire crée son accès, signe son contrat et paie depuis son espace. Le logiciel n&apos;arrive qu&apos;après le paiement.</span>
+                  </div>
+                )}
               </div>
             )}
             {contract && (contract.status === "REFUSED" || contract.status === "EXPIRED") && <p className="text-[12.5px] text-text-tertiary">Le contrat précédent est {contract.status === "REFUSED" ? "refusé" : "expiré"} : « Envoyer le contrat » en prépare une nouvelle version.</p>}

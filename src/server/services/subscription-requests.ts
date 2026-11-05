@@ -14,6 +14,7 @@ import { proposeReferee, reconcileNewProspect } from "@/server/services/referral
 import { formatPriceEuros } from "@/core/pricing/official-offer";
 import { buildSubscriptionReceivedEmail } from "@/core/platform/contract-emails";
 import { verifyPayload } from "@/server/security/tokens";
+import { startContracting } from "@/server/services/sales/contracts";
 import { nameKey } from "@/core/contracts/identity";
 import { normalizeSubscriptionRequest, type NormalizedRequest, type SubscriptionRequestInput } from "@/core/contracts/subscription-request";
 
@@ -25,10 +26,9 @@ export { normalizeSubscriptionRequest, type SubscriptionRequestInput };
  *  - Un dossier existant (même SIRET, ou officine déjà cliente) n'est JAMAIS
  *    modifié depuis le site : la demande lui est rattachée et l'équipe est
  *    prévenue ; aucun contrat ne part. Le SIRET est public, il ne prouve rien.
- *  - Le CONTRAT ne part jamais tout seul pour une demande du site : l'abonnement
- *    unique (126 € HT par mois, engagement de 12 mois) s'accompagne d'une mise en
- *    service (OFFICIAL_OFFER.setupFeeCents) qui n'existe pas dans le contrat automatique. L'équipe
- *    fixe les conditions puis « Envoyer le contrat » depuis la console.
+ *  - Le CONTRAT part tout seul pour un nouveau dossier du site (fondateur, 5 nov. 2026),
+ *    mise en service comprise ; un doublon possible le retient, l'équipe vérifie puis
+ *    « Envoyer le contrat » depuis la console.
  *  - Le prix figé au dossier est celui que le visiteur a VU (offre de la console
  *    ou offre officielle), pas celui d'un tarif plus ancien.
  *  - Le confrère que l'officine propose de parrainer est enregistré pour un NOUVEAU
@@ -137,7 +137,7 @@ async function handleRequest(v: NormalizedRequest, input: SubscriptionRequestInp
   await recordProspectEvent({ prospectId, type: "SUBSCRIPTION_REQUESTED", summary: `Demande d'abonnement reçue depuis le site (${v.ownerName}, ${v.ownerTitle})${plan ? ` — offre ${plan.name}` : ""} — abonnement à ${terms}.`, actor: system, metadata: { siret: v.siret, planId: plan?.id ?? null, referral: referrer?.name ?? null, monthlyPriceCents: pricing.monthlyPriceCents, setupFeeCents: pricing.setupFeeCents, commitmentMonths: pricing.commitmentMonths } });
   await recordProspectEvent({ prospectId, type: "CREATED", summary: `Dossier créé pour ${v.name}.`, actor: system });
   await recordAudit({ action: "sales.subscription_requested", entityType: "Prospect", entityId: prospectId, metadata: { siret: v.siret, planId: plan?.id ?? null } });
-  await notifyAdmins({ type: "SITE_SUBSCRIPTION", title: `Nouvelle demande d'abonnement — ${v.name}`, body: `${submitted}. Abonnement à ${terms}. Le contrat ne part pas tout seul : fixez les conditions puis « Envoyer le contrat ».`, linkUrl: `/admin/dossiers/${prospectId}`, severity: "SUCCESS" });
+  await notifyAdmins({ type: "SITE_SUBSCRIPTION", title: `Nouvelle demande d'abonnement — ${v.name}`, body: `${submitted}. Abonnement à ${terms}.`, linkUrl: `/admin/dossiers/${prospectId}`, severity: "SUCCESS" });
 
   // Parrainage : ce dossier rejoint le confrère qu'une autre officine avait proposé (même e-mail), et son propre confrère est enregistré.
   // Aucun e-mail, aucun SMS n'est envoyé à la personne parrainée : l'équipe la contacte.
@@ -165,18 +165,28 @@ async function handleRequest(v: NormalizedRequest, input: SubscriptionRequestInp
     }
     await recordProspectEvent({ prospectId, type: "NOTE", summary: "Souscription en ligne impossible : un compte PharmaBoost existe déjà avec cette adresse e-mail. L'équipe reprend la demande.", actor: system });
   }
-  // Le contrat ne part JAMAIS tout seul pour une demande du site : la mise en service n'existe pas dans le contrat automatique,
-  // l'équipe fixe les conditions. Jamais un contrat qui tairait un frais annoncé sur le site.
+  // Le contrat part TOUT SEUL (fondateur, 5 nov. 2026) : offre du site, mise en service comprise (le contrat la porte),
+  // PharmaBoost signe d'office si sa signature est déposée. Seul un doute retient l'envoi : un doublon possible, ou un
+  // dossier proche déjà sous contrat — l'équipe vérifie, puis « Envoyer le contrat ».
   const closeContract = suspects.some((s) => s.contracts[0] && (s.contracts[0].status === "FINALIZED" || IN_PROGRESS.includes(s.contracts[0].status)));
-  await notifyAdmins({
-    type: "DOSSIER_BLOCKED",
-    title: `Contrat retenu — ${v.name}`,
-    body: `Abonnement unique, engagement de ${pricing.commitmentMonths} mois : la mise en service de ${formatPriceEuros(pricing.setupFeeCents)} HT n'est pas prévue au contrat automatique. Fixez les conditions puis « Envoyer le contrat ».${closeContract ? " Un dossier proche a déjà un contrat en cours ou signé : vérifiez avant d'envoyer." : ""}`,
-    linkUrl: `/admin/dossiers/${prospectId}`,
-    severity: "WARNING",
-  });
+  if (!warning && !closeContract) {
+    const contracting = await startContracting(prospectId, system).catch((error: unknown) => ({ ok: false as const, error: error instanceof Error ? error.message : String(error) }));
+    if (contracting.ok) {
+      await notifyAdmins({ type: "CONTRACT_SENT", title: `Contrat envoyé tout seul — ${v.name}`, body: `${submitted}. Abonnement à ${terms}. ${contracting.message}`, linkUrl: `/admin/dossiers/${prospectId}`, severity: "SUCCESS" });
+      return { status: "RECEIVED", prospectId, reason: "contrat envoyé" };
+    }
+    await notifyAdmins({ type: "DOSSIER_BLOCKED", title: `Contrat non parti — ${v.name}`, body: `L'envoi automatique du contrat a échoué : ${contracting.error} Corrigez le dossier puis « Envoyer le contrat ».`, linkUrl: `/admin/dossiers/${prospectId}`, severity: "WARNING" });
+  } else {
+    await notifyAdmins({
+      type: "DOSSIER_BLOCKED",
+      title: `Contrat retenu — ${v.name}`,
+      body: `${warning ? `${warning} ` : ""}${closeContract ? "Un dossier proche a déjà un contrat en cours ou signé. " : ""}Vérifiez, puis « Envoyer le contrat ».`,
+      linkUrl: `/admin/dossiers/${prospectId}`,
+      severity: "WARNING",
+    });
+  }
   await acknowledge(v, GENERIC_NEXT_STEP, { prospectId });
-  return { status: "RECEIVED", prospectId, reason: "mise en service à faire figurer au contrat" };
+  return { status: "RECEIVED", prospectId, reason: "contrat à envoyer par l'équipe" };
 }
 
 /** Le confrère à parrainer. Un échec ne perd pas la saisie : l'équipe est prévenue avec les coordonnées, à enregistrer à la main. */

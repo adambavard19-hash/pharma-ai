@@ -154,7 +154,7 @@ async function loadInviteContext(pharmacyId: string, planId: string, contractId:
  * Crée le lien d'activation (ou réutilise celui en cours) et l'envoie au
  * titulaire. Le jeton en clair ne vit que le temps de l'e-mail.
  */
-export async function sendSubscriptionInvite(params: { pharmacyId: string; planId: string; contractId: string | null; adminId: string; /** Mise en service sur la première facture ; absent : celle de l'offre. 0 : offerte. */ setupFeeCents?: number | null }): Promise<{ ok: true; inviteId: string; sentTo: string; emailStatus: string } | { ok: false; error: string }> {
+export async function sendSubscriptionInvite(params: { pharmacyId: string; planId: string; contractId: string | null; /** null : envoyé tout seul, après la signature du contrat. */ adminId: string | null; /** Mise en service sur la première facture ; absent : celle de l'offre. 0 : offerte. */ setupFeeCents?: number | null; /** false : pas d'e-mail, le lien sert tout de suite (bouton « Payer » de l'espace du titulaire). */ deliver?: boolean }): Promise<{ ok: true; inviteId: string; sentTo: string; emailStatus: string; token: string } | { ok: false; error: string }> {
   const loaded = await loadInviteContext(params.pharmacyId, params.planId, params.contractId);
   if (!loaded.ok) return loaded;
   const { pharmacy, owner, plan, contractId, contract } = loaded.context;
@@ -183,6 +183,10 @@ export async function sendSubscriptionInvite(params: { pharmacyId: string; planI
     ? await prisma.subscriptionInvite.update({ where: { id: previous.id }, data: { planId: plan.id, contractId, tokenHash: hashToken(token), sentTo, expiresAt, sentCount: { increment: 1 }, sentAt: now, setupFeeCents } })
     : await prisma.subscriptionInvite.create({ data: { pharmacyId: pharmacy.id, organizationId: pharmacy.organizationId, planId: plan.id, contractId, tokenHash: hashToken(token), sentTo, expiresAt, sentCount: 1, sentAt: now, setupFeeCents, createdByAdminId: params.adminId } });
 
+  if (params.deliver === false) {
+    await recordAudit({ action: "billing.invite_sent", entityType: "SubscriptionInvite", entityId: invite.id, platformAdminId: params.adminId, metadata: { pharmacyId: pharmacy.id, planId: plan.id, contractId, sentTo, setupFeeCents, from: "espace du titulaire" } });
+    return { ok: true, inviteId: invite.id, sentTo, emailStatus: "SKIPPED", token };
+  }
   const message = buildSubscriptionInviteEmail({
     ownerName: owner ? `${owner.firstName} ${owner.lastName}` : pharmacy.name,
     pharmacyName: pharmacy.name,
@@ -203,7 +207,7 @@ export async function sendSubscriptionInvite(params: { pharmacyId: string; planI
     return { ok: false, error: `Le lien n'a pas pu être envoyé : ${outcome.detail}` };
   }
   await recordAudit({ action: "billing.invite_sent", entityType: "SubscriptionInvite", entityId: invite.id, platformAdminId: params.adminId, metadata: { pharmacyId: pharmacy.id, planId: plan.id, contractId, sentTo, setupFeeCents } });
-  return { ok: true, inviteId: invite.id, sentTo, emailStatus: outcome.status };
+  return { ok: true, inviteId: invite.id, sentTo, emailStatus: outcome.status, token };
 }
 
 async function findInviteByToken(token: string) {

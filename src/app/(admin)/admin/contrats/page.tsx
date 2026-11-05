@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Building2, Download, Eye, FileCheck2, FileSignature, FolderOpen, History } from "lucide-react";
 import { requirePlatformSession } from "@/server/auth/platform-session";
 import { CONTRACT_FILTER_KEYS, CONTRACT_FILTER_LABELS, listAffiliateContractsForAdmin, listContractsForAdmin, resolveContractFilter, signatureProviderState, type AdminAffiliateContractRow, type AdminContractRow } from "@/server/services/admin/contracts-admin";
-import { loadCountersigner } from "@/server/services/sales/countersigner";
+import { loadCompanySignature, loadCountersigner } from "@/server/services/sales/countersigner";
 import { expiryHint } from "@/core/contracts/admin-view";
 import { formatEuros, formatFrenchDate } from "@/core/billing/subscription";
 import { AdminPageHeader, AdminSection } from "@/components/admin/page-header";
@@ -18,7 +18,7 @@ import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { SendDraftButton } from "./send-draft-button";
 import { SignatureBanner } from "./signature-banner";
 import { SignersCell } from "./signers-cell";
-import { CountersignerForm, RefreshAffiliateButton, SendAffiliateContractForm } from "./countersign-controls";
+import { CompanySignatureForm, CountersignerForm, RefreshAffiliateButton, SendAffiliateContractForm } from "./countersign-controls";
 
 export const metadata: Metadata = { title: "Contrats" };
 
@@ -44,7 +44,7 @@ export default async function ContractsPage({ searchParams }: { searchParams: Se
   const q = one(params.q);
   const versions = one(params.versions) === "toutes" ? "toutes" : "derniere";
   const now = new Date();
-  const [list, affiliates, countersigner, signature] = await Promise.all([listContractsForAdmin({ statut, q, versions }, now), listAffiliateContractsForAdmin({ statut, q }, now), loadCountersigner(), Promise.resolve(signatureProviderState())]);
+  const [list, affiliates, countersigner, signature, companySignature] = await Promise.all([listContractsForAdmin({ statut, q, versions }, now), listAffiliateContractsForAdmin({ statut, q }, now), loadCountersigner(), Promise.resolve(signatureProviderState()), loadCompanySignature()]);
   const toCountersign = list.totals["a-contresigner"] + affiliates.totals["a-contresigner"];
 
   const keep = { q, versions: versions === "toutes" ? "toutes" : null, statut };
@@ -187,6 +187,10 @@ export default async function ContractsPage({ searchParams }: { searchParams: Se
             </Table>
           </div>
         )}
+      </AdminSection>
+
+      <AdminSection title="Signature de la société" description="La signature du représentant légal (tampon compris), déposée une fois : PharmaBoost signe d'office chaque nouveau contrat, le titulaire signe, et le contrat est complet. Le lien de paiement part alors tout seul.">
+        <CompanySignatureForm current={companySignature} />
       </AdminSection>
 
       <AdminSection title="Signataire PharmaBoost" description="Qui contresigne les prochains contrats pour PharmaBoost. Un contrat déjà envoyé garde son signataire.">

@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { loadSubscriptionSteps } from "@/server/services/subscription-steps";
+import { SubscriptionStepsCard } from "./subscription-steps-card";
 import {
   Building2,
   Cpu,
@@ -59,6 +61,7 @@ export default async function SettingsPage({
   });
 
   const referral = tab === "abonnement" ? await referralSummary(session.scope.pharmacyId) : null;
+  const subscriptionSteps = tab === "abonnement" ? await loadSubscriptionSteps(session.scope) : null;
   const [pharmacy, subscription, auditLogs] = await Promise.all([
     prisma.pharmacy.findUniqueOrThrow({
       where: { id: session.scope.pharmacyId },
@@ -101,6 +104,8 @@ export default async function SettingsPage({
       ) : tab === "conformite" ? (
         <ComplianceSettings isDemo={isDemoMode()} />
       ) : tab === "abonnement" ? (
+        <div className="space-y-5">
+        {subscriptionSteps && <SubscriptionStepsCard steps={subscriptionSteps} />}
         <SubscriptionSettings
           referral={referral}
           subscription={
@@ -130,6 +135,7 @@ export default async function SettingsPage({
           contract={contract ? { id: contract.id, version: contract.version, status: contract.status, finalizedAt: contract.finalizedAt?.toISOString() ?? null, monthlyPriceCents: contract.monthlyPriceCents, trialDays: contract.trialDays } : null}
           organizationName={pharmacy.organization.name}
         />
+        </div>
       ) : tab === "audit" ? (
         <AuditLog
           logs={auditLogs.map((log) => ({

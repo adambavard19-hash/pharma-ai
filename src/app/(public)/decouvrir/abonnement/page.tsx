@@ -34,7 +34,7 @@ export default async function SubscribePage({ searchParams }: { searchParams: Pr
         <p className="mt-3 text-[15.5px] leading-7 text-text-secondary">
           {payOnline
             ? "Une question à la fois, environ deux minutes, puis le paiement sécurisé par prélèvement SEPA ou carte. Votre espace PharmaBoost s'ouvre aussitôt."
-            : "Une question à la fois, environ deux minutes. Le contrat prérempli vous est ensuite envoyé pour une signature en ligne."}
+            : "Une question à la fois, environ deux minutes. Votre contrat prérempli part aussitôt par e-mail pour une signature en ligne, puis le lien de paiement. PharmaBoost arrive dès le paiement reçu."}
         </p>
         <p className="mt-4 inline-flex flex-wrap items-baseline gap-x-2 rounded-2xl border border-border-subtle bg-surface-card px-4 py-2 text-[13.5px] text-text-secondary lg:hidden">
           <span className="font-semibold text-text-primary">{pricing.name}</span>
