@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Check } from "lucide-react";
+import { ArrowRight, Check, ShieldCheck } from "lucide-react";
 import { fr, Kicker, SectionHead } from "./_components/site-shell";
 import { AutoVideo } from "./_components/auto-video";
 import { AppPhoneVisual } from "./_components/app-visual";
@@ -121,6 +121,21 @@ export default async function SitePage() {
 
       {/* ---- Le fil de l'accueil (fondateur, 20 oct. 2026) : le problème, ce qu'est PharmaBoost, ce que le pharmacien y gagne,
            le bilan du patient. Peu de texte, une animation par idée. ---- */}
+
+      {/* ---- Les données médicaments (fondateur, 5 nov. 2026 : contrat signé avec Claude Bernard) ---- */}
+      <section id="base-medicaments" aria-labelledby="base-medicaments-titre" className="scroll-mt-20 border-t border-border-subtle">
+        <div className="mx-auto max-w-4xl px-5 py-14 text-center md:py-16">
+          <p className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/70 px-4 py-1.5 text-[13px] font-medium text-brand-800 shadow-sm backdrop-blur">
+            <ShieldCheck className="size-4" aria-hidden="true" /> Base de données médicaments agréée par la HAS
+          </p>
+          <h2 id="base-medicaments-titre" className="mt-5 text-[28px] leading-[1.1] font-semibold tracking-[-0.03em] text-text-primary text-balance md:text-[38px]">
+            Les données de la Base Claude Bernard, toujours à jour.
+          </h2>
+          <p className="mx-auto mt-4 max-w-2xl text-[16.5px] leading-7 text-text-secondary">
+            PharmaBoost s&apos;appuie sur la Base Claude Bernard, base de données médicaments agréée par la HAS : fiches produits complètes, contre-indications et précautions, avec toutes les dernières mises à jour.
+          </p>
+        </div>
+      </section>
 
       {/* ---- 1. Le problème ------------------------------------------ */}
       <section id="probleme" className="scroll-mt-20 border-t border-border-subtle">

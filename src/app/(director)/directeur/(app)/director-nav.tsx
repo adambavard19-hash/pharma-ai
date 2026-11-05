@@ -3,12 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Award, ChevronDown, Euro, FileText, Home, PiggyBank, UserPlus, Users, type LucideIcon } from "lucide-react";
+import { Award, CalendarCheck, ChevronDown, Euro, FileText, Home, PiggyBank, UserPlus, Users, type LucideIcon } from "lucide-react";
 import { DIRECTOR_NAV, activeDirectorNavItem, type DirectorNavKey } from "@/core/sales/director/nav";
 import { cn } from "@/lib/utils";
 
 const ICONS: Record<DirectorNavKey, LucideIcon> = {
   "tableau-de-bord": Home,
+  demos: CalendarCheck,
   commerciaux: Users,
   candidatures: UserPlus,
   commissions: Euro,

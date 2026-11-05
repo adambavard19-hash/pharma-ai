@@ -34,7 +34,7 @@ export async function createPharmacyFromProspect(
     paidCheckout?: boolean;
     /**
      * Après une démo (fondateur, 5 nov. 2026) : l'espace s'ouvre AVANT le contrat, par le lien de bienvenue envoyé depuis la
-     * console ; le titulaire y signe puis paie. Réservé à la console (acteur ADMIN).
+     * console ; le titulaire y signe puis paie. Réservé à la console et au directeur commercial.
      */
     beforeContract?: boolean;
     /** L'e-mail d'accueil attend le paiement (souscription du site : contrat signé, lien de paiement d'abord). */
@@ -52,7 +52,7 @@ export async function createPharmacyFromProspect(
   if (prospect.blockedAt) return { ok: false, error: "Ce dossier est suspendu par l'administrateur." };
   const contract = prospect.contracts[0];
   const paidOnline = options.paidCheckout === true && Boolean(prospect.termsAcceptedAt);
-  const welcomeFirst = options.beforeContract === true && actor.type === "ADMIN";
+  const welcomeFirst = options.beforeContract === true && (actor.type === "ADMIN" || actor.type === "DIRECTOR");
   if (!paidOnline && !welcomeFirst && (!contract || contract.status !== "FINALIZED")) {
     return { ok: false, error: "Le contrat doit être signé par les deux parties (statut « Finalisé ») avant de créer l'espace pharmacie." };
   }

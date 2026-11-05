@@ -3,7 +3,7 @@
  * mêmes. Pur et sans icône (celles-ci vivent dans le composant), pour que la
  * liste serve aussi aux tests et aux autres écrans.
  */
-export type DirectorNavKey = "tableau-de-bord" | "commerciaux" | "candidatures" | "commissions" | "factures" | "challenges" | "remuneration";
+export type DirectorNavKey = "tableau-de-bord" | "demos" | "commerciaux" | "candidatures" | "commissions" | "factures" | "challenges" | "remuneration";
 
 export type DirectorNavItem = {
   key: DirectorNavKey;
@@ -20,6 +20,7 @@ export const DIRECTOR_LOGIN = "/directeur/connexion";
 
 export const DIRECTOR_NAV: readonly DirectorNavItem[] = [
   { key: "tableau-de-bord", href: DIRECTOR_HOME, label: "Tableau de bord", description: "L'essentiel de l'équipe, en un coup d'œil.", exact: true },
+  { key: "demos", href: "/directeur/demos", label: "Démos", description: "Les démonstrations programmées : « Démo faite », puis le lien de bienvenue. 100 € par démo qui va au bout." },
   { key: "commerciaux", href: "/directeur/commerciaux", label: "Commerciaux", description: "L'équipe : ajouter, suivre, réaffecter les dossiers." },
   { key: "candidatures", href: "/directeur/candidatures", label: "Candidatures", description: "Les personnes qui veulent rejoindre l'équipe." },
   { key: "commissions", href: "/directeur/commissions", label: "Commissions", description: "Valider et payer les commissions." },

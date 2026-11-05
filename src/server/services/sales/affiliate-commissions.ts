@@ -2,7 +2,7 @@ import "server-only";
 import type { Prisma } from "@/generated/prisma";
 import { prisma } from "@/server/db/client";
 import { AFFILIATE_RECURRING_RATE, AFFILIATE_SIGNUP_BONUS_CENTS, affiliateRateFor, monthlyCommissionApplies, rateLabel } from "@/core/affiliation/terms";
-import { DIRECTOR_SIGNUP_BONUS_CENTS } from "@/core/affiliation/director-terms";
+import { DIRECTOR_DEMO_BONUS_CENTS, DIRECTOR_SIGNUP_BONUS_CENTS } from "@/core/affiliation/director-terms";
 import { AFFILIATION_PROGRAM_START, ONE_OFF_COMMISSION_TYPES, SIGNUP_BONUS_KEY, affiliateCommissionForMonth, signupBonusDue, monthPeriodOf, monthlySubscriptionCents, previousMonthPeriod, subscribedAtMonthEnd, type MonthPeriod, type SubscriptionFacts } from "@/core/affiliation/monthly";
 import { formatCents } from "@/lib/format";
 import { recordProspectEvent, type SalesActor } from "./events";
@@ -230,15 +230,18 @@ export async function createSignupBonuses(now: Date = new Date()): Promise<Signu
   const run: SignupBonusRun = { affiliateBonuses: 0, directorBonuses: 0, totalCreatedCents: 0, directorUnassigned: 0 };
   const [affiliates, directors] = await Promise.all([
     prisma.salesRep.findMany({ where: { commissionType: "AFFILIATE", isActive: true }, select: { id: true } }),
-    prisma.salesDirector.findMany({ where: { isActive: true }, select: { id: true }, take: 2 }),
+    prisma.salesDirector.findMany({ where: { isActive: true }, select: { id: true } }),
   ]);
+  const activeDirectors = new Set(directors.map((director) => director.id));
   const affiliateIds = new Set(affiliates.map((rep) => rep.id));
+  // La prime d'équipe va au SEUL directeur actif ; celle d'une démo, au directeur qui l'a menée.
   const directorId = directors.length === 1 ? directors[0].id : null;
 
   const candidates = await prisma.prospect.findMany({
     where: {
       pharmacyId: { not: null },
-      OR: [{ salesRepId: { not: null } }, { activationSalesRepId: { not: null } }],
+      // Signée par l'équipe, ou démo menée par le directeur lui-même.
+      OR: [{ salesRepId: { not: null } }, { activationSalesRepId: { not: null } }, { demoDirectorId: { not: null } }],
       pharmacy: { isDemo: false, organization: { subscription: { setupFeeCents: { gt: 0 }, payments: { some: { status: "PAID", paidAt: { gte: AFFILIATION_PROGRAM_START } } } } } },
       // Seulement celles à qui il manque encore une prime.
       NOT: { AND: [{ directorBonus: { isNot: null } }, { commissions: { some: { type: "AFFILIATE_SIGNUP" } } }] },
@@ -250,6 +253,7 @@ export async function createSignupBonuses(now: Date = new Date()): Promise<Signu
       salesRepId: true,
       activatedAt: true,
       activationSalesRepId: true,
+      demoDirectorId: true,
       directorBonus: { select: { id: true } },
       pharmacy: { select: { organization: { select: { subscription: { select: { setupFeeCents: true, payments: { select: { status: true, paidAt: true, amountCents: true } } } } } } } },
       commissions: { where: { OR: [{ type: "AFFILIATE_SIGNUP" }, { type: { in: [...ONE_OFF_COMMISSION_TYPES] }, status: { not: "CANCELLED" } }] }, select: { type: true } },
@@ -277,17 +281,23 @@ export async function createSignupBonuses(now: Date = new Date()): Promise<Signu
       }
     }
 
-    // Le directeur commercial : sa prime pour une pharmacie signée par l'équipe.
+    // Le directeur commercial : 100 € pour une démo qu'il a menée et qui va au bout (fondateur, 5 nov. 2026), sinon 50 € pour une
+    // pharmacie signée par l'équipe. Une seule prime par pharmacie.
     if (!prospect.directorBonus) {
-      if (!directorId) { run.directorUnassigned += 1; continue; }
+      const ownDemo = prospect.demoDirectorId && activeDirectors.has(prospect.demoDirectorId) ? prospect.demoDirectorId : null;
+      const teamSigned = Boolean(prospect.salesRepId || prospect.activationSalesRepId);
+      const beneficiary = ownDemo ?? (teamSigned ? directorId : null);
+      if (!beneficiary) { if (teamSigned || prospect.demoDirectorId) run.directorUnassigned += 1; continue; }
+      const amountCents = ownDemo ? DIRECTOR_DEMO_BONUS_CENTS : DIRECTOR_SIGNUP_BONUS_CENTS;
+      const note = ownDemo ? "Démo menée par le directeur, allée au bout : mise en service réglée" : "Pharmacie signée par l'équipe : mise en service réglée";
       const created = await prisma.directorBonus.createMany({
-        data: [{ salesDirectorId: directorId, prospectId: prospect.id, amountCents: DIRECTOR_SIGNUP_BONUS_CENTS, status: "EARNED", earnedAt: now, dueAt: endOfNextMonth(now), note: "Pharmacie signée par l'équipe : mise en service réglée" }],
+        data: [{ salesDirectorId: beneficiary, prospectId: prospect.id, amountCents, status: "EARNED", earnedAt: now, dueAt: endOfNextMonth(now), note }],
         skipDuplicates: true,
       });
       if (created.count === 1) {
         run.directorBonuses += 1;
-        run.totalCreatedCents += DIRECTOR_SIGNUP_BONUS_CENTS;
-        await recordProspectEvent({ prospectId: prospect.id, type: "COMMISSION_CREATED", summary: `Prime du directeur commercial : ${formatCents(DIRECTOR_SIGNUP_BONUS_CENTS)} (mise en service réglée).`, actor: SYSTEM, metadata: { amountCents: DIRECTOR_SIGNUP_BONUS_CENTS, salesDirectorId: directorId } }).catch(() => undefined);
+        run.totalCreatedCents += amountCents;
+        await recordProspectEvent({ prospectId: prospect.id, type: "COMMISSION_CREATED", summary: `Prime du directeur commercial : ${formatCents(amountCents)} (${ownDemo ? "démo menée au bout" : "mise en service réglée"}).`, actor: SYSTEM, metadata: { amountCents, salesDirectorId: beneficiary } }).catch(() => undefined);
       }
     }
   }

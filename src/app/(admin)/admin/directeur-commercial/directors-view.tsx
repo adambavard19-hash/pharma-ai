@@ -9,7 +9,7 @@ import { AddDirectorForm, DirectorActions } from "./director-admin";
 import { DirectorBonusActions } from "./director-bonus-actions";
 import type { DirectorBonusRow } from "@/server/services/sales/director-bonuses";
 import { CommissionStatusBadge } from "@/components/sales/status-badge";
-import { DIRECTOR_SIGNUP_BONUS_CENTS } from "@/core/affiliation/director-terms";
+import { DIRECTOR_DEMO_BONUS_CENTS, DIRECTOR_SIGNUP_BONUS_CENTS } from "@/core/affiliation/director-terms";
 import { formatCents } from "@/lib/format";
 
 const plural = (n: number, one: string, many: string) => `${n} ${n > 1 ? many : one}`;
@@ -42,7 +42,7 @@ export function DirectorsView({ directors, team, bonuses, now }: { directors: Sa
         <AdminSection
           id="primes"
           title="Primes du directeur commercial"
-          description={`${formatCents(DIRECTOR_SIGNUP_BONUS_CENTS)} HT par pharmacie signée par l'équipe, une fois sa mise en service réglée. Acquises : ${formatCents(bonuses.earnedCents)} · à payer : ${formatCents(bonuses.payableCents)} · payées : ${formatCents(bonuses.paidCents)}.`}
+          description={`${formatCents(DIRECTOR_DEMO_BONUS_CENTS)} HT par démo menée par le directeur et allée au bout, ${formatCents(DIRECTOR_SIGNUP_BONUS_CENTS)} HT par pharmacie signée par l'équipe, une fois la mise en service réglée. Acquises : ${formatCents(bonuses.earnedCents)} · à payer : ${formatCents(bonuses.payableCents)} · payées : ${formatCents(bonuses.paidCents)}.`}
         >
           {bonuses.rows.length === 0 ? (
             <p className="text-[13px] text-text-secondary">Aucune prime pour l&apos;instant : la première naît quand une pharmacie signée par l&apos;équipe règle sa mise en service.</p>

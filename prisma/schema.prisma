@@ -3430,6 +3430,9 @@ model Prospect {
   /// Démonstration programmée (date et heure), puis réalisée.
   demoAt              DateTime?
   demoDoneAt          DateTime?
+  /// Le directeur commercial qui a mené la démonstration (« Démo faite » depuis son espace, fondateur 5 nov. 2026) : 100 € HT
+  /// pour lui quand la pharmacie va au bout (mise en service réglée). Une simple référence, sans relation.
+  demoDirectorId      String?
   /// Notes commerciales courantes (le détail horodaté vit dans les événements).
   notes               String?
   /// Conditions proposées : abonnement mensuel, en centimes.

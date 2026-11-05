@@ -342,7 +342,7 @@ export async function scheduleDemo(prospectId: string, at: Date, actor: AdminAct
  * « Démo réalisée » s'il n'était pas déjà plus loin ; déposé explicitement
  * dans la colonne (`explicit`), il y passe dans tous les cas permis.
  */
-export async function markDemoDone(prospectId: string, actor: AdminActor, options: { note?: string | null; explicit?: boolean } = {}): Promise<ServiceOutcome<{ status: ProspectStatusCode }>> {
+export async function markDemoDone(prospectId: string, actor: AdminActor | { type: "DIRECTOR"; id: string; label: string }, options: { note?: string | null; explicit?: boolean } = {}): Promise<ServiceOutcome<{ status: ProspectStatusCode }>> {
   const prospect = await prisma.prospect.findUnique({ where: { id: prospectId }, select: FOLLOW_UP_SELECT });
   if (!prospect) return { ok: false, error: "Dossier introuvable." };
   if (!options.explicit && !prospect.demoAt) return { ok: false, error: "Aucune démonstration n'est programmée pour ce dossier." };

@@ -5,7 +5,7 @@ import { requireDirectorSession } from "@/server/auth/director-session";
 import { listDirectorCommissions } from "@/server/services/sales/director-money";
 import { listDirectorBonuses } from "@/server/services/sales/director-bonuses";
 import { AFFILIATE_SIGNUP_BONUS_CENTS } from "@/core/affiliation/terms";
-import { DIRECTOR_SIGNUP_BONUS_CENTS } from "@/core/affiliation/director-terms";
+import { DIRECTOR_DEMO_BONUS_CENTS, DIRECTOR_SIGNUP_BONUS_CENTS } from "@/core/affiliation/director-terms";
 import { COMMISSION_STATUS_LABELS, type CommissionStatusCode } from "@/core/sales/pipeline";
 import { COMMISSION_STATUSES, isCommissionStatus, monthLabel, parseMonthParam, recentMonths } from "@/core/sales/director/money";
 import { FilterChips, hrefWith } from "@/components/admin/filters";
@@ -294,7 +294,7 @@ export default async function DirectorCommissionsPage({ searchParams }: { search
       <section aria-labelledby="mes-primes" className="space-y-2">
         <h2 id="mes-primes" className="text-[16px] font-semibold text-text-primary">Mes primes</h2>
         <p className="text-[13px] text-text-secondary">
-          {formatCents(DIRECTOR_SIGNUP_BONUS_CENTS)} HT par pharmacie signée par l&apos;équipe, une fois sa mise en service réglée. Validées et payées par PharmaBoost. Acquises : {formatCents(bonuses.earnedCents)} · à payer : {formatCents(bonuses.payableCents)} · payées : {formatCents(bonuses.paidCents)}.
+          {formatCents(DIRECTOR_DEMO_BONUS_CENTS)} HT par démo que vous menez et qui va au bout, {formatCents(DIRECTOR_SIGNUP_BONUS_CENTS)} HT par pharmacie signée par l&apos;équipe, une fois la mise en service réglée. Validées et payées par PharmaBoost. Acquises : {formatCents(bonuses.earnedCents)} · à payer : {formatCents(bonuses.payableCents)} · payées : {formatCents(bonuses.paidCents)}.
         </p>
         <Card>
           {bonuses.rows.length === 0 ? (
