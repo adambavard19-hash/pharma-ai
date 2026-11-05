@@ -97,7 +97,7 @@ export default async function SitePage() {
             centré qui dit tout de suite ce qu'est PharmaBoost, le robot dans le titre, une phrase qui l'explique, deux boutons. */}
         <div className="mx-auto flex w-full max-w-5xl flex-col items-center px-5 pt-16 pb-12 text-center md:pt-24">
           <p className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/60 px-3.5 py-1.5 text-[13px] font-medium text-text-secondary backdrop-blur-md dark:border-border-subtle dark:bg-surface-card">
-            <span className="size-1.5 rounded-full bg-brand-500" /> À côté de votre logiciel de gestion · le pharmacien décide
+            <span className="size-1.5 rounded-full bg-brand-500" /> À côté de votre logiciel de gestion
           </p>
           <h1 className="mt-6 text-[42px] leading-[1.02] font-bold tracking-[-0.045em] text-text-primary min-[390px]:text-[46px] md:text-[76px]">
             Le copilote IA{" "}
