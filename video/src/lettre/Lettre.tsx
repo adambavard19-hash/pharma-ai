@@ -208,14 +208,14 @@ function actCues(keys: [number, number][], only?: string[], until = Infinity): C
 }
 
 // ---- Les pièces du décor blanc ---------------------------------------------------------------------------------------
-const MINT = { bg: "#EAF6F0", deep: "#0E7C5A", green: "#0E8A7B", ink: "#0F2B26", soft: "#5B6B66", paper: "#F4F8F6", line: "#DCE7E2" };
+export const MINT = { bg: "#EAF6F0", deep: "#0E7C5A", green: "#0E8A7B", ink: "#0F2B26", soft: "#5B6B66", paper: "#F4F8F6", line: "#DCE7E2" };
 
-function Abs({ x, y, children, style }: { x: number; y: number; children: ReactNode; style?: CSSProperties }) {
+export function Abs({ x, y, children, style }: { x: number; y: number; children: ReactNode; style?: CSSProperties }) {
   return <div style={{ position: "absolute", left: x, top: y, transform: "translate(-50%, -50%)", ...style }}>{children}</div>;
 }
 
 /** Un tableau du décor blanc : il entre en douceur à `from` et s'efface à `to`. */
-function Scene({ t, from, to, children }: { t: number; from: number; to: number; children: ReactNode }) {
+export function Scene({ t, from, to, children }: { t: number; from: number; to: number; children: ReactNode }) {
   if (t < from - 0.05 || t > to + 0.45) return null;
   const k = from <= 0.01 ? 1 : prog(t, from, 0.42, SNAP);
   const out = prog(t, to, 0.4, IN_OUT);
@@ -223,7 +223,7 @@ function Scene({ t, from, to, children }: { t: number; from: number; to: number;
 }
 
 /** Un titre dont les mots montent un à un ; *entre étoiles* = couleur d'accent. */
-function Rise({ t, at, text, size = 70, color = MINT.ink, accent = MINT.green, stagger = 0.07, style }: { t: number; at: number; text: string; size?: number; color?: string; accent?: string; stagger?: number; style?: CSSProperties }) {
+export function Rise({ t, at, text, size = 70, color = MINT.ink, accent = MINT.green, stagger = 0.07, style }: { t: number; at: number; text: string; size?: number; color?: string; accent?: string; stagger?: number; style?: CSSProperties }) {
   let on = false;
   const words = text.split(/\s+/).map((raw) => {
     const startOn = on;
@@ -248,7 +248,7 @@ function Rise({ t, at, text, size = 70, color = MINT.ink, accent = MINT.green, s
 }
 
 /** Un titre qui laisse la place au suivant (il monte et s'efface à `out`). */
-function Title({ t, at, out, text, y = 150, size = 66 }: { t: number; at: number; out?: number; text: string; y?: number; size?: number }) {
+export function Title({ t, at, out, text, y = 150, size = 66 }: { t: number; at: number; out?: number; text: string; y?: number; size?: number }) {
   if (t < at - 0.05) return null;
   const o = out === undefined ? 0 : prog(t, out, 0.35, IN_OUT);
   if (o >= 1) return null;
@@ -259,11 +259,11 @@ function Title({ t, at, out, text, y = 150, size = 66 }: { t: number; at: number
   );
 }
 
-function Card({ children, style }: { children: ReactNode; style?: CSSProperties }) {
+export function Card({ children, style }: { children: ReactNode; style?: CSSProperties }) {
   return <div style={{ borderRadius: 28, background: "#FFFFFF", boxShadow: "0 40px 80px -40px rgba(15,43,38,.45), 0 0 0 1px rgba(15,43,38,.05)", ...style }}>{children}</div>;
 }
-const pop = (t: number, at: number) => (t < at ? 0 : ressort(t, at, { damping: 12, stiffness: 230, mass: 0.6 }));
-function Pill({ t, at, children, color = MINT.green, size = 30 }: { t: number; at: number; children: ReactNode; color?: string; size?: number }) {
+export const pop = (t: number, at: number) => (t < at ? 0 : ressort(t, at, { damping: 12, stiffness: 230, mass: 0.6 }));
+export function Pill({ t, at, children, color = MINT.green, size = 30 }: { t: number; at: number; children: ReactNode; color?: string; size?: number }) {
   const k = pop(t, at);
   if (k <= 0) return null;
   return (
@@ -272,7 +272,7 @@ function Pill({ t, at, children, color = MINT.green, size = 30 }: { t: number; a
     </span>
   );
 }
-const Cross = ({ size = 40, color = MINT.green, glow = 0 }: { size?: number; color?: string; glow?: number }) => (
+export const Cross = ({ size = 40, color = MINT.green, glow = 0 }: { size?: number; color?: string; glow?: number }) => (
   <svg viewBox="0 0 40 40" width={size} height={size} style={{ filter: glow > 0 ? `drop-shadow(0 0 ${12 * glow}px ${rgba(color, 0.8)})` : undefined }}>
     <path d="M14 2h12v12h12v12H26v12H14V26H2V14h12z" fill={color} />
   </svg>
@@ -281,7 +281,7 @@ const Cross = ({ size = 40, color = MINT.green, glow = 0 }: { size?: number; col
 // =====================================================================================================================
 // 1. La lettre
 // =====================================================================================================================
-function Lettre1({ t }: { t: number }) {
+export function Lettre1({ t }: { t: number }) {
   const slide = prog(t, w("Y1", "lettre,") - 0.6, 1.3, SNAP);
   return (
     <>
@@ -312,7 +312,7 @@ function Lettre1({ t }: { t: number }) {
 }
 
 /** « …plutôt que de vous déranger en pleine journée » : la file au comptoir, l'horloge, le téléphone qui sonne. */
-function Journee({ t }: { t: number }) {
+export function Journee({ t }: { t: number }) {
   const a = w("Y1", "plutôt");
   const ring = w("Y1", "déranger");
   const u = t - ring;
@@ -559,7 +559,7 @@ function Bilan({ t }: { t: number }) {
   );
 }
 
-const LOCK_BG = "linear-gradient(170deg,#CFEDE2,#8FD0BC 60%,#5DB8A2)";
+export const LOCK_BG = "linear-gradient(170deg,#CFEDE2,#8FD0BC 60%,#5DB8A2)";
 
 /** « Une notification lui rappelle que sa cure se termine : il revient. » */
 function Rappel({ t }: { t: number }) {
@@ -658,9 +658,9 @@ function Campagne({ t }: { t: number }) {
 // =====================================================================================================================
 // 5. Même rue, deux pharmacies — c'est un cercle
 // =====================================================================================================================
-const PASSANTS = ["#F0BAC6", "#8EEBD3", "#F6D98A", "#9CC7F0", "#C9B8F0", "#F4B59A"];
+export const PASSANTS = ["#F0BAC6", "#8EEBD3", "#F6D98A", "#9CC7F0", "#C9B8F0", "#F4B59A"];
 const SHELF = ["#2C9AB7", "#0E8A7B", "#7A5BD0", "#F2A23A", "#1E88C8", "#D0485F", "#109C7C"];
-function Shop({ x, lit, t }: { x: number; lit: number; t: number }) {
+export function Shop({ x, lit, t }: { x: number; lit: number; t: number }) {
   const on = lit > 0.5;
   const frame = on ? MINT.ink : "#B9C2BF";
   return (

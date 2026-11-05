@@ -19,6 +19,7 @@ export * from "./fx";
 export * from "./sound";
 export * from "./decor";
 export * from "./screens";
+export * from "./dupes";
 export * from "../../presentation/motion/kit/ease";
 export { hash, rnd, seedOf, mulberry32 } from "../../presentation/motion/kit/random";
 export { pick as pickRandom } from "../../presentation/motion/kit/random";

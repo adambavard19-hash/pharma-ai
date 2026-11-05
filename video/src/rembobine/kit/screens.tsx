@@ -1,4 +1,5 @@
 import { useId, type CSSProperties, type ReactNode } from "react";
+import { DupeTile, isDupe } from "./dupes";
 import { Img, staticFile } from "remotion";
 import { Candy, Droplets, Eye, ArrowUp, BellRing, CalendarCheck, Check, ChevronDown, ChevronLeft, ChevronRight, Clock, Home, Hourglass, Mail, Pill, Quote, ScanLine, Search, Star, Store, Trophy, User, Users } from "lucide-react";
 import { EXIT, F, IN_OUT, LINEAR, POP, SNAP, WHIP, clamp01, keys, lerp, prog, pulse, ressort, squash, wobble } from "../../presentation/motion/kit/ease";
@@ -485,6 +486,7 @@ const GENERIC: Record<string, { Icon: typeof Eye; from: string; to: string }> = 
   gorge: { Icon: Candy, from: "#F2A23A", to: "#D9772A" },
 };
 export function GenericPic({ kind, size, radius }: { kind: string; size: number; radius: number }) {
+  if (isDupe(kind)) return <DupeTile kind={kind} size={size} radius={radius} />;
   const g = GENERIC[kind] ?? GENERIC.nez;
   return (
     <span style={{ display: "inline-flex", flexShrink: 0, width: size, height: size, borderRadius: radius, background: `linear-gradient(145deg, ${g.from}, ${g.to})`, boxShadow: `inset 0 0 0 2px rgba(255,255,255,.25), 0 8px 18px -10px ${g.to}`, alignItems: "center", justifyContent: "center" }}>
@@ -1534,7 +1536,7 @@ export function AppOffer({ t, at = 0 }: { t: number; at?: number }) {
 // ---- L'e-mail du bilan, la notification, le calendrier ----------------------------------------------------------------
 
 export type BilanPoint = { Icon: typeof Clock; title: string; text: string };
-export function MailBilan({ t, at = 0, pharmacy = "Pharmacie du Centre", product = "Probiotique", why, points: customPoints, kind }: { t: number; at?: number; pharmacy?: string; product?: string; why?: string; points?: BilanPoint[]; kind?: string }) {
+export function MailBilan({ t, at = 0, pharmacy = "Pharmacie du Centre", product = "Probiotique", why, points: customPoints, kind, routine }: { t: number; at?: number; pharmacy?: string; product?: string; why?: string; points?: BilanPoint[]; kind?: string; /** Une routine : ses produits en vignettes (2 × 2) à la place du produit seul (film isotrétinoïne, 4 nov. 2026). */ routine?: { kind: string; name: string }[] }) {
   const DARK = "#0B3B47";
   const points = customPoints ?? [
     { Icon: Clock, title: "Pendant", text: "toute la durée de l'antibiotique" },
@@ -1561,6 +1563,22 @@ export function MailBilan({ t, at = 0, pharmacy = "Pharmacie du Centre", product
         <div style={{ marginTop: 12, padding: "0 4px", lineHeight: 1.1, ...appText(25, 800, DARK), ...stag(t, at, 2) }}>Votre bilan conseil</div>
         <div style={{ marginTop: 4, padding: "0 4px", ...appText(13, 500, "#475467"), ...stag(t, at, 2) }}>Bonjour, voici le conseil de votre pharmacien.</div>
         <div style={{ marginTop: 12, borderRadius: 18, background: "#FFF", border: "1px solid #E4ECE9", padding: 14, ...stag(t, at, 3, 0.1) }}>
+          {routine ? (
+            <div>
+              <div style={appText(17, 800, "#101828")}>{product}</div>
+              <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                {routine.map((r, i) => {
+                  const p = ressort(t, at + 0.35 + 0.12 * i, { damping: 12, stiffness: 260, mass: 0.5 });
+                  return (
+                    <div key={r.kind} style={{ display: "flex", alignItems: "center", gap: 6, borderRadius: 10, background: "#F5F9F7", padding: 5, opacity: clamp01(p * 3), transform: `scale(${lerp(0.7, 1, p)})` }}>
+                      <GenericPic kind={r.kind} size={38} radius={9} />
+                      <span style={{ lineHeight: 1.15, ...appText(10.5, 700, "#101828") }}>{r.name}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ width: 64, height: 64, borderRadius: 14, background: "#F4F8F7", display: "flex", alignItems: "center", justifyContent: "center" }}>
               {kind ? <GenericPic kind={kind} size={50} radius={12} /> : <MiniBox name={product} w={46} />}
@@ -1570,11 +1588,12 @@ export function MailBilan({ t, at = 0, pharmacy = "Pharmacie du Centre", product
               <span style={{ display: "inline-block", marginTop: 4, padding: "3px 10px", borderRadius: 99, background: "#E3F4EC", ...appText(11.5, 600, "#0B6B4F") }}>Conseillé aujourd'hui</span>
             </div>
           </div>
+          )}
           <div style={{ marginTop: 12, borderRadius: 10, background: "#EAF5EF", borderLeft: "4px solid #1D8174", padding: "10px 12px", ...stag(t, at, 5, 0.1) }}>
             <div style={{ ...appText(10.5, 800, "#0B6B4F"), letterSpacing: "0.05em", textTransform: "uppercase" }}>Pourquoi avec votre traitement</div>
             <div style={{ marginTop: 4, lineHeight: 1.35, ...appText(13.5, 600, "#101828") }}>{why ?? "Avec un antibiotique, la flore intestinale peut être perturbée."}</div>
           </div>
-          <div style={{ marginTop: 10, ...appText(10.5, 800, DARK), letterSpacing: "0.05em", textTransform: "uppercase", ...stag(t, at, 6, 0.1) }}>3 points clés</div>
+          <div style={{ marginTop: 10, ...appText(10.5, 800, DARK), letterSpacing: "0.05em", textTransform: "uppercase", ...stag(t, at, 6, 0.1) }}>{points.length} points clés</div>
           <div style={{ marginTop: 6, display: "flex", gap: 6 }}>
             {points.map(({ Icon, title, text }, i) => {
               const p = at === undefined ? 1 : ressort(t, at + 0.75 + 0.1 * i, { damping: 11, stiffness: 260, mass: 0.5 });

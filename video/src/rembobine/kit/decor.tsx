@@ -89,7 +89,7 @@ import { A1, JAKARTA, PB, rgba } from "./brand";
  * ======================================================================== */
 
 export type Mood = "act1" | "pb";
-export type MedKind = "amoxicilline" | "paracetamol" | "curacne" | "probiotique" | "pastilles" | "cetirizine" | "eaudemer" | "collyre";
+export type MedKind = "amoxicilline" | "paracetamol" | "curacne" | "probiotique" | "pastilles" | "cetirizine" | "eaudemer" | "collyre" | "isotretinoine" | "hydratant";
 export type Expression = "lasse" | "neutre" | "sourire";
 type Pt = { x: number; y: number };
 type Win = [number, number];
@@ -268,6 +268,8 @@ export const MED: Record<MedKind, { name: string; sub: string; form: string; col
   cetirizine: { name: "Cétirizine", sub: "10 mg", form: "comprimés", color: "#2C9AB7" },
   eaudemer: { name: "Eau de mer", sub: "nez allergique", form: "spray nasal", color: "#1E88C8" },
   collyre: { name: "Collyre", sub: "anti-allergique", form: "unidoses", color: "#7A5BD0" },
+  isotretinoine: { name: "Isotrétinoïne", sub: "20 mg", form: "capsules", color: "#C8453B" },
+  hydratant: { name: "Soin hydratant", sub: "apaisant", form: "crème", color: "#139C8C" },
 };
 
 const XR = "#8FE9FF";
@@ -294,6 +296,15 @@ function MedIcon({ kind, color }: { kind: MedKind; color: string }) {
         <path d="M-8.5,-7.5 L0,-7.5 L0,7.5 L-8.5,7.5 A7.5,7.5 0 0 1 -8.5,-7.5 Z" fill={color} transform="translate(-7.5 0)" />
       </g>
     );
+  if (kind === "isotretinoine")
+    return (
+      <g transform="rotate(-30)">
+        <rect x={-15} y={-8} width={30} height={16} rx={8} fill={color} />
+        <rect x={-15} y={-8} width={15} height={16} rx={8} fill="#F6B44A" />
+        <rect x={-7} y={-8} width={7} height={16} fill="#F6B44A" />
+      </g>
+    );
+  if (kind === "hydratant") return <path d="M0,-14 C6,-5 11,1 11,6 A11,11 0 0 1 -11,6 C-11,1 -6,-5 0,-14 Z" fill={color} />;
   if (kind === "eaudemer" || kind === "collyre")
     return <path d="M0,-14 C6,-5 11,1 11,6 A11,11 0 0 1 -11,6 C-11,1 -6,-5 0,-14 Z" fill={color} />;
   return <rect x={-10} y={-10} width={20} height={20} rx={5} fill={color} transform="rotate(45)" />;
