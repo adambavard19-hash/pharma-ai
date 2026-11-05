@@ -158,4 +158,14 @@ describe("une marque de probiotiques qui fait aussi des soins de peau (fondateur
     expect(classifyProductByName("CREME LACTOBACILLUS VISAGE")?.category).not.toBe("PROBIOTIQUES");
     expect(dictionaryTagsOfCategory("PROBIOTIQUES")).toEqual(expect.arrayContaining(["probiotique", "flore intestinale"]));
   });
+
+  it("un probiotique de la bouche ou intime n'est jamais « flore intestinale » : pas de Lactibiane Buccodentaire avec un Macrogol (fondateur, 5 nov. 2026)", async () => {
+    const { classifyProductByName } = await import("../product-vocabulary");
+    for (const name of ["LACTIBIANE BUCCODENTAIRE 30 CPR A SUCER", "LACTIBIANE BUCCO DENTAIRE CPR", "PROBIOTIQUE BUCCAL BLIS K12", "LACTIBIANE CND 10M GELULES"]) {
+      const result = classifyProductByName(name);
+      expect(result?.category, name).not.toBe("PROBIOTIQUES");
+      expect(result?.tags ?? [], name).not.toContain("flore intestinale");
+    }
+    expect(classifyProductByName("LACTIBIANE BUCCODENTAIRE 30 CPR A SUCER")?.tags).toContain("hygiène bucco-dentaire");
+  });
 });

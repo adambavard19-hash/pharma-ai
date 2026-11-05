@@ -75,11 +75,21 @@ const PATTERNS: Pattern[] = [
   {
     // Jamais un soin de la peau d'une marque de probiotiques : « LACTIBIANE TOPIC AD » (émollient de la peau atopique) était
     // rangé ici et proposé avec un laxatif (fondateur, 22 oct. 2026). Il va aux émollients.
-    test: /^(?!.*\b(topic|creme|baume|emollient|lait corps|gel douche|huile lavante|stick levres)\b).*\b(probioti|prebioti|levure(?! de riz)|ultra ?levure|lactobacil|bifidobact|saccharomyces|flore intestinale|ferments? lactiques?|lactibiane|ergyphilus|smebiocta|bion ?3|probiolog|lactéol|lacteol|enterogermina|alflorex|imgalt)/,
+    // Ni un probiotique de la BOUCHE (« LACTIBIANE BUCCODENTAIRE », flore buccale) proposé avec un laxatif (Macrogol, fondateur
+    // 5 nov. 2026), ni un probiotique INTIME (« LACTIBIANE CND ») : la marque ne fait pas l'usage, la flore visée le fait.
+    test: /^(?!.*\b(topic|creme|baume|emollient|lait corps|gel douche|huile lavante|stick levres|bucco\w*|buccal\w*|dentaires?|gingiv\w*|bouche|halitose|intima|intime|vaginal\w*|cnd|gyn\w*)\b).*\b(probioti|prebioti|levure(?! de riz)|ultra ?levure|lactobacil|bifidobact|saccharomyces|flore intestinale|ferments? lactiques?|lactibiane|ergyphilus|smebiocta|bion ?3|probiolog|lactéol|lacteol|enterogermina|alflorex|imgalt)/,
     category: "PROBIOTIQUES",
     tags: ["probiotique", "flore intestinale", "tolérance digestive"],
     ruleKeys: ["digestive-tolerance-antibiotics"],
     confidence: 0.9,
+  },
+  {
+    // Les probiotiques de la BOUCHE (flore buccale) : de l'hygiène bucco-dentaire, jamais la flore intestinale (fondateur, 5 nov. 2026).
+    test: /\b(lactibiane bucco\w*|bucco ?dentaire|probiotiques? buccal\w*|flore buccale|blis ?k12)\b/,
+    category: "HYGIENE",
+    tags: ["hygiène bucco-dentaire"],
+    ruleKeys: [],
+    confidence: 0.92,
   },
   {
     // Les soins de la peau atopique d'une marque de probiotiques (Lactibiane Topic AD) : émollients, sûrs de leur rang
