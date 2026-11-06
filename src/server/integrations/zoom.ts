@@ -16,12 +16,25 @@ export function zoomConfigured(): boolean {
 
 let cached: { token: string; until: number } | null = null;
 
+/** La raison donnée par Zoom (« invalid_client », « app not activated »…), sans jamais les codes eux-mêmes. */
+async function zoomReason(response: Response): Promise<string> {
+  try {
+    const body = (await response.json()) as { reason?: string; error?: string; message?: string };
+    const why = [body.error, body.reason ?? body.message].filter(Boolean).join(" — ");
+    return why ? ` : ${why.slice(0, 200)}` : "";
+  } catch {
+    return "";
+  }
+}
+
 async function accessToken(): Promise<string> {
   if (cached && cached.until > Date.now() + 60_000) return cached.token;
   const env = getEnv();
-  const basic = Buffer.from(`${env.ZOOM_CLIENT_ID}:${env.ZOOM_CLIENT_SECRET}`).toString("base64");
-  const response = await fetch(`https://zoom.us/oauth/token?grant_type=account_credentials&account_id=${encodeURIComponent(env.ZOOM_ACCOUNT_ID ?? "")}`, { method: "POST", headers: { Authorization: `Basic ${basic}` } });
-  if (!response.ok) throw new Error(`Zoom a refusé la connexion (HTTP ${response.status}).`);
+  // Un code collé dans Vercel garde souvent un espace ou un retour à la ligne : Zoom répond alors 400.
+  const clean = (v: string | undefined) => (v ?? "").trim();
+  const basic = Buffer.from(`${clean(env.ZOOM_CLIENT_ID)}:${clean(env.ZOOM_CLIENT_SECRET)}`).toString("base64");
+  const response = await fetch(`https://zoom.us/oauth/token?grant_type=account_credentials&account_id=${encodeURIComponent(clean(env.ZOOM_ACCOUNT_ID))}`, { method: "POST", headers: { Authorization: `Basic ${basic}` } });
+  if (!response.ok) throw new Error(`Zoom a refusé la connexion (HTTP ${response.status}${await zoomReason(response)}).`);
   const body = (await response.json()) as { access_token: string; expires_in: number };
   cached = { token: body.access_token, until: Date.now() + body.expires_in * 1000 };
   return body.access_token;
@@ -45,7 +58,7 @@ export async function createZoomMeeting(input: { topic: string; start: Date; dur
       settings: { waiting_room: true, join_before_host: false, host_video: true, participant_video: true, mute_upon_entry: false, auto_recording: "none" },
     }),
   });
-  if (!response.ok) throw new Error(`Zoom n'a pas créé la réunion (HTTP ${response.status}).`);
+  if (!response.ok) throw new Error(`Zoom n'a pas créé la réunion (HTTP ${response.status}${await zoomReason(response)}).`);
   const body = (await response.json()) as { id: number | string; join_url: string };
   return { id: String(body.id), joinUrl: body.join_url };
 }
