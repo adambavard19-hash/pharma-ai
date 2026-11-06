@@ -36,11 +36,27 @@ export class ResendMessagingProvider implements MessagingProvider {
       from: string;
       /** Délai au-delà duquel on renonce plutôt que de bloquer le comptoir. */
       timeoutMs?: number;
+      /** La pause avant de réessayer un envoi refusé pour excès de vitesse (HTTP 429). */
+      retryDelayMs?: number;
     },
     private readonly fetchImpl: FetchLike = globalThis.fetch as unknown as FetchLike,
   ) {}
 
+  /**
+   * Resend n'accepte que quelques envois par seconde : une démo réservée en déclenche quatre ou cinq d'affilée (alerte
+   * équipe, contact@, administrateurs, accusé de réception). Un refus « trop de requêtes » (HTTP 429) se réessaie après
+   * une courte pause, au lieu de perdre l'e-mail en silence (fondateur, 6 nov. 2026).
+   */
   async sendEmail(message: OutgoingEmail): Promise<DeliveryOutcome> {
+    let outcome = await this.sendOnce(message);
+    for (let attempt = 1; attempt <= 3 && outcome.status === "FAILED" && /HTTP 429/.test(outcome.detail ?? ""); attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, (this.config.retryDelayMs ?? 1100) * attempt));
+      outcome = await this.sendOnce(message);
+    }
+    return outcome;
+  }
+
+  private async sendOnce(message: OutgoingEmail): Promise<DeliveryOutcome> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.config.timeoutMs ?? 10_000);
 

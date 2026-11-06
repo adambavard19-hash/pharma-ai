@@ -153,7 +153,11 @@ async function recordSiteLead(input: SiteLeadInput & { demoAt: Date | null }): P
     : undefined;
   // L'alerte part à l'adresse de la société ET toujours à contact@pharmaboost.app, la boîte de l'équipe (fondateur, 5 nov. 2026).
   const teamInboxes = [...new Set([contactEmail, DEFAULT_CONTACT_EMAIL].map((address) => address.trim().toLowerCase()))];
-  for (const to of teamInboxes) await messaging.sendEmail({ to, fromName: "PharmaBoost", subject: alert.subject, text: alert.text, html: alert.html, attachments: teamInvite }).catch(() => undefined);
+  for (const to of teamInboxes) {
+    const sent = await messaging.sendEmail({ to, fromName: "PharmaBoost", subject: alert.subject, text: alert.text, html: alert.html, attachments: teamInvite }).catch(() => null);
+    // Chaque alerte de l'équipe est tracée comme l'accusé du pharmacien : un refus se voit dans la console.
+    if (sent) await traceDispatch({ kind: "SITE_LEAD_ALERT", recipient: to, outcome: sent, subject: alert.subject, trigger: "SYSTEM", prospectId: prospect.id });
+  }
   // Chaque administrateur reçoit l'alerte détaillée par e-mail, démo ou non (fondateur, 17 puis 21 oct. 2026).
   await notifyAdmins({ type: "SITE_LEAD", title: `${input.demoAt ? `Démo réservée ${formatDemoSlot(input.demoAt)}` : kindLabel} — ${input.pharmacyName}`, body: `${input.contactName} · ${input.email}${input.phone ? ` · ${input.phone}` : ""}${repName ? ` · apportée par ${repName}` : ""}`, linkUrl: `/admin/dossiers/${prospect.id}`, severity: "INFO", email: { ...alert, attachments: teamInvite }, alreadySentTo: teamInboxes });
   // Le commercial qui a envoyé le lien est prévenu lui aussi, avec le lien vers le dossier dans son espace.

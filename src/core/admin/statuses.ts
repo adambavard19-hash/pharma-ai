@@ -108,6 +108,7 @@ export const DISPATCH_KIND_LABELS: Record<string, string> = {
   EMAIL_CONFIRMATION: "Confirmation d'adresse avant contrat",
   SUBSCRIPTION_RECEIVED: "Demande d'abonnement reçue",
   SITE_LEAD_ACK: "Accusé de réception (site)",
+  SITE_LEAD_ALERT: "Alerte de l'équipe (démo, site)",
   RECOMMENDATION_ALERT: "Alerte pharmacie recommandée (à l'équipe)",
   TEAM_ALERT: "Alerte à l'équipe (e-mail aux administrateurs)",
   INSTALL_GUIDE: "Guide d'installation",
