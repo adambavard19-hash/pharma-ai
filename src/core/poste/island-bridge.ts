@@ -471,10 +471,13 @@ function isDone(value: unknown): value is HostDone {
   return typeof info.id === "string" && Array.isArray(info.lines);
 }
 
-/** « Rien de neuf » pour une vente ancienne sans conseils structurés : ses lignes de texte deviennent des cartes simples. */
+/**
+ * Les cartes de conseil de la vente : seulement les vrais conseils. Les notes (« Rien à ajouter pour cette délivrance. »,
+ * « Conseils écartés par la sécurité. »…) ne deviennent jamais une carte : sinon la petite bannière affichait « 1 » alors
+ * qu'il n'y avait rien à proposer (fondateur, 6 nov. 2026). L'agent convertit déjà lui-même les lignes d'un ancien serveur.
+ */
 export function itemsOf(entry: HostEntry): HostItem[] {
-  if (entry.items.length > 0) return entry.items;
-  return entry.notes.map((note) => ({ id: "", drug: "", challenge: "", shortDate: "", outcome: "NONE", name: note, price: "", reason: "", availability: "UNKNOWN", quantity: "", image: "" }));
+  return entry.items;
 }
 
 // ---------------------------------------------------------------------------------------------------------------

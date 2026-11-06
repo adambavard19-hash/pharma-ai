@@ -83,10 +83,10 @@ describe("l'île du poste, pilotée par les commandes de l'agent", () => {
     expect(posteReducer(view, host({ op: "remove", id: "vente1" })).island.stage).toBe("idle");
   });
 
-  it("une vente ancienne (lignes de texte seulement) s'affiche en cartes simples", () => {
-    const view = run([host({ op: "show", entry: { ...ENTRY, items: [], notes: ["Penser à l'hydratation"] } })]);
-    expect(stageForEntry(view.entry!, false)).toBe("advice");
-    expect(view.entry!.items[0].name).toBe("Penser à l'hydratation");
+  it("une note (« Rien à ajouter… ») ne devient jamais une carte : pas de « 1 » sans conseil (fondateur, 6 nov. 2026)", () => {
+    const view = run([host({ op: "show", entry: { ...ENTRY, items: [], notes: ["Rien à ajouter pour cette délivrance."] } })]);
+    expect(view.entry!.items).toHaveLength(0);
+    expect(stageForEntry(view.entry!, false)).toBe("quiet");
   });
 
   it("le scénario d'essai ne contient que des commandes valides de l'agent", () => {
