@@ -10,10 +10,17 @@
  */
 
 /**
- * L'appli des patients est mise de côté (fondateur, 21 oct. 2026) : visible dans l'aperçu seulement. Ses offres, ses écrans
- * côté pharmacie et console suivent la même règle, tant qu'elle n'est pas ouverte sur pharmaboost.app.
+ * L'appli des patients, ouverte sur pharmaboost.app pour son envoi à l'App Store (fondateur, 6 nov. 2026 : « qu'on mette en
+ * ligne la dernière appli »). Elle avait été mise de côté le 21 oct. 2026 (aperçu seulement).
  */
-export const PATIENT_APP_LIVE = process.env.NODE_ENV !== "production";
+export const PATIENT_APP_LIVE = true;
+
+/**
+ * PharmaBoost+ n'est pas proposé dans la première version (fondateur, 6 nov. 2026) : Apple impose son propre paiement pour
+ * un abonnement vendu dans une appli. En attendant, toutes les offres sont ouvertes à tous, et l'écran d'abonnement est
+ * retiré.
+ */
+export const PLUS_OFFERED = false;
 
 /** PharmaBoost+ : 2,99 € par mois (fondateur, 22 oct. 2026). */
 export const PLUS_PRICE_CENTS = 299;
@@ -99,7 +106,7 @@ export function offerIsLive(offer: Pick<OfferForMember, "status" | "startsAt" | 
 export function offerAccess(offer: OfferForMember, member: MemberForOffer, now: Date): "hidden" | "locked" | "open" {
   if (!offerIsLive(offer, now)) return "hidden";
   if (offer.funding === "PHARMACY" && (!member.homePharmacyId || offer.pharmacyId !== member.homePharmacyId)) return "hidden";
-  if (offer.audience === "SUBSCRIBERS" && member.plan !== "PLUS") return "locked";
+  if (PLUS_OFFERED && offer.audience === "SUBSCRIBERS" && member.plan !== "PLUS") return "locked";
   return "open";
 }
 

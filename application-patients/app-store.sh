@@ -1,5 +1,6 @@
 #!/bin/zsh
-# PharmaBoost (appli des patients, bundle app.pharmaboost.patients) → App Store Connect, en une commande.
+# PharmaBoost (appli des patients) → App Store Connect, en une commande. Bundle app.pharmaboost.mobile depuis le 6 nov. 2026 :
+# elle reprend la fiche « PharmaBoost » de l'ancienne appli des pharmaciens, abandonnée (fondateur).
 # Même compte Apple que l'appli des pharmaciens (application-mobile/) : la configuration ~/.pharmaboost-apple.env est partagée.
 #
 #   ./app-store.sh --configurer   une seule fois : enregistre l'identifiant d'équipe Apple et la clé d'API

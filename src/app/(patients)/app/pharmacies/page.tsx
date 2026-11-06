@@ -15,7 +15,7 @@ export default async function PharmaciesPage() {
       <div className="relative">
         <PageTitle sub="Un conseil personnalisé au comptoir, et votre bilan après chaque visite.">Pharmacies PharmaBoost</PageTitle>
         {pharmacies.length === 0 ? (
-          <Card className="mt-4 text-[14px] text-[#4B6A62]">Les premières pharmacies PharmaBoost arrivent bientôt près de chez vous.</Card>
+          <Card className="mt-4 text-[14px] text-[#4B6A62]">Aucune pharmacie PharmaBoost n&apos;est encore référencée ici.</Card>
         ) : (
           <div className="mt-4 space-y-2.5">
             {pharmacies.map((pharmacy) => (

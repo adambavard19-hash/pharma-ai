@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { codeValidAt, ean13CheckDigit, ean13Modules, isOfferCode, joinRequestKey, makeOfferCode, offerAccess, spacedCode, validateJoinRequest, validateOffer } from "../offers";
+import { codeValidAt, ean13CheckDigit, ean13Modules, isOfferCode, joinRequestKey, makeOfferCode, offerAccess, PLUS_OFFERED, spacedCode, validateJoinRequest, validateOffer } from "../offers";
 
 const now = new Date("2026-10-22T12:00:00Z");
 const live = { status: "ACTIVE" as const, startsAt: new Date("2026-10-01"), endsAt: new Date("2026-11-30") };
@@ -36,9 +36,9 @@ describe("qui voit quelle offre", () => {
     expect(offerAccess(offer, { plan: "PLUS", homePharmacyId: "ph2" }, now)).toBe("hidden");
     expect(offerAccess(offer, { plan: "PLUS", homePharmacyId: null }, now)).toBe("hidden");
   });
-  it("réservée aux abonnés : visible avec un cadenas pour les autres", () => {
+  it("réservée aux abonnés : ouverte à tous tant que PharmaBoost+ n'est pas proposé (fondateur, 6 nov. 2026)", () => {
     const offer = { ...live, funding: "PHARMACY" as const, pharmacyId: "ph1", audience: "SUBSCRIBERS" as const };
-    expect(offerAccess(offer, free, now)).toBe("locked");
+    expect(offerAccess(offer, free, now)).toBe(PLUS_OFFERED ? "locked" : "open");
     expect(offerAccess(offer, plus, now)).toBe("open");
   });
   it("l'offre d'un laboratoire : tout le réseau, même un inscrit hors réseau", () => {

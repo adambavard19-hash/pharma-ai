@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Check, Crown } from "lucide-react";
-import { PLUS_PRICE_LABEL } from "@/core/patient-app/offers";
+import { redirect } from "next/navigation";
+import { PLUS_OFFERED, PLUS_PRICE_LABEL } from "@/core/patient-app/offers";
 import { Card, Dna, GRAD, PageTitle } from "../_components/ui";
 import { getAppMember } from "../_components/member";
 import { PlusButton } from "./plus-button";
@@ -13,6 +14,7 @@ const PLUS = ["Toutes les offres de votre pharmacie : nouvelles gammes, ventes p
 
 /** PharmaBoost+ (2,99 € par mois) : ce que l'appli donne à tous, et ce que l'abonnement ajoute. */
 export default async function PlusPage() {
+  if (!PLUS_OFFERED) redirect("/app/offres");
   const member = await getAppMember();
   return (
     <div className="relative px-5 pt-4">

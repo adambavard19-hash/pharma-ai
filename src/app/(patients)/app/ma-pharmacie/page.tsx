@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ChevronRight, Crown, LogIn, Mail, Pill, Tag } from "lucide-react";
 import { Robot } from "@/components/robot";
 import { listPublicPharmacies } from "@/server/services/patient-app";
-import { PLUS_PRICE_LABEL } from "@/core/patient-app/offers";
+import { PLUS_OFFERED, PLUS_PRICE_LABEL } from "@/core/patient-app/offers";
 import { ACCENT, Card, Dna, GRAD, PageTitle, SectionTitle } from "../_components/ui";
 import { getAppMember } from "../_components/member";
 import { PharmacyPicker } from "./pharmacy-picker";
@@ -56,6 +56,8 @@ export default async function MyPharmacyPage({ searchParams }: { searchParams: P
               pharmacies={pharmacies.map((pharmacy) => ({ id: pharmacy.id, name: pharmacy.name, city: [pharmacy.postalCode, pharmacy.city].filter(Boolean).join(" ") }))}
             />
 
+            {PLUS_OFFERED && (
+              <>
             <SectionTitle>PharmaBoost+</SectionTitle>
             <Link href="/app/abonnement">
               <Card className="flex items-center gap-3">
@@ -69,6 +71,8 @@ export default async function MyPharmacyPage({ searchParams }: { searchParams: P
                 <ChevronRight className="size-5 text-[#94A3A0]" aria-hidden="true" />
               </Card>
             </Link>
+              </>
+            )}
 
             <div className="mt-2.5 grid grid-cols-2 gap-2.5">
               <Link href="/app/offres">

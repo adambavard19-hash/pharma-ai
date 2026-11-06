@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, ExternalLink, ShoppingBag, Store } from "lucide-react";
+import { ArrowLeft, ExternalLink, Store } from "lucide-react";
 import { adviceForSpecialty, lookupProductByCode, lookupSpecialty } from "@/server/services/patient-app";
 import type { DrugSheet, ParaSheet, PatientAdvice } from "@/core/patient-app/sheet";
 import { ACCENT, Card, Dna, GRAD, NotAdvice, SectionTitle } from "../_components/ui";
@@ -109,10 +109,7 @@ function FindButtons() {
       <Link href="/app/pharmacies" className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-full text-[14px] font-bold text-white" style={{ background: GRAD }}>
         <Store className="size-4" aria-hidden="true" /> Le trouver en pharmacie
       </Link>
-      {/* L'achat en ligne suivi (rémunération partenaire) n'est pas encore branché : le bouton est là, inactif. */}
-      <button type="button" disabled title="Bientôt disponible" className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-full border border-[#D5E3DF] text-[14px] font-bold text-[#94A3A0]">
-        <ShoppingBag className="size-4" aria-hidden="true" /> Acheter en ligne · bientôt
-      </button>
+      {/* L'achat en ligne suivi n'est pas encore branché : aucun bouton inactif (Apple refuse les fonctions « bientôt »). */}
     </>
   );
 }
