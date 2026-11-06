@@ -9,6 +9,7 @@ import type { CounterSheetLine } from "../../../agent/src/counter-sheet";
 import type { IslandOutcome } from "@/core/island/banner-flow";
 import { Robot } from "@/components/robot";
 import type { IslandAdvice } from "./counter-island";
+import { withoutMargin } from "./no-margin";
 import { sendsToDoctor } from "@/core/counter/answer-filter";
 import { IslandShell } from "./island-shell";
 import { HelixBackdrop } from "@/components/app/helix/helix-backdrop";
@@ -141,7 +142,8 @@ export type ReduceStyle = "a" | "b" | "c" | "d" | "e";
 /** Une question à l'aide et sa réponse (vide tant qu'elle n'est pas arrivée). */
 export type HelpExchange = { advice: string; question: string; answer: string; error?: string };
 
-export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, onOpen, onClose, onFinish, onAnswer, boxes = [], help, startAt, everyAdvice = false, routineChip, routineBeside, headAside, belowHead, cards = false, enterFrom, reduce, initialPanel }: MixIslandProps) {
+export function MixIsland({ items: rawItems, outcomes, open, narrow, look, aurore = true, onOpen, onClose, onFinish, onAnswer, boxes = [], help, startAt, everyAdvice = false, routineChip, routineBeside, headAside, belowHead, cards = false, enterFrom, reduce, initialPanel }: MixIslandProps) {
+  const items = withoutMargin(rawItems);
   const challengedBoxes = boxes.filter((box) => box.challenge);
   // La routine (fondateur, 28 oct. 2026, essai « C » qui clignote) : ses étapes quittent la liste des conseils ; leurs photos
   // clignotent à droite de la petite bannière et, au survol, la routine s'ouvre dans une deuxième bannière.
@@ -175,17 +177,28 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
   // elle, continue (rien n'est vendu ni refusé en réduisant).
   const [reduced, setReduced] = useState<null | "pill" | "dot">(initialPanel === "reduced" ? "pill" : null);
   const [over, setOver] = useState(false);
-  const reduceTo = (to: "pill" | "dot") => {
+  // Réduite d'un clic, la petite bannière apparaît sous la souris : sans ce verrou, le survol la rouvrait aussitôt (fondateur,
+  // 6 nov. 2026 : « quand j'appuie sur Réduire, ça réouvre direct »). Elle ne se rouvre au survol qu'une fois la souris sortie.
+  // La bannière rétrécit en s'animant : la souris en « sort » puis y « rentre » aussitôt. Une sortie ne compte qu'après 700 ms.
+  const [armed, setArmed] = useState(true);
+  const reducedAt = useRef(0);
+  const reduceTo = (to: "pill" | "dot", byClick = true) => {
     setRoutineOpen(false);
     if (open && onClose) onClose();
+    setOver(false);
+    setArmed(!byClick);
+    reducedAt.current = byClick ? performance.now() : 0;
     setReduced(to);
+  };
+  const armAfterLeave = () => {
+    if (performance.now() - reducedAt.current > 700) setArmed(true);
   };
   // D : la bannière se réduit seule 8 secondes après que la souris l'a quittée (ou sans jamais avoir été survolée), et se
   // rouvre au survol. Retenue pour le poste le 2 nov. 2026, avec le bouton « – Réduire » gardé. Un conseil ou une routine
   // ouverts d'un clic restent ouverts : le pharmacien est en train de les lire.
   useEffect(() => {
     if (reduce !== "d" || reduced || over || open || routineOpen) return;
-    const id = setTimeout(() => reduceTo("pill"), 8000);
+    const id = setTimeout(() => reduceTo("pill", false), 8000);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reduceTo ne dépend que de l'état courant
   }, [reduce, reduced, over, open, routineOpen]);
@@ -223,7 +236,7 @@ export function MixIsland({ items, outcomes, open, narrow, look, aurore = true, 
     return (
       <>
         <style>{`${SCAN_CSS}\n${CARDS_CSS}`}</style>
-        <IslandShell width={WHITE_PILL_WIDTH + 44} tone="accent" className="crd-white" contentKey="reduite-pastille" label="Bannière réduite (cliquez pour rouvrir)" onPointerEnter={reduce === "d" ? () => { setOver(true); reopen(); } : undefined}>
+        <IslandShell width={WHITE_PILL_WIDTH + 44} tone="accent" className="crd-white" contentKey="reduite-pastille" label="Bannière réduite (cliquez pour rouvrir)" onPointerEnter={reduce === "d" ? () => { if (!armed) return; setOver(true); reopen(); } : undefined} onPointerLeave={reduce === "d" ? armAfterLeave : undefined}>
           <button type="button" data-ile-reduite="pastille" onClick={reopen} title="Rouvrir les conseils" className="flex h-10 w-full items-center justify-center gap-2.5 px-4">
             <GreenCross lit={4} />
             <span className="text-[11px] font-bold tracking-[0.22em] whitespace-nowrap text-[#0F2B26] uppercase">

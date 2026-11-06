@@ -34,7 +34,7 @@ describe("le mode compact des conseils (poste)", () => {
     expect(html).toContain("LACTIBIANE REFERENCE GELU BT30");
     expect(html).not.toContain("SÉRUM PHYSIOLOGIQUE");
     expect(html).toContain("26,95 €");
-    expect(html).toContain("Marge 9,75 € HT");
+    expect(html).not.toContain("Marge"); // jamais de marge sur la bannière (fondateur, 6 nov. 2026)
     expect(html).toContain("En stock · 52");
     expect(html).toContain('aria-label="Vendu"');
     expect(html).toContain('aria-label="Non vendu"');

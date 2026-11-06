@@ -10,6 +10,7 @@ import { QrCode } from "@/components/document/qr-code";
 import { HelixBackdrop } from "@/components/app/helix/helix-backdrop";
 import { GreenCross, LIVING_PILL_WIDTH, ScanCapsule, SCAN_CSS, SCAN_STEPS, WHITE_PILL_WIDTH, WhitePill, shortAdviceName, type ScanLook, type WhiteFound } from "./scan-capsule";
 import { eurosOf, possibleMargin } from "./mix-island";
+import { withoutMargin } from "./no-margin";
 import { analysisSteps, allAnswered, followAdviceLink, isTap, registerTap, splitAlert, STAGE_MOOD, STAGE_WIDTH, stageTitle, stageTone, type IslandOutcome, type IslandState } from "@/core/island/banner-flow";
 import { cn } from "@/lib/utils";
 import { IslandShell } from "./island-shell";
@@ -359,7 +360,8 @@ function LightPanel({ children }: { children: ReactNode }) {
   );
 }
 
-export function CounterIsland(props: CounterIslandProps) {
+export function CounterIsland(rawProps: CounterIslandProps) {
+  const props = { ...rawProps, items: withoutMargin(rawProps.items) };
   const { state, items, alert, pills } = props;
   const count = items.length;
   const [hover, setHover] = useState(false);
@@ -1135,13 +1137,12 @@ export function PitchPanel({ item }: { item: IslandAdvice }) {
   const [picked, setPicked] = useState<Record<number, number>>({});
   const cells: { label: string; value: string; color?: string }[] = [
     { label: "Prix", value: item.price && item.stock !== "UNKNOWN" ? item.price : "—" },
-    { label: "Marge HT", value: item.margin ?? "—" },
     { label: "Stock", value: !stock || item.stock === "UNKNOWN" ? "—" : item.stock === "OUT_OF_STOCK" ? "Rupture" : item.quantity !== undefined ? String(item.quantity) : stock.label, color: item.stock === "OUT_OF_STOCK" ? C.outFg : item.stock === "LOW_STOCK" ? C.lowFg : undefined },
   ];
   return (
     <div data-pitch-panel="" className="isl-pop mt-1.5 space-y-2 border-t pt-2 text-[11.5px] leading-4" style={{ borderColor: C.line, color: C.ink }}>
       <p className="text-[12px] leading-4 font-bold break-words">{item.sheet?.name || item.name}</p>
-      <div className="grid grid-cols-3 gap-1">
+      <div className="grid grid-cols-2 gap-1">
         {cells.map((cell) => (
           <div key={cell.label} className="rounded-md px-1.5 py-1 text-center" style={{ background: C.cell }}>
             <p className="text-[9.5px] font-bold tracking-[0.04em] uppercase" style={{ color: C.inkSoft }}>{cell.label}</p>
