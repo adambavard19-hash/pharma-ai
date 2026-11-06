@@ -69,13 +69,14 @@ export function agendaFeedUrls(token: string): { https: string; webcal: string }
   return { https, webcal: https.replace(/^https?:\/\//, "webcal://") };
 }
 
-type DemoProspect = { id: string; name: string; ownerName: string | null; email: string | null; phone: string | null; city: string | null; demoAt: Date | null; demoDoneAt: Date | null };
+type DemoProspect = { id: string; name: string; ownerName: string | null; email: string | null; phone: string | null; city: string | null; demoAt: Date | null; demoDoneAt: Date | null; /** Le lien de la réunion Zoom (5 nov. 2026). */ demoMeetingUrl?: string | null };
 
 /** Une démonstration, telle qu'elle s'affiche dans l'agenda des téléphones de l'équipe. */
 export function demoEvent(prospect: DemoProspect): AgendaEvent | null {
   if (!prospect.demoAt) return null;
   const lines = [
     `Démo PharmaBoost · ${formatDemoSlot(prospect.demoAt)}`,
+    prospect.demoMeetingUrl ? `Réunion Zoom : ${prospect.demoMeetingUrl}` : null,
     prospect.ownerName ? `Contact : ${prospect.ownerName}` : null,
     prospect.phone ? `Téléphone : ${prospect.phone}` : null,
     prospect.email ? `E-mail : ${prospect.email}` : null,
@@ -93,7 +94,7 @@ export function demoEvent(prospect: DemoProspect): AgendaEvent | null {
   };
 }
 
-const PROSPECT_FIELDS = { id: true, name: true, ownerName: true, email: true, phone: true, city: true, demoAt: true, demoDoneAt: true } as const;
+const PROSPECT_FIELDS = { id: true, name: true, ownerName: true, email: true, phone: true, city: true, demoAt: true, demoDoneAt: true, demoMeetingUrl: true } as const;
 
 /** Le flux d'abonnement : les démos des trente derniers jours et à venir, et les plages bloquées. */
 export async function buildDemoFeed(now = new Date()): Promise<string> {
