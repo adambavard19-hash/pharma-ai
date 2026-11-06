@@ -1049,7 +1049,7 @@ export function makeFilm(variant: Variant) {
               </div>
               <div style={{ marginTop: 18, display: "grid", gridTemplateColumns: "90px 1.4fr 1fr 1fr 1fr 1.5fr", gap: 0, alignItems: "center", padding: "0 10px", ...tx(18, 800, MINT.soft) }}>
                 <span>Rang</span>
-                <span>Pharmacien</span>
+                <span>Pharmacien / préparateur</span>
                 {cols.map((c) => (
                   <span key={c.k} style={{ color: colLit(c.at) > 0.3 ? MINT.green : undefined }}>{c.l}</span>
                 ))}
@@ -1336,7 +1336,6 @@ export function makeFilm(variant: Variant) {
         </Scene>
         {actWrap(S_END, ACT2_END, ACT2, ["S6", "S7"])}
         <Chargement t={t} />
-        <Vitrine t={t} />
         <Scene t={t} from={ACT2_END} to={F_END}>
           <Fiche t={t} />
         </Scene>

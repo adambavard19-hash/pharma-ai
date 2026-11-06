@@ -10,6 +10,7 @@ import {
   Pharmacienne,
   Patient,
   Ordonnance,
+  ISO_RX,
   Bubble,
   FranceMap,
   FRANCE_DOTS,
@@ -499,7 +500,7 @@ function S1Wide({ T, life, boost = 1 }: { T: number; life: number; boost?: numbe
       <Camera t={T} origin={[1010, 330]} zoom={zoom} drift={0.8}>
         <Pharmacy t={life} mood="act1" light={s1Salve(T, 1.0, 1.17, "s1neonC", 0.55, 1) ?? 1} doorOpen={door} chimeAt={5.3 - T + life}>
           <Pharmacienne t={life} mood="act1" expression="lasse" talk={shiftWin([[1.4, 2.18], [2.22, 3.56]], T, life)} />
-          <Ordonnance x={SET.slots.rx.x} y={SET.slots.rx.y} w={150} flat={1} rotate={-8} mood="act1" />
+          <Ordonnance lines={ISO_RX} x={SET.slots.rx.x} y={SET.slots.rx.y} w={150} flat={1} rotate={-8} mood="act1" />
           <Patient t={life} mood="act1" talk={shiftWin([[4.3, 4.96]], T, life)} grab={grab} leave={leave} peek boxesInBag={1} />
           <Bubble t={T} at={1.4} exitAt={2.62} text="Et avec ceci…" side={pb.side} mood="act1" x={pb.x - 6} y={pb.y + 34} size={42} />
           <Bubble t={T} at={2.76} exitAt={3.96} text="Autre chose ?" side={pb.side} mood="act1" x={pb.x - 6} y={pb.y + 34} size={58} />

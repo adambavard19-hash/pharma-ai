@@ -4,6 +4,7 @@ import {
   Flash,
   MotionBlur,
   Ordonnance,
+  ISO_RX,
   Patient,
   PBLogo,
   Pharmacienne,
@@ -200,7 +201,7 @@ function World({ t }: { t: number }) {
     <AbsoluteFill style={{ transformOrigin: "0 0", transform: `translate(${960 + c.sx}px, ${540 + c.sy}px) scale(${c.z}) translate(${-c.fx}px, ${-c.fy}px)`, filter: blur > 0.05 ? `blur(${blur / c.z}px)` : undefined }}>
       <Pharmacy t={t} mood="pb" screen="pb" screenPower={power} screenTilt={tilt} screenContent={<StageInScreen t={t} />}>
         <Pharmacienne t={t} mood="pb" expression={t < T.burst + 0.06 ? "neutre" : "sourire"} place={prog(t, T.place, 0.95, LINEAR)} placeKind="isotretinoine" placeTo={SET.slots.box1} wink={T.wink} />
-        {t >= T.slide - 0.01 && <Ordonnance x={lerp(1330, SET.slots.rx.x, sl)} y={lerp(596, SET.slots.rx.y, sl)} w={150} flat={1} rotate={lerp(16, -8, sl) + (1 - clamp01(slSettle)) * 5} />}
+        {t >= T.slide - 0.01 && <Ordonnance lines={ISO_RX} x={lerp(1330, SET.slots.rx.x, sl)} y={lerp(596, SET.slots.rx.y, sl)} w={150} flat={1} rotate={lerp(16, -8, sl) + (1 - clamp01(slSettle)) * 5} />}
         <Patient t={t} mood="pb" expression={t < 23.9 ? "neutre" : "sourire"} peek={false} y={SET.patient.y - hop} />
       </Pharmacy>
     </AbsoluteFill>

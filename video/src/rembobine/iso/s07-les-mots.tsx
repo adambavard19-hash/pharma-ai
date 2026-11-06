@@ -103,7 +103,7 @@ const QUESTIONS = [
   { text: `La peau ou les lèvres tiraillent-elles déjà${NB}?`, at: S7_T.q2 },
 ];
 /** Validé par le fondateur (5 nov. 2026) : « une sécheresse à différents niveaux », plus de soleil ni de SPF ici. */
-export const DISCOURS = { text: "Ce traitement peut provoquer une sécheresse à différents niveaux, dès les premières semaines. Lavez en douceur, matin et soir, sans frotter, puis hydratez.", at: S7_T.disc, dur: S7_T.discDur };
+export const DISCOURS = { text: "Ce traitement peut provoquer une sécheresse à différents niveaux, dès les premières semaines.", at: S7_T.disc, dur: S7_T.discDur };
 
 /* ------------------------------------------------------------------ géométrie */
 

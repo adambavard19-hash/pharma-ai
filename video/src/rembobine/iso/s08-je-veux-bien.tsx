@@ -7,6 +7,7 @@ import {
   JAKARTA,
   MedBox,
   Ordonnance,
+  ISO_RX,
   PB,
   Patient,
   Pharmacienne,
@@ -413,7 +414,7 @@ function Counter({ t }: { t: number }) {
   return (
     <Pharmacy t={t} mood="pb" screen="pb" screenPower={1} screenContent={<ScreenView t={t} />} screenTilt={diveTilt(t)} doorOpen={door} chimeAt={T.chime}>
       <Pharmacienne t={t} mood="pb" expression="sourire" talk={[[35.49, 38.29]]} place={place} placeKind="hydratant" wink={40.16} />
-      <Ordonnance x={SET.slots.rx.x} y={SET.slots.rx.y} w={150} flat={1} rotate={-8} />
+      <Ordonnance lines={ISO_RX} x={SET.slots.rx.x} y={SET.slots.rx.y} w={150} flat={1} rotate={-8} />
       {antiGlow > 0 && <div style={{ position: "absolute", left: box1.x - 110, top: box1.y - 120, width: 220, height: 160, borderRadius: "50%", background: `radial-gradient(ellipse at 50% 55%, ${rgba(PB.citron, 0.85 * antiGlow)} 0%, ${rgba(PB.citron, 0.3 * antiGlow)} 45%, transparent 70%)` }} />}
       {t < T.hop1 && <MedBox kind="isotretinoine" x={box1.x} y={box1.y + antiHop} w={110} />}
       <Ring t={t} at={T.antibio + 0.02} x={box1.x} y={box1.y - 40} max={190} color={PB.brand} width={5} life={0.5} />

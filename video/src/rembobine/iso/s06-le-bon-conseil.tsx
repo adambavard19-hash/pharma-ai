@@ -408,7 +408,7 @@ const S7_QUESTIONS = [
 ];
 const CARD_TO = { x: 960, y: 470, s: 0.98 } as const;
 /** « À dire au patient » : la phrase de S7 (écrite à son temps), jamais celle de l'antibiotique par défaut. */
-const ISO_DISCOURS = { text: "Ce traitement peut provoquer une sécheresse à différents niveaux, dès les premières semaines. Lavez en douceur, matin et soir, sans frotter, puis hydratez.", at: 31.62, dur: 1.5 };
+const ISO_DISCOURS = { text: "Ce traitement peut provoquer une sécheresse à différents niveaux, dès les premières semaines.", at: 31.62, dur: 1.5 };
 
 function cardPose(t: number) {
   const k = prog(t, T.unfold, 0.3, SNAP);

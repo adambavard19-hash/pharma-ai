@@ -486,7 +486,17 @@ export function MedBox({
 
 /* ================================================================== L'ORDONNANCE */
 
-export function Ordonnance({ w = 260, x, y, flat = 0, rotate = 0, write = 1, mood = "pb", style }: { w?: number; x?: number; y?: number; flat?: number; rotate?: number; write?: number; mood?: Mood; style?: CSSProperties }) {
+/** Les lignes de l'ordonnance par défaut (films antibiotique) ; le film isotrétinoïne passe la sienne. */
+export type RxLine = { name: string; dose: string };
+const DEFAULT_RX: RxLine[] = [
+  { name: "Amoxicilline 1 g", dose: "1 cp matin et soir, 7 jours" },
+  { name: "Paracétamol 1 g", dose: "si douleur ou fièvre" },
+  { name: "Curacné 20 mg", dose: "1 capsule par jour, au repas" },
+];
+/** L'ordonnance du film isotrétinoïne (fondateur, 6 nov. 2026) : le seul médicament de la vente. */
+export const ISO_RX: RxLine[] = [{ name: "Isotrétinoïne 20 mg", dose: "1 capsule par jour, au repas" }];
+
+export function Ordonnance({ w = 260, x, y, flat = 0, rotate = 0, write = 1, mood = "pb", style, lines = DEFAULT_RX }: { w?: number; x?: number; y?: number; flat?: number; rotate?: number; write?: number; mood?: Mood; style?: CSSProperties; lines?: RxLine[] }) {
   const h = w * 1.38;
   const abs = x !== undefined && y !== undefined;
   const c = tones({ paper: "#FFFEFA", ink: "#23408E", ink2: "#3A4F8F", grey: "#C9D2CF", grey2: "#8E9C98", rule: "#DDE4E1" }, mood, 0.95);
@@ -524,31 +534,16 @@ export function Ordonnance({ w = 260, x, y, flat = 0, rotate = 0, write = 1, moo
           ORDONNANCE
         </text>
         <line x1={24} y1={106} x2={276} y2={106} stroke={c.rule} strokeWidth={2} />
-        <g opacity={show(0)}>
-          <text x={24} y={140} fontFamily={JAKARTA} fontWeight={800} fontSize={23} fontStyle="italic" fill={c.ink}>
-            Amoxicilline 1 g
-          </text>
-          <text x={24} y={163} fontFamily={JAKARTA} fontWeight={600} fontSize={15.5} fontStyle="italic" fill={c.ink2}>
-            1 cp matin et soir, 7 jours
-          </text>
-        </g>
-        <g opacity={show(0.3)}>
-          <text x={24} y={200} fontFamily={JAKARTA} fontWeight={800} fontSize={23} fontStyle="italic" fill={c.ink}>
-            Paracétamol 1 g
-          </text>
-          <text x={24} y={223} fontFamily={JAKARTA} fontWeight={600} fontSize={15.5} fontStyle="italic" fill={c.ink2}>
-            si douleur ou fièvre
-          </text>
-        </g>
-        {/* La 3e ligne (fondateur, 31 oct. 2026 : « plusieurs médicaments, plusieurs conseils ») : l'isotrétinoïne. */}
-        <g opacity={show(0.6)}>
-          <text x={24} y={260} fontFamily={JAKARTA} fontWeight={800} fontSize={23} fontStyle="italic" fill={c.ink}>
-            Curacné 20 mg
-          </text>
-          <text x={24} y={283} fontFamily={JAKARTA} fontWeight={600} fontSize={15.5} fontStyle="italic" fill={c.ink2}>
-            1 capsule par jour, au repas
-          </text>
-        </g>
+        {lines.slice(0, 3).map((line, i) => (
+          <g key={line.name} opacity={show(i * 0.3)}>
+            <text x={24} y={140 + i * 60} fontFamily={JAKARTA} fontWeight={800} fontSize={23} fontStyle="italic" fill={c.ink}>
+              {line.name}
+            </text>
+            <text x={24} y={163 + i * 60} fontFamily={JAKARTA} fontWeight={600} fontSize={15.5} fontStyle="italic" fill={c.ink2}>
+              {line.dose}
+            </text>
+          </g>
+        ))}
         <path
           d="M168,352 C176,326 186,322 184,342 C182,362 172,370 178,352 C186,330 200,330 198,348 C197,360 206,356 212,344 C218,334 222,340 220,350 C219,358 230,356 240,346 C246,340 252,342 262,338"
           fill="none"

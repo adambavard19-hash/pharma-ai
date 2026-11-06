@@ -7,6 +7,7 @@ import {
   Pharmacienne,
   Patient,
   Ordonnance,
+  ISO_RX,
   MedBox,
   Douchette,
   Bubble,
@@ -230,7 +231,7 @@ function Macro({ t }: { t: number }) {
     <AbsoluteFill style={{ background: A1.ink }}>
       <Camera t={t} {...cam}>
         <Pharmacy t={t} mood="act1" douchette={false}>
-          <Ordonnance x={SET.slots.rx.x} y={SET.slots.rx.y} w={150} flat={1} rotate={-8} mood="act1" />
+          <Ordonnance lines={ISO_RX} x={SET.slots.rx.x} y={SET.slots.rx.y} w={150} flat={1} rotate={-8} mood="act1" />
           <MedBox kind="isotretinoine" x={SET.slots.box1.x} y={SET.slots.box1.y} w={110} mood="act1" />
           <Patient t={t} mood="act1" grab={0} peek={false} />
           <ScanArm t={t} />
@@ -270,7 +271,7 @@ function WideWorld({ t }: { t: number }) {
   return (
     <Pharmacy t={t} mood="act1" light={wideLight(t)} doorOpen={door} chimeAt={5.3}>
       <Pharmacienne t={t} mood="act1" expression="lasse" talk={[[1.4, 2.18], [2.22, 3.56]]} />
-      <Ordonnance x={SET.slots.rx.x} y={SET.slots.rx.y} w={150} flat={1} rotate={-8} mood="act1" />
+      <Ordonnance lines={ISO_RX} x={SET.slots.rx.x} y={SET.slots.rx.y} w={150} flat={1} rotate={-8} mood="act1" />
       <Patient t={t} mood="act1" talk={[[4.3, 4.96]]} grab={grab} leave={leave} peek boxesInBag={1} />
       <Bubble t={t} at={1.4} exitAt={2.62} text="Et avec ceci…" side={pb.side} mood="act1" x={pb.x - 6} y={pb.y + 34} size={42} />
       <Bubble t={t} at={2.76} exitAt={3.96} text="Autre chose ?" side={pb.side} mood="act1" x={pb.x - 6} y={pb.y + 34} size={58} />
