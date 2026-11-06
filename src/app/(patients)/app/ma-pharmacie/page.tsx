@@ -29,13 +29,13 @@ export default async function MyPharmacyPage({ searchParams }: { searchParams: P
           <div className="flex justify-center">
             <Robot size={80} mood="happy" label="Le robot PharmaBoost" />
           </div>
-          <p className="mt-3 text-[17px] font-extrabold">Bientôt : retrouvez votre bilan ici</p>
+          <p className="mt-3 text-[17px] font-extrabold">Vos bilans conseil</p>
           <p className="mt-1.5 text-[14px] leading-6 text-[#4B6A62]">
-            Après votre passage dans une pharmacie PharmaBoost, le lien de votre bilan reçu par e-mail ouvrira votre espace : vos produits, vos rappels de fin de cure et les nouveautés de votre pharmacie.
+            Après votre passage dans une pharmacie PharmaBoost, scannez le QR code de votre bilan : vos produits et vos rappels de fin de cure restent sur ce téléphone.
           </p>
-          <p className="mt-4 inline-flex items-center gap-2 rounded-full px-4 py-2 text-[13px] font-bold text-white" style={{ background: GRAD }}>
-            <Mail className="size-4" aria-hidden="true" /> En attendant, gardez l&apos;e-mail de votre bilan
-          </p>
+          <Link href="/app/bilans" className="mt-4 inline-flex items-center gap-2 rounded-full px-4 py-2 text-[13px] font-bold text-white" style={{ background: GRAD }}>
+            <Mail className="size-4" aria-hidden="true" /> Voir mes bilans
+          </Link>
         </Card>
 
         {!member ? (
