@@ -411,13 +411,13 @@ export function Chip({ t, kind, text, at, size = 24, onDark = false, x, y, scale
 // La bannière d'aujourd'hui (fondateur, 30 oct. 2026 : « que ce soit la nouvelle bannière qui soit affichée ») :
 // src/components/island/scan-capsule.tsx (la petite bannière blanche, la croix verte) et mix-island.tsx (les cartes menthe).
 
-export type BannerLine = { n: number; drug: string; product: string; /** La vraie photo studio du produit (public/rembobine/images) ; absente : ses initiales. */ image?: string; /** Une ligne de routine : les photos de ses étapes, en petites vignettes qui se chevauchent. */ routine?: string[]; chips?: ChipSpec[]; at: number; price?: string; challenge?: boolean; shortDate?: boolean };
+export type BannerLine = { n: number; drug: string; product: string; /** La vraie photo studio du produit (public/rembobine/images) ; absente : ses initiales. */ image?: string; /** Une ligne de routine : les photos de ses étapes, en petites vignettes qui se chevauchent. */ routine?: string[]; chips?: ChipSpec[]; at: number; price?: string; challenge?: boolean; shortDate?: boolean; /** La bannière s'ouvre à ce temps (sinon après la dernière ligne) ; les lignes suivantes arrivent ensuite, chacune à son temps. */ openAt?: number };
 
 const HEAD = { padX: 22, padY: 18, row: 140, idle: 100, top: 58 } as const;
 const headSpring = (t: number, at: number) => ressort(t, at, { damping: 13, stiffness: 190, mass: 0.7 });
 /** Le nom de chaque conseil s'affiche dans la petite bannière à son `at` ; les cartes s'ouvrent ensuite. */
-export const bannerOpenAt = (lines: BannerLine[]) => (lines.length ? Math.max(...lines.map((l) => l.at)) + 0.34 : Infinity);
-const rowAt = (lines: BannerLine[], i: number) => bannerOpenAt(lines) + 0.09 * i;
+export const bannerOpenAt = (lines: BannerLine[]) => (lines.length ? (lines.find((l) => l.openAt !== undefined)?.openAt ?? Math.max(...lines.map((l) => l.at)) + 0.34) : Infinity);
+const rowAt = (lines: BannerLine[], i: number) => Math.max(bannerOpenAt(lines) + 0.09 * i, lines[i].openAt === undefined && lines.some((l) => l.openAt !== undefined) ? lines[i].at : -Infinity);
 /** La hauteur de la bannière à l'instant t (scale 1) : la petite bannière, puis les cartes qui arrivent en ressort. */
 export function bannerHeadHeight(t: number, lines: BannerLine[]) {
   return Math.max(HEAD.idle, 36 + lines.reduce((s, _l, i) => s + HEAD.row * headSpring(t, rowAt(lines, i)), 0));

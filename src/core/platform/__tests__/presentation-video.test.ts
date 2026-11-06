@@ -22,7 +22,7 @@ function expectVideo(message: { text: string; html: string }, mainUrl: string) {
 describe("le film de présentation dans les e-mails", () => {
   it("des adresses absolues sur le domaine public, vers la page qui lit le film et sa vignette", () => {
     expect(video).toEqual({ pageUrl: PAGE, imageUrl: IMAGE });
-    expect(PRESENTATION_VIDEO_LABEL).toBe("Voir la vidéo de présentation (2 min 09)");
+    expect(PRESENTATION_VIDEO_LABEL).toBe("Voir la vidéo de présentation (2 min 39)");
   });
 
   it("l'invitation d'un collaborateur : le lien de création du compte d'abord, puis le film", () => {

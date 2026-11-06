@@ -10,7 +10,7 @@ import { useId } from "react";
 export type DupeKind = "iso-nettoyant" | "iso-hydratant" | "iso-levres" | "iso-solaire";
 
 export const DUPES: Record<DupeKind, { name: string; short: string; tile: [string, string] }> = {
-  "iso-nettoyant": { name: "Crème lavante apaisante", short: "Nettoyant doux", tile: ["#E6F6F2", "#CFEDE5"] },
+  "iso-nettoyant": { name: "Crème lavante apaisante", short: "Crème lavante", tile: ["#E6F6F2", "#CFEDE5"] },
   "iso-hydratant": { name: "Soin hydratant apaisant", short: "Soin hydratant", tile: ["#EEF7F4", "#DCEFE8"] },
   "iso-levres": { name: "Baume réparateur lèvres", short: "Baume à lèvres", tile: ["#F7F1EE", "#EDE2DC"] },
   "iso-solaire": { name: "Protection solaire SPF 50+", short: "Protection solaire", tile: ["#FFF1E4", "#FFDDBF"] },

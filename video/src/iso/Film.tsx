@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import { AbsoluteFill, Audio, Sequence, staticFile, useCurrentFrame } from "remotion";
-import { Bell, Boxes, CalendarCheck, CalendarClock, Check, Lightbulb, ListChecks, Lock, Megaphone, QrCode, ShieldCheck, MousePointer2, Play, Plug, Repeat, ShieldAlert, Smartphone, Sun, Trophy, Droplets, Smile, Sparkles } from "lucide-react";
+import { Bell, Boxes, CalendarCheck, CalendarClock, Check, Coins, Link2, Lock, Megaphone, PackageOpen, Pill as PillIcon, QrCode, ShieldCheck, MousePointer2, Play, Plug, Repeat, ShieldAlert, Store, Sun, Trophy, Droplets, Smile, Sparkles, Flower2, Zap, X } from "lucide-react";
 import { AdnBackdrop, BagDrugs, Confetti, Cues, DUPES, Dupe, DupeTile, Flash, JAKARTA, MailBilan, Notification, PB, PBLogo, Phone, Ring, Sparkle, cue, rgba, type Cue, type DupeKind } from "../rembobine/kit";
 import { ISO } from "../rembobine/iso";
 import { FilmClock } from "../presentation/motion/kit/clock";
@@ -110,7 +110,7 @@ export function makeFilm(variant: Variant) {
   VAT.I5 = ACT1_END + 0.35;
   const H_END = end("I5") + 0.4;
   VAT.I6 = H_END + 0.3;
-  VAT.I7 = end("I6") + 0.35;
+  VAT.I7 = end("I6") + 0.2;
   const S_END = end("I7") + 0.45;
   VAT.I8 = S_END + 0.5;
   VAT.I9 = end("I8") + 1.3;
@@ -126,29 +126,32 @@ export function makeFilm(variant: Variant) {
   VAT.I16 = end("I13") + 0.3;
   const B_END = end("I16") + 0.6;
   VAT.I14 = B_END + 0.35;
-  const C_END = end("I14") + 0.5;
+  const C_END = end("I14") + 0.4;
   VAT.I15 = C_END + 0.35;
-  const E_END = end("I15") + 0.6;
-  VAT.N12 = E_END + 0.45;
-  VAT.D5 = end("N12") + 0.45;
-  if (lettre) VAT.L3 = end("D5") + 0.6;
-  const FINAL_HIT = end(lettre ? "L3" : "D5") + 0.9;
-  const TOTAL = Math.ceil(FINAL_HIT + 4.2);
+  const E_END = end("I15") + 0.4;
+  VAT.N12 = E_END + 0.3;
+  VAT.D5 = end("N12") + 0.3;
+  if (lettre) VAT.L3 = end("D5") + 0.5;
+  const FINAL_HIT = end(lettre ? "L3" : "D5") + 0.55;
+  const TOTAL = Math.ceil(FINAL_HIT + 3.4);
 
   // ---- Les trois morceaux du comptoir : temps du film → temps d'histoire de « Rembobinons » ---------------------------
   const ACT1: [number, number][] = [
     [A, 0],
     [VAT.I1, 6.0],
     [w("I1", "l'acné…"), 8.02],
-    [w("I1", "et"), 9.286],
+    [w("I1", "mais"), 9.286],
     [w("I1", "rien"), 9.727],
     [w("I1", "sécheresse"), 10.2],
-    [w("I1", "qui"), 10.667],
-    [w("I1", "l'attend."), 11.074],
+    [w("I1", "provoquer"), 10.667],
+    [w("I1", "médicament."), 11.074],
     [end("I1"), 12.38],
     [w("I2", "cette"), 12.748],
     [w("I2", "chaque"), 14.002],
     [w("I2", "france"), 15.535],
+    // « Et pas seulement pour l'acné… » : la carte de France reste, les autres ordonnances passent devant (Trappe).
+    [w("I2", "et"), 15.85],
+    [end("I2") - 0.3, 16.1],
     [end("I2"), 16.342],
     [w("I3", "alors…"), 16.825],
     [w("I3", "rembobinons"), 17.8],
@@ -166,27 +169,30 @@ export function makeFilm(variant: Variant) {
     [S_END - 0.4, 25.95],
     [w("I8", "dès"), 26.1],
     [w("I8", "scannée,"), 26.44],
-    // Chaque conseil se nomme sur son mot, à vitesse normale (sinon son nom met des secondes à apparaître).
-    [w("I8", "nettoyant") - 0.02, 26.55],
-    [w("I8", "nettoyant") + 0.25, 26.8],
-    [w("I8", "hydratant,") - 0.02, 26.85],
-    [w("I8", "hydratant,") + 0.12, 26.99],
-    [w("I8", "baume") - 0.08, 27.02],
-    [w("I8", "baume") + 0.08, 27.12],
-    [w("I8", "solaire") - 0.04, 27.15],
-    [w("I8", "solaire") + 0.4, 27.55],
-    [end("I8"), 27.62],
+    // La barre de chargement (Chargement) tient pendant que l'ordonnance s'analyse ; puis « le bon conseil » : la ligne ①.
+    [w("I8", "bon") - 0.06, 26.5],
+    [w("I8", "conseil") + 0.1, 26.62],
+    [w("I8", "s'affiche,") + 0.3, 26.8],
+    [w("I8", "pris") - 0.05, 26.98],
+    [w("I8", "stock"), 27.8],
+    [w("I8", "crème"), 27.9],
+    [w("I8", "routine"), 28.05],
+    // « Puis la routine » : chaque ligne sur son mot.
+    [w("I8", "hydratant,") - 0.05, 28.15],
+    [w("I8", "baume") - 0.05, 28.3],
+    [w("I8", "solaire") - 0.05, 28.45],
+    [end("I8"), 28.6],
     [VAT.I9 - 0.2, 29.95],
     [VAT.I9, 30.15],
     [w("I9", "questions"), 30.359],
     [w("I9", "poser"), 30.847],
-    [w("I9", "les", 1), 31.299],
-    [w("I9", "mots"), 31.462],
-    [w("I9", "dire"), 31.729],
-    // « Le challenge, la date courte » : les deux pastilles claquent sur leur mot (la « marge » n'existe plus dans ce film).
-    [w("I9", "le"), 32.9],
-    [w("I9", "challenge,") - 0.05, 33.47],
-    [w("I9", "date") - 0.05, 34.35],
+    [w("I9", "le"), 31.299],
+    [w("I9", "conseil"), 31.462],
+    [w("I9", "prodiguer"), 31.729],
+    // « Les challenges laboratoires, les dates courtes » : les deux pastilles claquent sur leur mot.
+    [w("I9", "les", 1), 32.9],
+    [w("I9", "challenges") - 0.05, 33.47],
+    [w("I9", "dates") - 0.05, 34.35],
     [end("I9"), 35.04],
     [ACT2_END + 0.5, 35.3],
   ];
@@ -194,7 +200,7 @@ export function makeFilm(variant: Variant) {
     [F_END - 0.4, 35.3],
     [VAT.C1, 35.49],
     [w("C1", "conseille"), 37.058],
-    [w("C1", "nettoyant"), 37.603],
+    [w("C1", "crème"), 37.603],
     [end("C1"), 38.36],
     [VAT.D4, 38.791],
     [end("D4"), 40.01],
@@ -314,63 +320,289 @@ export function makeFilm(variant: Variant) {
   // « En une seconde, personne ne peut tout avoir en tête… PharmaBoost, lui, y pense pour vous. »
   // ===================================================================================================================
   function UneSeconde({ t }: { t: number }) {
-    // Les deux questions du fondateur (5 nov. 2026), puis « PharmaBoost, lui, y pense pour vous » : ce à quoi il pense, coché.
-    const items = [
-      { I: Boxes, l: "Le stock" },
-      { I: CalendarClock, l: "Les dates courtes" },
-      { I: Trophy, l: "Les challenges" },
-      { I: Lightbulb, l: "Le bon conseil" },
-      { I: ListChecks, l: "La routine parfaite" },
+    // Les deux questions du fondateur (5 nov. 2026), mot à mot sur la voix — puis le moteur : stock, dates courtes,
+    // surstock, challenges laboratoires et marge entrent dans PharmaBoost, qui en sort le bon conseil et la routine.
+    const words = M.I6.words;
+    const split = words.findIndex((x) => /^combien/i.test(x.w));
+    const q1 = words.slice(0, split);
+    const q2 = words.slice(split);
+    const KEY = /potentiel|conseil|opportunit|inaper/i;
+    const q2At = VAT.I6 + q2[0].at - 0.1;
+    const engine = VAT.I7;
+    const qOut = prog(t, engine - 0.25, 0.35, IN_OUT);
+    const lift = prog(t, q2At - 0.05, 0.45, SNAP);
+    const sentence = (list: Word[], size: number) =>
+      list.map((x, i) => {
+        const k = prog(t, VAT.I6 + x.at - 0.06, 0.22, SNAP);
+        const key = KEY.test(x.w);
+        const hit = key ? pop(t, VAT.I6 + x.at - 0.04) : 1;
+        return (
+          <span key={i} style={{ display: "inline-block", marginRight: size * 0.26, opacity: 0.14 + 0.86 * k, transform: `translateY(${(1 - k) * 14}px) scale(${key ? 0.8 + 0.2 * Math.min(1.15, hit) : 1})`, color: key && k > 0.5 ? MINT.green : MINT.ink }}>
+            {x.w}
+          </span>
+        );
+      });
+    const missed = Math.round(37 * prog(t, q2At, end("I6") - q2At, IN_OUT));
+    // Le moteur
+    const inputs = [
+      { I: Boxes, l: "Stock", at: w("I7", "stock,") },
+      { I: CalendarClock, l: "Dates courtes", at: w("I7", "dates") },
+      { I: PackageOpen, l: "Surstock", at: w("I7", "surstock,") },
+      { I: Trophy, l: "Challenges laboratoires", at: w("I7", "challenges") },
+      { I: Coins, l: "Marge", at: w("I7", "marge…") },
     ];
-    const order = VAT.I7;
-    const questions = [
-      { at: VAT.I6, text: "Votre équipe exploite-t-elle réellement *tout le potentiel de conseil* de chaque ordonnance ?" },
-      { at: w("I6", "Combien") - 0.1, text: "Combien d'opportunités de conseil passent *chaque jour inaperçues* au comptoir ?" },
-    ];
-    const leave = prog(t, order - 0.1, 0.5, IN_OUT);
-    const rich = (text: string) =>
-      text.split("*").map((part, i) => (
-        <span key={i} style={i % 2 ? { color: MINT.green } : undefined}>
-          {part}
-        </span>
-      ));
+    const absorb = w("I7", "en") - 0.2;
+    const core = { x: 960, y: 540 };
+    const coreIn = pop(t, engine + 0.05);
+    const flash = prog(t, absorb + 0.55, 0.12, SNAP) * (1 - prog(t, absorb + 0.7, 0.5, IN_OUT));
+    const spin = (t - engine) * (60 + 400 * prog(t, absorb, 0.6, IN_OUT) * (1 - prog(t, absorb + 1.4, 0.8)));
+    const out = { bon: w("I7", "bon") - 0.1, routine: w("I7", "routine") - 0.1 };
+    const card = prog(t, out.bon, 0.5, SNAP);
+    const engineOut = prog(t, S_END - 0.35, 0.35, IN_OUT);
     return (
       <>
-        {leave < 1 &&
-          questions.map((q, i) => {
-            const k = pop(t, q.at);
-            if (k <= 0) return null;
-            return (
-              <Abs key={i} x={960} y={430 + i * 260 - leave * 60}>
-                <div style={{ opacity: Math.min(1, k * 1.6) * (1 - leave), transform: `translateY(${(1 - Math.min(1, k)) * 40}px) scale(${0.9 + 0.1 * Math.min(1, k)})` }}>
-                  <Card style={{ display: "flex", alignItems: "center", gap: 28, width: 1360, padding: "34px 44px", borderRadius: 34 }}>
-                    <span style={{ display: "inline-flex", flexShrink: 0, width: 92, height: 92, borderRadius: 26, background: "#FCEBDD", alignItems: "center", justifyContent: "center", ...tx(62, 800), color: "#D9772A" }}>?</span>
-                    <span style={{ ...tx(46, 800), lineHeight: 1.18, letterSpacing: "-0.02em" }}>{rich(q.text)}</span>
+        {qOut < 1 && (
+          <div style={{ position: "absolute", inset: 0, opacity: 1 - qOut, transform: `translateY(${-qOut * 40}px)` }}>
+            <Abs x={960} y={420 - 140 * lift}>
+              <div style={{ transform: `scale(${(1 - 0.22 * lift) * (0.92 + 0.08 * Math.min(1, pop(t, VAT.I6 - 0.1)))})`, opacity: (1 - 0.45 * lift) * Math.min(1, pop(t, VAT.I6 - 0.1) * 2) }}>
+                <Card style={{ display: "flex", alignItems: "center", gap: 28, width: 1420, padding: "34px 44px", borderRadius: 34 }}>
+                  <span style={{ display: "inline-flex", flexShrink: 0, width: 92, height: 92, borderRadius: 26, background: "#FCEBDD", alignItems: "center", justifyContent: "center", ...tx(62, 800), color: "#D9772A" }}>?</span>
+                  <span style={{ ...tx(46, 800), lineHeight: 1.22 }}>{sentence(q1, 46)}</span>
+                </Card>
+              </div>
+            </Abs>
+            {t >= q2At && (
+              <Abs x={960} y={640}>
+                <div style={{ transform: `translateY(${(1 - Math.min(1, lift)) * 60}px) scale(${0.9 + 0.1 * Math.min(1, pop(t, q2At))})`, opacity: Math.min(1, lift * 2) }}>
+                  <Card style={{ display: "flex", alignItems: "center", gap: 28, width: 1420, padding: "34px 44px", borderRadius: 34, boxShadow: `0 0 0 4px ${rgba("#D9772A", 0.35)}, 0 30px 60px -30px rgba(15,43,38,.5)` }}>
+                    <span style={{ display: "inline-flex", flexShrink: 0, width: 92, height: 92, borderRadius: 26, background: "#D9772A", alignItems: "center", justifyContent: "center", ...tx(62, 800, "#FFFFFF") }}>?</span>
+                    <span style={{ ...tx(46, 800), lineHeight: 1.22 }}>{sentence(q2, 46)}</span>
                   </Card>
                 </div>
               </Abs>
-            );
-          })}
-        <Title t={t} at={order} text="PharmaBoost *y pense pour vous.*" y={120} size={70} />
-        {t >= order &&
-          items.map((it, i) => {
-            const k = pop(t, order + 0.25 + i * 0.14);
-            if (k <= 0) return null;
-            const checked = prog(t, order + 0.55 + i * 0.14, 0.25, SNAP);
-            return (
-              <Abs key={it.l} x={960} y={330 + i * 112}>
-                <div style={{ transform: `scale(${k})` }}>
-                  <Card style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 26px 16px 16px", width: 560, borderRadius: 22 }}>
-                    <span style={{ display: "inline-flex", width: 56, height: 56, borderRadius: 16, background: checked > 0 ? MINT.green : "#FCEBDD", alignItems: "center", justifyContent: "center" }}>
-                      {checked > 0 ? <Check size={32} color="#FFFFFF" strokeWidth={3} style={{ transform: `scale(${checked})` }} /> : <it.I size={30} color="#D9772A" />}
-                    </span>
-                    <span style={tx(32, 800)}>{it.l}</span>
+            )}
+            <Abs x={960} y={850}>
+              <div style={{ opacity: prog(t, q2At + 0.3, 0.3), transform: `scale(${0.8 + 0.2 * Math.min(1, pop(t, q2At + 0.3))})`, display: "inline-flex", alignItems: "center", gap: 14, padding: "14px 26px", borderRadius: 999, background: "#FFFFFF", boxShadow: "0 18px 40px -22px rgba(15,43,38,.5)" }}>
+                <span style={tx(26, 700, MINT.soft)}>Conseils passés inaperçus aujourd&apos;hui</span>
+                <span style={{ ...tx(40, 800, "#D9772A"), fontVariantNumeric: "tabular-nums", minWidth: 60, textAlign: "right" }}>{missed}</span>
+              </div>
+            </Abs>
+          </div>
+        )}
+        {t >= engine - 0.05 && (
+          <div style={{ position: "absolute", inset: 0, opacity: 1 - engineOut }}>
+            <Title t={t} at={engine} out={w("I7", "seconde,") - 0.35} text="PharmaBoost *croise tout.*" y={110} size={66} />
+            <Title t={t} at={w("I7", "seconde,") - 0.2} text="Le bon conseil, *en une seconde.*" y={110} size={66} />
+            {/* Les fils : chaque donnée part vers PharmaBoost */}
+            <svg width={1920} height={1080} style={{ position: "absolute", inset: 0, overflow: "visible" }}>
+              {inputs.map((it, i) => {
+                const y = 270 + i * 130;
+                const draw = prog(t, it.at + 0.05, 0.35, IN_OUT) * (1 - prog(t, absorb + i * 0.06, 0.3));
+                if (draw <= 0) return null;
+                return <path key={it.l} d={`M640 ${y} C 780 ${y}, 800 ${core.y}, ${core.x - 130} ${core.y}`} fill="none" stroke={MINT.green} strokeWidth={5} strokeDasharray="12 12" strokeDashoffset={-t * 120} opacity={0.7 * draw} />;
+              })}
+            </svg>
+            {inputs.map((it, i) => {
+              const k = pop(t, it.at - 0.08);
+              if (k <= 0) return null;
+              const y0 = 270 + i * 130;
+              const a = prog(t, absorb + i * 0.06, 0.4, IN_OUT);
+              if (a >= 1) return null;
+              return (
+                <Abs key={it.l} x={420 + (core.x - 420) * a} y={y0 + (core.y - y0) * a}>
+                  <div style={{ transform: `scale(${Math.min(1, k) * (1 - 0.7 * a)})`, opacity: 1 - a * a }}>
+                    <Card style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 24px 14px 14px", width: 430, borderRadius: 22 }}>
+                      <span style={{ display: "inline-flex", width: 56, height: 56, borderRadius: 16, background: MINT.bg, alignItems: "center", justifyContent: "center" }}>
+                        <it.I size={30} color={MINT.green} />
+                      </span>
+                      <span style={tx(30, 800)}>{it.l}</span>
+                    </Card>
+                  </div>
+                </Abs>
+              );
+            })}
+            {/* Le cœur : PharmaBoost */}
+            <Abs x={core.x} y={core.y}>
+              <div style={{ position: "relative", width: 260, height: 260, transform: `scale(${Math.min(1.1, coreIn) * (1 + 0.12 * flash)})` }}>
+                <svg width={260} height={260} viewBox="0 0 260 260" style={{ position: "absolute", inset: 0, transform: `rotate(${spin}deg)` }}>
+                  <circle cx={130} cy={130} r={120} fill="none" stroke={rgba(MINT.green, 0.25)} strokeWidth={10} />
+                  <circle cx={130} cy={130} r={120} fill="none" stroke={MINT.green} strokeWidth={10} strokeLinecap="round" strokeDasharray="90 60 30 60" />
+                </svg>
+                <div style={{ position: "absolute", inset: 28, borderRadius: 999, background: "#FFFFFF", boxShadow: `0 30px 60px -30px rgba(15,43,38,.55), 0 0 ${60 * flash}px ${rgba(MINT.green, 0.8 * flash)}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                  <Cross size={64} />
+                  <span style={{ ...tx(20, 800, MINT.deep), letterSpacing: "0.12em" }}>PHARMABOOST</span>
+                </div>
+              </div>
+            </Abs>
+            <Ring t={t} at={absorb + 0.55} x={core.x} y={core.y} max={520} color={MINT.green} />
+            {/* Ce qui en sort : le bon conseil, puis la routine complète */}
+            {card > 0 && (
+              <Abs x={core.x + (1500 - core.x) * card} y={core.y}>
+                <div style={{ transform: `scale(${0.4 + 0.6 * card})`, opacity: Math.min(1, card * 2) }}>
+                  <Card style={{ width: 500, padding: "24px 26px", borderRadius: 28, boxShadow: `0 0 0 4px ${rgba(MINT.green, 0.45)}, 0 40px 80px -40px rgba(15,43,38,.6)` }}>
+                    <div style={{ ...tx(16, 800, MINT.green), letterSpacing: "0.12em" }}>LE BON CONSEIL</div>
+                    <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 16 }}>
+                      <DupeTile kind="iso-nettoyant" size={80} radius={18} />
+                      <span style={tx(27, 800)}>{DUPES["iso-nettoyant"].name}</span>
+                    </div>
+                    <div style={{ marginTop: 18, ...tx(16, 800, MINT.green), letterSpacing: "0.12em", opacity: prog(t, out.routine, 0.3) }}>+ LA ROUTINE COMPLÈTE</div>
+                    <div style={{ marginTop: 10, display: "flex", gap: 14 }}>
+                      {ROUTINE.slice(1).map((r, i) => {
+                        const k = pop(t, out.routine + 0.1 + i * 0.12);
+                        return (
+                          <div key={r.k} style={{ transform: `scale(${k})`, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                            <DupeTile kind={r.k} size={70} radius={16} />
+                            <span style={tx(15, 700, MINT.soft)}>{r.gest}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </Card>
                 </div>
               </Abs>
-            );
-          })}
+            )}
+          </div>
+        )}
       </>
+    );
+  }
+
+  // ===================================================================================================================
+  // « Et pas seulement pour l'acné : antibiotiques, allergies, douleurs… à chaque ordonnance, des conseils passent à la
+  // trappe. » — devant la carte de France : trois autres ordonnances, leur conseil oublié, puis la trappe s'ouvre.
+  // ===================================================================================================================
+  function Trappe({ t }: { t: number }) {
+    const from = w("I2", "et") - 0.15;
+    const trap = w("I2", "trappe.") - 0.25;
+    if (t < from || t > end("I2") + 0.6) return null;
+    const veil = prog(t, from, 0.35) * (1 - prog(t, end("I2") + 0.1, 0.4));
+    const cases = [
+      { I: PillIcon, l: "Antibiotiques", miss: "Probiotique oublié", at: w("I2", "antibiotiques,") },
+      { I: Flower2, l: "Allergies", miss: "Lavage nasal oublié", at: w("I2", "allergies,") },
+      { I: Zap, l: "Douleurs", miss: "Patch chauffant oublié", at: w("I2", "douleurs…") },
+    ];
+    const xs = w("I2", "ordonnance,") - 0.1;
+    return (
+      <>
+        <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, ${rgba(MINT.paper, 0.2)} 0%, ${rgba(MINT.paper, 0.85)} 60%)`, opacity: veil }} />
+        <Abs x={960} y={150}>
+          <div style={{ opacity: prog(t, from + 0.1, 0.35) * (1 - prog(t, trap + 0.4, 0.3)), ...tx(56, 800), whiteSpace: "nowrap" }}>
+            Et pas seulement <span style={{ color: MINT.green }}>pour l&apos;acné.</span>
+          </div>
+        </Abs>
+        {cases.map((c, i) => {
+          const k = pop(t, c.at - 0.1);
+          if (k <= 0) return null;
+          const cross = pop(t, xs + i * 0.1);
+          const fall = prog(t, trap + i * 0.07, 0.55, (x) => x * x);
+          return (
+            <Abs key={c.l} x={520 + i * 440} y={620 + fall * 700}>
+              <div style={{ transform: `scale(${Math.min(1, k)}) rotate(${fall * (i - 1) * 25}deg)`, opacity: 1 - fall * 0.6 }}>
+                <Card style={{ width: 380, padding: "26px 28px", borderRadius: 28, display: "flex", flexDirection: "column", gap: 14 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                    <span style={{ display: "inline-flex", width: 60, height: 60, borderRadius: 18, background: MINT.bg, alignItems: "center", justifyContent: "center" }}>
+                      <c.I size={32} color={MINT.green} />
+                    </span>
+                    <span style={tx(32, 800)}>{c.l}</span>
+                  </div>
+                  <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 14, background: "#FDF0EE" }}>
+                    <span style={{ display: "inline-flex", width: 30, height: 30, borderRadius: 99, background: "#D9534A", alignItems: "center", justifyContent: "center", transform: `scale(${Math.min(1.2, cross)})` }}>
+                      <X size={20} color="#FFFFFF" strokeWidth={3} />
+                    </span>
+                    <span style={tx(22, 700, "#B23B33")}>{c.miss}</span>
+                  </div>
+                </Card>
+              </div>
+            </Abs>
+          );
+        })}
+        {/* La trappe : une fente sombre qui s'ouvre sous les cartes */}
+        <Abs x={960} y={900}>
+          <div style={{ width: 1500 * prog(t, trap - 0.2, 0.3, SNAP) * (1 - prog(t, end("I2") + 0.1, 0.3)), height: 26, borderRadius: 99, background: "radial-gradient(ellipse at 50% 50%, #0F2B26 30%, rgba(15,43,38,0) 75%)", opacity: 0.85 }} />
+        </Abs>
+      </>
+    );
+  }
+
+  // ===================================================================================================================
+  // La barre de chargement (fondateur, 5 nov. 2026) : entre « scannée » et « le bon conseil », on VOIT l'ordonnance
+  // s'analyser, vite, et l'on sait quand le conseil arrive.
+  // ===================================================================================================================
+  function Chargement({ t }: { t: number }) {
+    const a = w("I8", "scannée,") + 0.05;
+    const b = w("I8", "bon") - 0.08;
+    if (t < a - 0.1 || t > b + 0.9) return null;
+    const p = prog(t, a, b - a, (x) => 1 - Math.pow(1 - x, 2.2));
+    const done = t >= b;
+    const inK = prog(t, a - 0.1, 0.25, SNAP);
+    const outK = prog(t, b + 0.45, 0.4, IN_OUT);
+    const ok = pop(t, b);
+    return (
+      <Abs x={1240} y={300 - outK * 30}>
+        <div style={{ opacity: inK * (1 - outK), transform: `scale(${0.9 + 0.1 * inK})` }}>
+          <Card style={{ width: 620, padding: "20px 26px", borderRadius: 24, boxShadow: `0 30px 60px -30px rgba(15,43,38,.55)${done ? `, 0 0 0 ${4 * Math.min(1, ok)}px ${rgba(MINT.green, 0.5)}` : ""}` }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              {done ? (
+                <span style={{ display: "inline-flex", width: 34, height: 34, borderRadius: 99, background: MINT.green, alignItems: "center", justifyContent: "center", transform: `scale(${Math.min(1.2, ok)})` }}>
+                  <Check size={22} color="#FFFFFF" strokeWidth={3} />
+                </span>
+              ) : (
+                <Cross size={28} />
+              )}
+              <span style={tx(26, 800, done ? MINT.deep : MINT.ink)}>{done ? "Conseil prêt" : "Analyse de l'ordonnance…"}</span>
+              <span style={{ marginLeft: "auto", ...tx(24, 800, MINT.green), fontVariantNumeric: "tabular-nums" }}>{Math.round(p * 100)} %</span>
+            </div>
+            <div style={{ marginTop: 14, height: 14, borderRadius: 99, background: "#E3ECE8", overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${p * 100}%`, borderRadius: 99, background: `linear-gradient(90deg, ${MINT.green}, #2BD67B)`, boxShadow: `0 0 16px ${rgba(MINT.green, 0.6)}` }} />
+            </div>
+          </Card>
+        </div>
+      </Abs>
+    );
+  }
+
+  // ===================================================================================================================
+  // Pendant que la pharmacienne parle : le conseil (la crème lavante), puis la routine, chacun sur son mot.
+  // ===================================================================================================================
+  function ConseilPuisRoutine({ t }: { t: number }) {
+    const a = w("C1", "crème") - 0.15;
+    const r = w("C1", "routine") - 0.1;
+    if (t < a - 0.1 || t > end("C1") + 0.8) return null;
+    const outK = prog(t, end("C1") + 0.2, 0.4, IN_OUT);
+    const items = [
+      { k: ROUTINE[1].k, at: w("C1", "hydratant,") },
+      { k: ROUTINE[2].k, at: w("C1", "baume") },
+      { k: ROUTINE[3].k, at: w("C1", "solaire.") },
+    ];
+    return (
+      <Abs x={1330} y={110 - outK * 30}>
+        <div style={{ opacity: 1 - outK, display: "flex", alignItems: "center", gap: 18 }}>
+          <div style={{ transform: `scale(${Math.min(1, pop(t, a))})` }}>
+            <Card style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 22px 12px 12px", borderRadius: 22 }}>
+              <DupeTile kind="iso-nettoyant" size={64} radius={14} />
+              <div>
+                <div style={{ ...tx(13, 800, MINT.green), letterSpacing: "0.12em" }}>LE CONSEIL</div>
+                <div style={{ ...tx(22, 800), whiteSpace: "nowrap" }}>Crème lavante apaisante</div>
+              </div>
+            </Card>
+          </div>
+          {t >= r && (
+            <>
+              <span style={{ ...tx(40, 800, MINT.green), transform: `scale(${Math.min(1, pop(t, r))})` }}>+</span>
+              <div style={{ transform: `scale(${Math.min(1, pop(t, r))})` }}>
+                <Card style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 18px", borderRadius: 22 }}>
+                  <div style={{ ...tx(13, 800, MINT.green), letterSpacing: "0.12em", width: 92, lineHeight: 1.2 }}>LA ROUTINE</div>
+                  {items.map((it) => (
+                    <div key={it.k} style={{ transform: `scale(${Math.min(1, pop(t, it.at - 0.08))})` }}>
+                      <DupeTile kind={it.k} size={58} radius={13} />
+                    </div>
+                  ))}
+                </Card>
+              </div>
+            </>
+          )}
+        </div>
+      </Abs>
     );
   }
 
@@ -379,9 +611,9 @@ export function makeFilm(variant: Variant) {
   // protection solaire »), au-dessus de la bannière qui les nomme.
   // ===================================================================================================================
   function Vitrine({ t }: { t: number }) {
-    const words = ["nettoyant", "hydratant,", "baume", "solaire"];
+    const words = ["lavante", "hydratant,", "baume", "solaire"];
     const out = prog(t, end("I8") + 0.5, 0.45, IN_OUT);
-    if (t < w("I8", "nettoyant") - 0.2 || out >= 1) return null;
+    if (t < w("I8", "lavante") - 0.2 || out >= 1) return null;
     return (
       <Abs x={960} y={800}>
         <div style={{ display: "flex", gap: 34, opacity: 1 - out, transform: `translateY(${out * 40}px)` }}>
@@ -414,8 +646,8 @@ export function makeFilm(variant: Variant) {
     const cursor = prog(t, a, 0.9, IN_OUT);
     const d = DUPES["iso-solaire"];
     const sections = [
-      { t: "Pourquoi avec ce traitement", v: "Sous isotrétinoïne, la peau devient très sensible au soleil.", at: w("I10", "fiche") },
-      { t: "Utilisation", v: "Chaque matin sur le visage ; renouveler toutes les 2 heures dehors.", at: w("I10", "complète,") },
+      { t: "Indication", v: "Protéger la peau, rendue très sensible au soleil par le traitement.", at: w("I10", "fiche") },
+      { t: "Conseils d'utilisation", v: "Chaque matin sur le visage ; renouveler toutes les 2 heures dehors.", at: w("I10", "complète,") },
       { t: "Précautions et contre-indications", v: "Allergie connue à l'un des composants. Ne pas appliquer sur une peau lésée.", at: ci, alert: true },
     ];
     return (
@@ -623,56 +855,114 @@ export function makeFilm(variant: Variant) {
   // chez vous, plutôt qu'ailleurs. »
   // ===================================================================================================================
   function Campagne({ t }: { t: number }) {
-    const lance = w("I14", "lancez");
-    const labo = w("I14", "laboratoire,");
-    const remise = w("I14", "remise");
-    const click = remise + 0.6;
+    // « Et cette application ne sert pas qu'au patient : c'est aussi le lien direct entre votre pharmacie et toute votre
+    // patientèle. » Le téléphone du bilan reste à sa place : la pharmacie se relie à lui, puis à tous les patients.
+    // « Vous lancez une campagne d'offres avec un laboratoire ? Vos patients reçoivent la notification… et viennent en
+    // profiter chez vous, plutôt qu'ailleurs. »
+    const lien = w("I14", "lien");
     const toute = w("I14", "toute");
+    const vous = w("I14", "vous") - 0.35;
+    const lance = w("I14", "lancez");
+    const offres = w("I14", "d'offres");
+    const labo = w("I14", "laboratoire");
+    const click = labo + 0.85;
+    const patients = w("I14", "patients");
     const notif = w("I14", "notification…");
-    const revient = w("I14", "revient");
-    const crowd = 1 - prog(t, revient - 0.5, 0.45, IN_OUT);
-    const shops = prog(t, revient - 0.45, 0.6, SNAP);
-    const lit = prog(t, revient - 0.1, 0.4, SNAP);
+    const viennent = w("I14", "viennent");
+    const p1 = 1 - prog(t, vous, 0.4, IN_OUT);
+    const link = prog(t, lien - 0.1, 0.6, IN_OUT);
+    const crowd = prog(t, patients - 0.3, 0.4) * (1 - prog(t, viennent - 0.5, 0.45, IN_OUT));
+    const shops = prog(t, viennent - 0.45, 0.6, SNAP);
+    const lit = prog(t, viennent - 0.1, 0.4, SNAP);
+    const minis = [
+      [-250, -260], [250, -250], [-330, 40], [330, 60], [-230, 300], [240, 300],
+    ];
     return (
       <>
-        <Title t={t} at={VAT.I14} out={revient - 0.75} text="Vos campagnes, *chez tous vos patients.*" y={110} size={62} />
-        <Title t={t} at={revient - 0.1} text="Ils reviennent *chez vous.*" y={110} size={70} />
-        <Abs x={500} y={590}>
-          <div style={{ transform: `scale(${pop(t, lance - 0.3) * 0.92})` }}>
-            <Card style={{ width: 640, padding: 34 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                <span style={{ display: "inline-flex", width: 56, height: 56, borderRadius: 16, background: MINT.bg, alignItems: "center", justifyContent: "center" }}>
-                  <Megaphone size={30} color={MINT.green} />
-                </span>
-                <span style={tx(34, 800)}>Nouvelle campagne</span>
-                <span style={{ marginLeft: "auto" }}>
-                  <Example />
-                </span>
+        <Title t={t} at={VAT.I14} out={vous - 0.1} text="L'application, *le lien avec vos patients.*" y={110} size={62} />
+        <Title t={t} at={lance - 0.1} out={viennent - 0.75} text="Vos offres laboratoire, *sur leur téléphone.*" y={110} size={62} />
+        <Title t={t} at={viennent - 0.1} text="Ils viennent *chez vous.*" y={110} size={70} />
+        {/* 1. La pharmacie, le téléphone du patient, et le lien direct */}
+        {p1 > 0 && (
+          <div style={{ position: "absolute", inset: 0, opacity: p1 }}>
+            <svg width={1920} height={1080} style={{ position: "absolute", inset: 0, overflow: "visible" }}>
+              <path d="M770 600 C 950 520, 1050 540, 1150 600" fill="none" stroke={MINT.green} strokeWidth={8} strokeLinecap="round" pathLength={1} strokeDasharray={1} strokeDashoffset={1 - link} />
+              {link >= 1 && <path d="M770 600 C 950 520, 1050 540, 1150 600" fill="none" stroke="#FFFFFF" strokeWidth={4} strokeDasharray="10 22" strokeDashoffset={-t * 140} />}
+              {minis.map(([dx, dy], i) => {
+                const k = prog(t, toute + i * 0.07, 0.4, IN_OUT);
+                return k > 0 ? <path key={i} d={`M770 600 Q ${960 + dx * 0.3} ${600 + dy * 0.6}, ${1280 + dx} ${620 + dy}`} fill="none" stroke={rgba(MINT.green, 0.6)} strokeWidth={4} pathLength={1} strokeDasharray={1} strokeDashoffset={1 - k} /> : null;
+              })}
+            </svg>
+            <Abs x={560} y={600}>
+              <div style={{ transform: `scale(${Math.min(1, pop(t, VAT.I14 - 0.2))})` }}>
+                <Card style={{ width: 380, padding: "30px 28px", borderRadius: 32, display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+                  <span style={{ display: "inline-flex", width: 96, height: 96, borderRadius: 28, background: PB.green, alignItems: "center", justifyContent: "center" }}>
+                    <Store size={54} color={PB.citron} />
+                  </span>
+                  <span style={tx(30, 800)}>Votre pharmacie</span>
+                </Card>
               </div>
-              {[
-                { l: "Laboratoire", v: "Laboratoire partenaire", at: labo - 0.1 },
-                { l: "Gamme", v: "Soins solaires", at: labo + 0.2 },
-                { l: "Remise", v: "−20 % en pharmacie", at: remise - 0.1 },
-              ].map((f) => (
-                <div key={f.l} style={{ marginTop: 18, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px", borderRadius: 14, background: "#F4F8F6", opacity: prog(t, f.at, 0.3) }}>
-                  <span style={tx(24, 600, MINT.soft)}>{f.l}</span>
-                  <span style={tx(26, 800)}>{f.v}</span>
-                </div>
-              ))}
-              <div style={{ marginTop: 24, display: "flex", justifyContent: "flex-end" }}>
-                <span style={{ padding: "16px 34px", borderRadius: 999, background: t > click ? MINT.deep : MINT.green, ...tx(28, 800, "#FFFFFF"), transform: `scale(${t > click && t < click + 0.15 ? 0.94 : 1})` }}>{t > click + 0.1 ? "✓ Campagne lancée" : "Lancer la campagne"}</span>
+            </Abs>
+            <Abs x={960} y={545}>
+              <div style={{ opacity: prog(t, lien, 0.3), transform: `scale(${Math.min(1, pop(t, lien))})`, display: "inline-flex", alignItems: "center", gap: 10, padding: "10px 20px", borderRadius: 999, background: "#FFFFFF", boxShadow: "0 14px 30px -18px rgba(15,43,38,.5)", ...tx(24, 800, MINT.deep) }}>
+                <Link2 size={26} color={MINT.green} /> Lien direct
               </div>
-            </Card>
+            </Abs>
+            {minis.map(([dx, dy], i) => {
+              const k = pop(t, toute + 0.25 + i * 0.07);
+              return k > 0 ? (
+                <Abs key={i} x={1280 + dx} y={620 + dy}>
+                  <div style={{ transform: `scale(${Math.min(1, k) * 0.9})`, width: 74, height: 130, borderRadius: 18, background: "#FFFFFF", border: `4px solid ${MINT.ink}`, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 12px 24px -14px rgba(0,0,0,.4)" }}>
+                    <Cross size={26} />
+                  </div>
+                </Abs>
+              ) : null;
+            })}
+            <Phone t={t} x={1280} y={620} scale={0.98} tilt={-8}>
+              <div style={{ position: "absolute", inset: 0 }}>
+                <AppIso t={t} at={-10} />
+              </div>
+            </Phone>
           </div>
-        </Abs>
-        {/* Toute la patientèle : chaque patient reçoit la notification */}
+        )}
+        {/* 2. La campagne d'offres avec un laboratoire */}
+        {t >= lance - 0.4 && (
+          <Abs x={500} y={590}>
+            <div style={{ transform: `scale(${pop(t, lance - 0.3) * 0.92})` }}>
+              <Card style={{ width: 640, padding: 34 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                  <span style={{ display: "inline-flex", width: 56, height: 56, borderRadius: 16, background: MINT.bg, alignItems: "center", justifyContent: "center" }}>
+                    <Megaphone size={30} color={MINT.green} />
+                  </span>
+                  <span style={tx(34, 800)}>Campagne d&apos;offres</span>
+                  <span style={{ marginLeft: "auto" }}>
+                    <Example />
+                  </span>
+                </div>
+                {[
+                  { l: "Laboratoire", v: "Laboratoire partenaire", at: labo - 0.1 },
+                  { l: "Gamme", v: "Soins solaires", at: offres },
+                  { l: "Offre", v: "−20 % en pharmacie", at: labo + 0.3 },
+                ].map((f) => (
+                  <div key={f.l} style={{ marginTop: 18, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px", borderRadius: 14, background: "#F4F8F6", opacity: prog(t, f.at, 0.3) }}>
+                    <span style={tx(24, 600, MINT.soft)}>{f.l}</span>
+                    <span style={tx(26, 800)}>{f.v}</span>
+                  </div>
+                ))}
+                <div style={{ marginTop: 24, display: "flex", justifyContent: "flex-end" }}>
+                  <span style={{ padding: "16px 34px", borderRadius: 999, background: t > click ? MINT.deep : MINT.green, ...tx(28, 800, "#FFFFFF"), transform: `scale(${t > click && t < click + 0.15 ? 0.94 : 1})` }}>{t > click + 0.1 ? "✓ Campagne lancée" : "Lancer la campagne"}</span>
+                </div>
+              </Card>
+            </div>
+          </Abs>
+        )}
+        {/* Les patients reçoivent la notification */}
         {crowd > 0 && (
           <div style={{ position: "absolute", inset: 0, opacity: crowd }}>
             {Array.from({ length: 15 }, (_, i) => {
               const col = i % 5;
               const row = Math.floor(i / 5);
-              const at = toute + 0.05 * i;
-              const k = pop(t, at);
+              const k = pop(t, patients - 0.2 + 0.04 * i);
               const ping = prog(t, notif - 0.3 + 0.04 * i, 0.2, SNAP);
               const ripple = prog(t, notif - 0.3 + 0.04 * i, 0.9);
               const x = 1110 + col * 170;
@@ -690,23 +980,23 @@ export function makeFilm(variant: Variant) {
             })}
             <Abs x={1450} y={960}>
               <Pill t={t} at={notif} size={26}>
-                <Bell size={28} color={MINT.green} /> Toute votre patientèle prévenue
+                <Bell size={28} color={MINT.green} /> « −20 % chez votre pharmacie »
               </Pill>
             </Abs>
           </div>
         )}
-        {/* … et ils reviennent chez vous, plutôt qu'ailleurs */}
+        {/* … et ils viennent en profiter chez vous, plutôt qu'ailleurs */}
         {shops > 0 && (
           <div style={{ position: "absolute", left: 1000, top: 170, width: 1100, height: 900, opacity: shops, transform: `scale(${0.56}) translateY(${(1 - shops) * 60}px)`, transformOrigin: "0 0" }}>
             <div style={{ position: "absolute", left: 0, right: -400, top: 890, height: 12, background: MINT.ink, opacity: 0.85 }} />
             <Shop x={360} lit={lit} t={t} />
             <Shop x={1180} lit={0} t={t} />
             {PASSANTS.map((c, i) => {
-              const s = revient - 0.2 + i * 0.25;
-              const k = prog(t, s, 1.5, IN_OUT);
-              if (t < s || k >= 1) return null;
+              const s0 = viennent - 0.2 + i * 0.25;
+              const k = prog(t, s0, 1.5, IN_OUT);
+              if (t < s0 || k >= 1) return null;
               return (
-                <div key={i} style={{ position: "absolute", left: 860 - 420 * k, top: 720 - Math.abs(Math.sin(k * 14)) * 8, opacity: Math.min(1, k * 6) * (1 - prog(t, s + 1.3, 0.2)) }}>
+                <div key={i} style={{ position: "absolute", left: 860 - 420 * k, top: 720 - Math.abs(Math.sin(k * 14)) * 8, opacity: Math.min(1, k * 6) * (1 - prog(t, s0 + 1.3, 0.2)) }}>
                   <div style={{ width: 44, height: 44, borderRadius: 99, background: c, margin: "0 auto" }} />
                   <div style={{ width: 66, height: 112, borderRadius: "33px 33px 10px 10px", background: c, filter: "brightness(.9)", marginTop: 5 }} />
                 </div>
@@ -819,6 +1109,9 @@ export function makeFilm(variant: Variant) {
           <PBLogo t={t} at={finalIn ? FINAL_HIT : pb} size={finalIn ? 130 : 110} tone="light" grad />
         </Abs>
         <Ring t={t} at={pb + 0.1} x={960} y={280} max={1000} color={MINT.green} />
+        <Ring t={t} at={w("N12", "copilote") - 0.05} x={960} y={500} max={700} color={PB.citron} />
+        <Sparkle t={t} at={w("N12", "copilote")} x={300} y={440} size={64} color={PB.gold} />
+        <Sparkle t={t} at={w("N12", "copilote") + 0.12} x={1620} y={560} size={56} color={MINT.green} />
         {!finalIn && (
           <>
             <div style={{ position: "absolute", inset: 0, opacity: 1 - sloganOut }}>
@@ -855,10 +1148,21 @@ export function makeFilm(variant: Variant) {
         )}
         {(lettre ? t >= reservez : finalIn) && (
           <Abs x={960} y={finalIn ? 740 : 700}>
-            <div style={{ transform: `scale(${btn})`, display: "flex", alignItems: "center", gap: 16, padding: "26px 50px", borderRadius: 999, background: MINT.green, ...tx(42, 800, "#FFFFFF"), boxShadow: `0 24px 50px -20px ${rgba(MINT.green, 0.7)}` }}>
+            <div style={{ position: "relative", transform: `scale(${btn * (t > FINAL_HIT + 1.25 && t < FINAL_HIT + 1.4 ? 0.96 : 1)})`, display: "flex", alignItems: "center", gap: 16, padding: "26px 50px", borderRadius: 999, background: MINT.green, ...tx(42, 800, "#FFFFFF"), boxShadow: `0 24px 50px -20px ${rgba(MINT.green, 0.7)}` }}>
               <CalendarCheck size={44} /> Réserver une démonstration
+              <span style={{ position: "absolute", inset: 0, borderRadius: 999, overflow: "hidden", pointerEvents: "none" }}>
+                <span style={{ position: "absolute", top: 0, bottom: 0, width: 160, left: `${-30 + 160 * (((t - FINAL_HIT) * 0.7) % 1.6)}%`, background: "linear-gradient(100deg, transparent, rgba(255,255,255,.45), transparent)" }} />
+              </span>
             </div>
           </Abs>
+        )}
+        {finalIn && (
+          <>
+            <Abs x={960 + 420 * (1 - prog(t, FINAL_HIT + 0.5, 0.7, IN_OUT)) + 140} y={finalIn ? 780 + 260 * (1 - prog(t, FINAL_HIT + 0.5, 0.7, IN_OUT)) : 0}>
+              <MousePointer2 size={58} fill="#0F2B26" color="#FFFFFF" strokeWidth={1.5} style={{ opacity: prog(t, FINAL_HIT + 0.45, 0.2), transform: `scale(${t > FINAL_HIT + 1.25 && t < FINAL_HIT + 1.4 ? 0.82 : 1})` }} />
+            </Abs>
+            <Ring t={t} at={FINAL_HIT + 1.28} x={1100} y={760} max={260} color={MINT.green} />
+          </>
         )}
         <Abs x={960} y={finalIn ? 860 : 820}>
           <div style={{ opacity: prog(t, reservez + 0.8, 0.5), ...tx(36, 800, MINT.deep) }}>pharmaboost.app</div>
@@ -938,12 +1242,18 @@ export function makeFilm(variant: Variant) {
     cue("whoosh-pb", ACT1_END - 0.1, 0.35),
     cue("ui-clic", w("I5", "connecte"), 0.35),
     cue("pop-leger", w("I5", "directement"), 0.35),
+    ...[w("I2", "antibiotiques,"), w("I2", "allergies,"), w("I2", "douleurs…")].map((at, i) => cue("pop-leger", at - 0.1, 0.32, 1 + i * 0.06)),
+    cue("whoosh-rapide", w("I2", "trappe.") - 0.25, 0.35),
     cue("chrono", VAT.I6 + 0.1, 0.3),
     cue("pop-leger", VAT.I6 + 0.02, 0.3, 1),
     cue("pop-leger", w("I6", "Combien") - 0.08, 0.3, 1.05),
-    ...[0, 1, 2, 3, 4].map((i) => cue("pop-leger", VAT.I7 + 0.25 + i * 0.14, 0.26, 1 + i * 0.05)),
-    cue("etincelle", VAT.I7 + 0.1, 0.4),
-    cue("cloche-reussite", VAT.I7 + 0.7, 0.3),
+    cue("pop-leger", VAT.I7 + 0.05, 0.3, 0.95),
+    ...[w("I7", "stock,"), w("I7", "dates"), w("I7", "surstock,"), w("I7", "challenges"), w("I7", "marge…")].map((at, i) => cue("pop-leger", at - 0.08, 0.28, 1 + i * 0.05)),
+    cue("whoosh-rapide", w("I7", "en") - 0.2, 0.35),
+    cue("etincelle", w("I7", "en") + 0.35, 0.4),
+    cue("cloche-reussite", w("I7", "bon") - 0.1, 0.3),
+    ...[0, 1, 2].map((i) => cue("pop-leger", w("I7", "routine") + i * 0.12, 0.26, 1.05 + i * 0.05)),
+    cue("ui-ding", w("I8", "bon") - 0.08, 0.35),
     cue("whoosh-rapide", S_END - 0.2, 0.3),
     ...actCues(ACT2, ["S6", "S7"], 25.9, 35.3),
     cue("whoosh-rapide", ACT2_END - 0.1, 0.3),
@@ -952,6 +1262,8 @@ export function makeFilm(variant: Variant) {
     cue("ui-ding", w("I10", "contre-indications"), 0.3),
     cue("whoosh-rapide", F_END - 0.2, 0.3),
     ...actCues(ACT3, ["S8"], 35.3, 45.3),
+    cue("pop-leger", w("C1", "crème") - 0.15, 0.3),
+    ...[w("C1", "hydratant,"), w("C1", "baume"), w("C1", "solaire.")].map((at, i) => cue("pop-leger", at - 0.08, 0.26, 1.05 + i * 0.05)),
     cue("whoosh-pb", ACT3_END - 0.1, 0.35),
     cue("pop-leger", w("I12", "scanne") - 0.1, 0.35, 1),
     cue("mail", w("I12", "s'ouvre") - 0.1, 0.4),
@@ -960,12 +1272,15 @@ export function makeFilm(variant: Variant) {
     cue("pop-leger", w("I13", "conseils,"), 0.3),
     cue("pop-leger", w("I13", "routine,"), 0.3),
     cue("notif-douce", w("I13", "rappel"), 0.35),
-    cue("ui-clic", w("I14", "remise") + 0.6, 0.5),
+    cue("swipe-tel", w("I14", "lien") - 0.1, 0.3),
+    cue("pop-leger", w("I14", "toute") + 0.25, 0.28, 1.1),
+    cue("whoosh-rapide", w("I14", "vous") - 0.35, 0.3),
+    cue("ui-clic", w("I14", "laboratoire") + 0.85, 0.5),
     cue("notif-douce", w("I14", "notification…") - 0.3, 0.35),
     cue("notif-douce", w("I14", "notification…") - 0.1, 0.3, 1.08),
     cue("notif-douce", w("I14", "notification…") + 0.1, 0.3, 1.16),
-    cue("neon", w("I14", "revient") - 0.1, 0.4),
-    cue("porte-carillon", w("I14", "revient") + 0.5, 0.3),
+    cue("neon", w("I14", "viennent") - 0.1, 0.4),
+    cue("porte-carillon", w("I14", "viennent") + 0.5, 0.3),
     cue("whoosh-rapide", C_END - 0.2, 0.3),
     cue("pop-leger", w("I15", "conseils"), 0.28),
     cue("pop-leger", w("I15", "chiffre"), 0.28, 1.05),
@@ -975,6 +1290,8 @@ export function makeFilm(variant: Variant) {
     cue("impact-net", VAT.N12 - 0.05, 0.45),
     ...(lettre ? [cue("ui-ding", w("L3", "réservez"), 0.35)] : []),
     cue("confettis", FINAL_HIT + 0.1, 0.35),
+    cue("etincelle", w("N12", "copilote"), 0.35),
+    cue("ui-clic", FINAL_HIT + 1.28, 0.45),
   ];
 
   function Film() {
@@ -1010,6 +1327,7 @@ export function makeFilm(variant: Variant) {
             <Act t={t} keys={ACT1} only={ONE} />
           </AbsoluteFill>
         )}
+        <Trappe t={t} />
         <Scene t={t} from={ACT1_END} to={H_END}>
           <Habitudes t={t} />
         </Scene>
@@ -1017,11 +1335,13 @@ export function makeFilm(variant: Variant) {
           <UneSeconde t={t} />
         </Scene>
         {actWrap(S_END, ACT2_END, ACT2, ["S6", "S7"])}
+        <Chargement t={t} />
         <Vitrine t={t} />
         <Scene t={t} from={ACT2_END} to={F_END}>
           <Fiche t={t} />
         </Scene>
         {actWrap(F_END, ACT3_END, ACT3, ["S8"])}
+        <ConseilPuisRoutine t={t} />
         <Scene t={t} from={ACT3_END} to={B_END}>
           <Bilan t={t} />
         </Scene>
@@ -1051,7 +1371,7 @@ export function makeFilm(variant: Variant) {
       </AbsoluteFill>
     );
   }
-  return { Film, TOTAL_FRAMES: TOTAL * FPS, TOTAL };
+  return { Film, TOTAL_FRAMES: TOTAL * FPS, TOTAL, VAT };
 }
 
 export const PRESENTATION = makeFilm("presentation");

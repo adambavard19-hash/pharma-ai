@@ -86,7 +86,7 @@ type Hero = { kind: ChipKind; text: string; word: string; at: number; fly: numbe
 const HEROES: Hero[] = [
   // Plus de marge à l'écran (fondateur, 4 nov. 2026) : la pastille « marge » ne sort jamais (temps hors de la scène).
   { kind: "marge", text: `Marge +4,20${NNB}€`, word: "MARGE", at: 99, fly: 99, land: 99, scale: 2.35, color: PB.brand },
-  { kind: "challenge", text: `Challenge · +1${NNB}€ par boîte pour l'équipe`, word: "CHALLENGE", at: 33.52, fly: 33.94, land: 34.2, scale: 1.42, color: PB.gold },
+  { kind: "challenge", text: `Challenge laboratoire · +1${NNB}€ par boîte`, word: "CHALLENGE LABO", at: 33.52, fly: 33.94, land: 34.2, scale: 1.42, color: PB.gold },
   { kind: "date", text: "Date courte", word: "DATE COURTE", at: 34.4, fly: 34.78, land: 35.04, scale: 2.35, color: PB.date },
 ];
 const [H_MARGE, H_CHAL, H_DATE] = HEROES;
@@ -102,7 +102,8 @@ const QUESTIONS = [
   { text: `Le traitement vient-il de commencer${NB}?`, at: S7_T.q1 },
   { text: `La peau ou les lèvres tiraillent-elles déjà${NB}?`, at: S7_T.q2 },
 ];
-const DISCOURS = { text: "Ce traitement dessèche la peau dès les premières semaines. Lavez en douceur matin et soir, sans frotter, puis hydratez. Évitez le soleil et protégez-vous en SPF 50+.", at: S7_T.disc, dur: S7_T.discDur };
+/** Validé par le fondateur (5 nov. 2026) : « une sécheresse à différents niveaux », plus de soleil ni de SPF ici. */
+export const DISCOURS = { text: "Ce traitement peut provoquer une sécheresse à différents niveaux, dès les premières semaines. Lavez en douceur, matin et soir, sans frotter, puis hydratez.", at: S7_T.disc, dur: S7_T.discDur };
 
 /* ------------------------------------------------------------------ géométrie */
 
@@ -421,7 +422,7 @@ export function CardWorld({ t, sold, children }: { t: number; sold?: number; chi
         <S7Cursor t={t} qTab={qTab} dTab={dTab} />
         {/* le titre de la scène */}
         <Heading t={t} l1={["Les", "questions"]} l2="à poser." at1={30.6} at2={S7_T.q2} exitAt={S7_T.h1Out} />
-        <Heading t={t} l1={["Les", "mots"]} l2="à dire." at1={S7_T.mots} at2={S7_T.dire} exitAt={S7_T.h2Out} />
+        <Heading t={t} l1={["Le", "conseil"]} l2="à prodiguer." at1={S7_T.mots} at2={S7_T.dire} exitAt={S7_T.h2Out} />
         {/* les pastilles en vedette */}
         {HEROES.map((h) => (
           <HeroFx key={`fx${h.kind}`} t={t} h={h} />

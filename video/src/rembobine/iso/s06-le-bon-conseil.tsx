@@ -62,23 +62,19 @@ const CETI = `Isotrétinoïne 20${NB}mg`;
 const T = {
   /** « boîte » : la boîte est sous la douchette, le laser part. */
   beam1: 26.44,
+  /** « le bon conseil » : la ligne ① (la crème lavante) arrive, puis s'illumine (5 nov. 2026 : le conseil d'abord). */
   line1: 26.56,
-  beam2: 26.74,
-  line2: 26.86,
-  /** La 3e boîte (Curacné, 31 oct. 2026) et sa routine, avant que les cartes ne s'ouvrent. */
-  beam3: 27.0,
-  line3: 27.1,
-  line4: 27.16,
-  /** « bon conseil » : la carte 1 s'illumine, juste après l'ouverture des cartes (la petite bannière nomme d'abord les
-   * conseils, 30 oct. 2026). */
-  bon: 27.62,
-  /** « pris » 28,40 : le panneau du stock entre. */
-  pris: 28.38,
-  lock: 28.62,
-  arrow: 28.8,
-  /** « stock » 29,22 : la pastille pope au bout de la flèche. */
-  stock: 29.2,
-  stock2: 29.34,
+  bon: 26.7,
+  /** « pris dans votre stock » : le panneau du stock entre, le viseur se verrouille, « 6 » défile. */
+  pris: 27.0,
+  lock: 27.24,
+  stock: 27.8,
+  stockOut: 27.86,
+  /** « Puis la routine » : les lignes ②, ③ et la routine ④ suivent. */
+  line2: 28.15,
+  line3: 28.3,
+  line4: 28.45,
+  stock2: 28.25,
   cursorIn: 29.42,
   click: 29.95,
   unfold: 30.04,
@@ -87,7 +83,7 @@ const T = {
 } as const;
 
 export const S6_LINES: BannerLine[] = [
-  { n: 1, drug: CETI, product: "Crème lavante apaisante", image: "kind:iso-nettoyant", challenge: true, chips: [{ kind: "stock", text: "6 en stock", at: T.stock }], at: T.line1 },
+  { n: 1, drug: CETI, product: "Crème lavante apaisante", image: "kind:iso-nettoyant", challenge: true, chips: [{ kind: "stock", text: "6 en stock", at: T.stock }], at: T.line1, openAt: T.line1 + 0.06 },
   { n: 2, drug: CETI, product: "Soin hydratant apaisant", image: "kind:iso-hydratant", chips: [{ kind: "stock", text: "9 en stock", at: T.stock2 }], at: T.line2 },
   { n: 3, drug: CETI, product: "Baume réparateur lèvres", image: "kind:iso-levres", shortDate: true, chips: [{ kind: "stock", text: "14 en stock", at: T.stock2 + 0.08 }, { kind: "date", text: "Date courte", at: T.stock2 + 0.16 }], at: T.line3 },
   { n: 4, drug: CETI, product: "Routine isotrétinoïne · 4 produits", routine: ["kind:iso-nettoyant", "kind:iso-hydratant", "kind:iso-levres", "kind:iso-solaire"], chips: [{ kind: "plain", text: "Nettoyer · Hydrater · Lèvres · Soleil", at: T.stock2 + 0.24 }], at: T.line4 },
@@ -147,31 +143,28 @@ type Cam = { fx: number; fy: number; z: number; sx: number; sy: number };
 
 function camAt(t: number): Cam {
   const z = keys(t, [
-    [26.4, 1],
-    [27.14, 1.035, LINEAR],
-    [27.46, 1.16, SNAP],
-    [28.24, 1.19, LINEAR],
-    [28.62, 1.045, SNAP],
+    [26.5, 1],
+    [26.68, 1.14, SNAP],
+    [26.96, 1.16, LINEAR],
+    [27.16, 1.045, SNAP],
     [29.38, 1.065, LINEAR],
     [29.9, 1.14, IN_OUT],
     [30.3, 1.0, SNAP],
   ]);
   let fx = keys(t, [
-    [26.4, 960],
-    [27.14, 950, LINEAR],
-    [27.46, 1088, SNAP],
-    [28.24, 1100, LINEAR],
-    [28.62, 925, SNAP],
+    [26.5, 960],
+    [26.68, 1088, SNAP],
+    [26.96, 1100, LINEAR],
+    [27.16, 925, SNAP],
     [29.38, 940, LINEAR],
     [29.9, 1070, IN_OUT],
     [30.3, 960, SNAP],
   ]);
   let fy = keys(t, [
-    [26.4, 540],
-    [27.14, 532, LINEAR],
-    [27.46, 470, SNAP],
-    [28.24, 468, LINEAR],
-    [28.62, 522, SNAP],
+    [26.5, 540],
+    [26.68, 470, SNAP],
+    [26.96, 468, LINEAR],
+    [27.16, 522, SNAP],
     [29.38, 518, LINEAR],
     [29.9, 480, IN_OUT],
     [30.3, 540, SNAP],
@@ -191,8 +184,6 @@ function camAt(t: number): Cam {
   let sy = wobble(t, 62, 3, 0.5) * live;
   for (const [at, amp, frames] of [
     [T.beam1 + 0.02, 5, 9],
-    [T.beam2 + 0.02, 4, 8],
-    [T.beam3 + 0.02, 4, 8],
     [T.lock, 4, 8],
     [T.click, 5, 9],
   ] as const) {
@@ -212,14 +203,14 @@ const SCAN = { x: 400, y: 392, box: { x: 386, y: 690 } } as const;
 
 function Scanner({ t }: { t: number }) {
   const inK = prog(t, 26.22, 0.3, SNAP);
-  const outK = prog(t, 27.3, 0.34, EXIT);
+  const outK = prog(t, 26.62, 0.3, EXIT);
   if (inK <= 0 || outK >= 1) return null;
   // Petit coup de poignet à chaque bip.
   const kick = (b: number) => pulse(t, b - 0.04, 0.05, 0.04, 0.2);
   const x = SCAN.x + lerp(-420, 0, inK) + lerp(0, -380, outK) + wobble(t, 64, 3, 0.9);
-  const y = SCAN.y + lerp(-420, 0, inK) + lerp(0, -520, outK) - 10 * (kick(T.beam1) + kick(T.beam2) + kick(T.beam3)) + wobble(t, 65, 3, 0.8);
-  const angle = lerp(-38, -6, inK) + 6 * (kick(T.beam1) + kick(T.beam2) + kick(T.beam3)) + lerp(0, -30, outK);
-  return <Douchette t={t} x={x} y={y} angle={angle} size={1.4} beamAt={[T.beam1, T.beam2, T.beam3]} beamDur={0.34} beamLength={118} beamWidth={330} />;
+  const y = SCAN.y + lerp(-420, 0, inK) + lerp(0, -520, outK) - 10 * kick(T.beam1) + wobble(t, 65, 3, 0.8);
+  const angle = lerp(-38, -6, inK) + 6 * kick(T.beam1) + lerp(0, -30, outK);
+  return <Douchette t={t} x={x} y={y} angle={angle} size={1.4} beamAt={[T.beam1]} beamDur={0.34} beamLength={118} beamWidth={330} />;
 }
 
 /** Une boîte qui glisse sous la douchette, attend le bip, puis tombe (dans le sac, hors cadre). */
@@ -241,41 +232,6 @@ function ScanBox({ t, kind, inAt, beam }: { t: number; kind: MedKind; inAt: numb
       {lit > 0 && <div style={{ position: "absolute", left: x - 215, top: y - 255, width: 430, height: 290, background: `radial-gradient(ellipse at 50% 55%, ${rgba("#FF3B3B", 0.22 * lit)} 0%, transparent 65%)`, pointerEvents: "none" }} />}
     </>
   );
-}
-
-/** La traînée qui part de la boîte scannée et file jusqu'à sa ligne dans la capsule (arrivée à `arrive`). */
-function Streak({ t, from, to, arrive, dur = 0.16 }: { t: number; from: { x: number; y: number }; to: { x: number; y: number }; arrive: number; dur?: number }) {
-  const start = arrive - dur;
-  const k = prog(t, start, dur, IN_OUT);
-  const tail = prog(t, start + dur * 0.45, dur, IN_OUT);
-  if (t < start || tail >= 1) return null;
-  // Une courbe qui monte un peu (contrôle au-dessus du milieu).
-  const c = { x: (from.x + to.x) / 2, y: Math.min(from.y, to.y) - 160 };
-  const at = (u: number) => ({ x: (1 - u) * (1 - u) * from.x + 2 * u * (1 - u) * c.x + u * u * to.x, y: (1 - u) * (1 - u) * from.y + 2 * u * (1 - u) * c.y + u * u * to.y });
-  const n = 14;
-  const pts = Array.from({ length: n + 1 }, (_, i) => at(lerp(tail, k, i / n)));
-  const d = pts.map((p, i) => `${i ? "L" : "M"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
-  const head = at(k);
-  return (
-    <svg width={1920} height={1080} style={{ position: "absolute", inset: 0, overflow: "visible", pointerEvents: "none" }}>
-      <path d={d} fill="none" stroke={rgba(PB.green, 0.85)} strokeWidth={12} strokeLinecap="round" />
-      <path d={d} fill="none" stroke={PB.citron} strokeWidth={6} strokeLinecap="round" />
-      {k < 1 && (
-        <>
-          <circle cx={head.x} cy={head.y} r={16} fill={PB.green} />
-          <circle cx={head.x} cy={head.y} r={10} fill={PB.citron} />
-        </>
-      )}
-    </svg>
-  );
-}
-
-/** L'éclat à l'arrivée de la traînée dans la ligne. */
-function Hit({ t, at, x, y }: { t: number; at: number; x: number; y: number }) {
-  const k = prog(t, at, 0.38, SNAP);
-  if (t < at || k >= 1) return null;
-  const r = 20 + 90 * k;
-  return <div style={{ position: "absolute", left: x - r, top: y - r, width: 2 * r, height: 2 * r, borderRadius: "50%", border: `${6 * (1 - k)}px solid ${PB.citron}`, opacity: 1 - k, boxShadow: `0 0 24px ${rgba(PB.citron, 0.6 * (1 - k))}` }} />;
 }
 
 /* ------------------------------------------------------------------ le stock */
@@ -389,7 +345,7 @@ function RollNumber({ t, from, to, at, dur, size }: { t: number; from: number; t
 
 function StockPanel({ t }: { t: number }) {
   const inK = prog(t, T.pris, 0.34, SNAP);
-  const out = prog(t, T.unfold - 0.04, 0.24, EXIT);
+  const out = prog(t, T.stockOut, 0.1, EXIT);
   if (t < T.pris || out >= 1) return null;
   const lockK = prog(t, T.lock, 0.2, SNAP);
   const shelfTop = PANEL.y + 84;
@@ -433,32 +389,6 @@ function StockPanel({ t }: { t: number }) {
   );
 }
 
-/** La flèche qui part du rayon et file jusqu'à la pastille « 12 en stock » de la ligne 1. */
-function StockArrow({ t }: { t: number }) {
-  const draw = prog(t, T.arrow, T.stock - T.arrow - 0.02, IN_OUT);
-  const out = prog(t, T.click - 0.1, 0.25, EXIT);
-  if (t < T.arrow || out >= 1) return null;
-  const a = { x: PANEL.x + PANEL.w - 40, y: PANEL.y + 150 };
-  const b = { x: CHIP1.x - 116, y: CHIP1.y + 8 };
-  const c1 = { x: a.x + 150, y: a.y - 10 };
-  const c2 = { x: b.x - 120, y: b.y + 40 };
-  const d = `M${a.x},${a.y} C${c1.x},${c1.y} ${c2.x},${c2.y} ${b.x},${b.y}`;
-  const len = 520;
-  const head = draw >= 0.98;
-  return (
-    <svg width={1920} height={1080} style={{ position: "absolute", inset: 0, overflow: "visible", opacity: 1 - out, pointerEvents: "none" }}>
-      <path d={d} fill="none" stroke={PB.green} strokeWidth={12} strokeLinecap="round" strokeDasharray={len} strokeDashoffset={len * (1 - draw)} />
-      <path d={d} fill="none" stroke={PB.citron} strokeWidth={5} strokeLinecap="round" strokeDasharray={`14 16`} strokeDashoffset={-t * 90} style={{ clipPath: "none" }} opacity={draw >= 1 ? 1 : 0} />
-      <circle cx={a.x} cy={a.y} r={11 * clamp01(draw * 6)} fill={PB.green} />
-      {head && (
-        <g transform={`translate(${b.x} ${b.y}) rotate(-12) scale(${clamp01(ressort(t, T.stock - 0.04, { damping: 9, stiffness: 300, mass: 0.5 }))})`}>
-          <path d="M-22,-16 L6,0 L-22,16 Z" fill={PB.green} stroke={PB.green} strokeWidth={6} strokeLinejoin="round" />
-        </g>
-      )}
-    </svg>
-  );
-}
-
 /* ------------------------------------------------------------------ la sortie : clic, grande carte */
 
 /**
@@ -469,7 +399,7 @@ function StockArrow({ t }: { t: number }) {
 const NNB = "\u202F";
 const S7_CHIPS: ChipSpec[] = [
   { kind: "stock", text: "6 en stock", at: T.unfold + 0.18 },
-  { kind: "challenge", text: `Challenge · +1${NNB}€ par boîte pour l'équipe`, at: 34.11 },
+  { kind: "challenge", text: `Challenge laboratoire · +1${NNB}€ par boîte`, at: 34.11 },
   { kind: "date", text: "Date courte", at: 34.95 },
 ];
 const S7_QUESTIONS = [
@@ -477,6 +407,8 @@ const S7_QUESTIONS = [
   { text: `La peau ou les lèvres tiraillent-elles déjà${NB}?`, at: 30.86 },
 ];
 const CARD_TO = { x: 960, y: 470, s: 0.98 } as const;
+/** « À dire au patient » : la phrase de S7 (écrite à son temps), jamais celle de l'antibiotique par défaut. */
+const ISO_DISCOURS = { text: "Ce traitement peut provoquer une sécheresse à différents niveaux, dès les premières semaines. Lavez en douceur, matin et soir, sans frotter, puis hydratez.", at: 31.62, dur: 1.5 };
 
 function cardPose(t: number) {
   const k = prog(t, T.unfold, 0.3, SNAP);
@@ -506,7 +438,7 @@ function TheCursor({ t }: { t: number }) {
 function Unfold({ t }: { t: number }) {
   if (t < T.unfold - 0.02) return null;
   const c = cardPose(t);
-  return <BannerCard t={t} at={T.unfold} product="Crème lavante apaisante" image="kind:iso-nettoyant" for={CETI} tab="questions" questions={S7_QUESTIONS} chips={S7_CHIPS} x={c.x} y={c.y} scale={c.s} />;
+  return <BannerCard t={t} at={T.unfold} product="Crème lavante apaisante" image="kind:iso-nettoyant" for={CETI} tab="questions" questions={S7_QUESTIONS} discours={ISO_DISCOURS} chips={S7_CHIPS} x={c.x} y={c.y} scale={c.s} />;
 }
 
 /* ------------------------------------------------------------------ la scène */
@@ -521,24 +453,13 @@ export function Scene({ t }: { t: number }) {
   const c = camAt(t);
   const dim = prog(t, T.unfold, 0.3, SNAP);
   const fade = prog(t, T.fadeOut, T.end - T.fadeOut, LINEAR);
-  const scanFrom1 = { x: SCAN.box.x + 40, y: SCAN.box.y - 130 };
-  const sp = inCap({ x: 470, y: 26 }, t);
   return (
     <AbsoluteFill style={{ background: SCREEN_UI.paper, overflow: "hidden", opacity: 1 - fade }}>
       <AbsoluteFill style={{ transformOrigin: "0 0", transform: worldTransform(c) }}>
         <ComptoirStage t={t} highlight={{ n: 1, at: T.bon }} pressed={{ n: 1, at: T.click }} dim={dim} />
         <ScanBox t={t} kind="isotretinoine" inAt={26.18} beam={T.beam1} />
         <Scanner t={t} />
-        <Streak t={t} from={scanFrom1} to={rowHead(1, T.line1)} arrive={T.line1} />
-        <Streak t={t} from={scanFrom1} to={rowHead(2, T.line2)} arrive={T.line2} />
-        <Streak t={t} from={scanFrom1} to={rowHead(3, T.line3)} arrive={T.line3} />
-        <Hit t={t} at={T.line1} x={rowHead(1, t).x} y={rowHead(1, t).y} />
-        <Hit t={t} at={T.line2} x={rowHead(2, t).x} y={rowHead(2, t).y} />
-        <Hit t={t} at={T.line3} x={rowHead(3, t).x} y={rowHead(3, t).y} />
-        <Sparkle t={t} at={T.bon + 0.08} x={sp.x} y={sp.y} size={70} color={PB.citron} />
         <StockPanel t={t} />
-        <StockArrow t={t} />
-        <Sparkle t={t} at={T.stock + 0.04} x={CHIP1.x + 70} y={CHIP1.y - 24} size={56} color={PB.citron} />
         {dim > 0 && <div style={{ position: "absolute", inset: 0, background: rgba(PB.green, 0.28 * dim) }} />}
         <Unfold t={t} />
         <TheCursor t={t} />
@@ -556,10 +477,9 @@ export const cues: Cue[] = [
   cue("pop-leger", T.line3, 0.28, 1.14),
   cue("pop-leger", T.line4, 0.26, 1.2),
   cue("scintillement", T.bon, 0.45),
-  cue("swoosh", 27.3, 0.25),
+  cue("swoosh", 26.62, 0.25),
   cue("whoosh-pb", T.pris - 0.04, 0.3),
   cue("verrou-hud", T.lock, 0.55),
-  cue("laser-ecrit", T.arrow, 0.25, 1.2, 0.4),
   cue("ui-pop", T.stock, 0.5),
   cue("pop-leger", T.stock2, 0.35),
   cue("ui-clic", T.click, 0.6),

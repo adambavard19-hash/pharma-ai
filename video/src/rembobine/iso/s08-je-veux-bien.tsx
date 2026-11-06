@@ -433,7 +433,7 @@ function Counter({ t }: { t: number }) {
         wave={T.wave}
       />
       <XrayTag t={t} leave={leave} />
-      <Bubble t={t} at={T.je} exitAt={T.d3Out} text={<>Nettoyant, hydratant,<br />lèvres et soleil.</>} side="right" mood="pb" x={SET.pharmacienne.bubble.x} y={SET.pharmacienne.bubble.y + 6} size={44} />
+      <Bubble t={t} at={T.je} exitAt={T.d3Out} text={<>Une crème lavante,<br />puis la routine.</>} side="right" mood="pb" x={SET.pharmacienne.bubble.x} y={SET.pharmacienne.bubble.y + 6} size={44} />
       <Bubble t={t} at={T.ah} exitAt={39.97} text={<>Ah oui,<br />{`je veux bien${NB}!`}</>} side="left" mood="pb" x={SET.patient.bubble.x} y={SET.patient.bubble.y + 8} size={50} />
     </Pharmacy>
   );

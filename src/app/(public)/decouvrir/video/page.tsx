@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: "Vidéo de présentation", descriptio
  * doit lancer la vidéo tout de suite, sans connexion).
  */
 const FILMS = {
-  presentation: { src: PRESENTATION_VIDEO_SRC, poster: PRESENTATION_VIDEO_POSTER, eyebrow: "Vidéo de présentation · 2 min 09", title: "« Il vous fallait autre chose ? »", text: "La scène de tous les jours au comptoir, puis la même avec PharmaBoost : à l'isotrétinoïne scannée, la routine complète, prise dans le stock de l'officine. Puis le bilan par e-mail et dans l'application, les campagnes, et l'équipe suivie par le titulaire." },
+  presentation: { src: PRESENTATION_VIDEO_SRC, poster: PRESENTATION_VIDEO_POSTER, eyebrow: "Vidéo de présentation · 2 min 39", title: "« Il vous fallait autre chose ? »", text: "La scène de tous les jours au comptoir, puis la même avec PharmaBoost : à l'isotrétinoïne scannée, le bon conseil puis la routine complète, pris dans le stock de l'officine. Puis le bilan par QR code dans l'application, les campagnes d'offres, et l'équipe suivie par le titulaire." },
   pharmacien: { src: "/video/prise-en-main-pharmacien.mp4", poster: "/video/prise-en-main-pharmacien.jpg", eyebrow: "Utilisation du logiciel · 2 min", title: "PharmaBoost au comptoir", text: "Scanner, lire le conseil, poser les deux questions, proposer, puis le bilan par e-mail au patient." },
   titulaire: { src: "/video/prise-en-main-titulaire.mp4", poster: "/video/prise-en-main-titulaire.jpg", eyebrow: "Utilisation du logiciel · 2 min 40", title: "PharmaBoost pour le titulaire", text: "Les postes, l'équipe, les résultats et les conseils de la pharmacie." },
 } as const;
