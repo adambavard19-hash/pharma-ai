@@ -8,7 +8,7 @@ import { SHEET_MISSING, SHEET_PATIENT_LABELS, type CounterSheet, type CounterShe
 import { Robot } from "@/components/robot";
 import { QrCode } from "@/components/document/qr-code";
 import { HelixBackdrop } from "@/components/app/helix/helix-backdrop";
-import { GreenCross, ScanCapsule, SCAN_CSS, SCAN_STEPS, WHITE_PILL_WIDTH, WhitePill, shortAdviceName, whiteFoundWidth, type ScanLook, type WhiteFound } from "./scan-capsule";
+import { GreenCross, LIVING_PILL_WIDTH, ScanCapsule, SCAN_CSS, SCAN_STEPS, WHITE_PILL_WIDTH, WhitePill, shortAdviceName, type ScanLook, type WhiteFound } from "./scan-capsule";
 import { eurosOf, possibleMargin } from "./mix-island";
 import { analysisSteps, allAnswered, followAdviceLink, isTap, registerTap, splitAlert, STAGE_MOOD, STAGE_WIDTH, stageTitle, stageTone, type IslandOutcome, type IslandState } from "@/core/island/banner-flow";
 import { cn } from "@/lib/utils";
@@ -538,6 +538,7 @@ export function CounterIsland(props: CounterIslandProps) {
             done={Math.round((Math.min(state.stepsDone, total) / Math.max(1, total)) * SCAN_STEPS.length)}
             drug={/lecture en cours/i.test(props.drug) ? "" : props.drug}
             found={whiteFound}
+            total={items.filter((item) => !item.sheet?.routine).length + (items.some((item) => item.sheet?.routine) ? 1 : 0)}
           />
         </>
       ) : (
@@ -1091,7 +1092,7 @@ export function CounterIsland(props: CounterIslandProps) {
       }}
     >
       <IslandShell
-        width={whiteLook && resting && !peek && !grumpy ? (hover ? 330 : WHITE_PILL_WIDTH) : whiteLook && scanCapsule ? (state.stage === "ready" ? whiteFoundWidth(whiteFound) : WHITE_PILL_WIDTH) : scanCapsule ? 340 : width}
+        width={whiteLook && resting && !peek && !grumpy ? (hover ? 330 : WHITE_PILL_WIDTH) : whiteLook && scanCapsule ? LIVING_PILL_WIDTH : scanCapsule ? 340 : width}
         tone={tone}
         className={whiteLook && peek && !grumpy ? "crd-light" : whiteLook && ((resting && !peek && !grumpy) || scanCapsule) ? "crd-white" : scanCapsule ? "crd-glass crd-cap-in" : props.compactEnd && (state.stage === "email" || (state.stage === "done" && state.outcomes.some((outcome) => outcome === "SOLD"))) ? "crd-light" : undefined}
         contentKey={whiteLook && resting && !peek && !grumpy ? "attente-blanche" : scanCapsule ? "scan-capsule" : grumpy ? "grumpy" : peek ? "peek" : collapsed ? `${state.stage}-replie` : sleeping ? "advice-capsule" : compact ? "advice-compact" : state.stage}

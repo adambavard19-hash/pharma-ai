@@ -85,9 +85,9 @@ export function ScanCapsule(props: ScanCapsuleProps) {
 }
 
 export const SCAN_CSS = `
-section.crd-white.crd-white{background:#FFFFFF!important;border-radius:999px!important;box-shadow:0 14px 32px -14px rgba(15,43,38,.45),0 0 0 1px rgba(14,138,123,.25)!important;isolation:isolate}
+section.crd-white.crd-white{background:#FFFFFF!important;border-radius:999px!important;box-shadow:0 12px 26px -16px rgba(14,138,123,.45),0 2px 6px -3px rgba(14,138,123,.2),0 0 0 1px #CDEBE4!important;isolation:isolate}
 section.crd-white.crd-white::before{display:none!important}
-section.crd-white.crd-white::after{content:"";position:absolute;inset:-60% -10%;z-index:-1;pointer-events:none;background:url(/poste/adn-helice.jpg) 62% 40%/cover no-repeat;mix-blend-mode:multiply;opacity:.42;animation:crd-adn 14s ease-in-out infinite alternate}
+section.crd-white.crd-white::after{display:none;content:"";position:absolute;inset:-60% -10%;z-index:-1;pointer-events:none;background:url(/poste/adn-helice.jpg) 62% 40%/cover no-repeat;mix-blend-mode:multiply;opacity:.42;animation:crd-adn 14s ease-in-out infinite alternate}
 @keyframes crd-adn{from{transform:translate3d(-6%,-3%,0) scale(1.05) rotate(-2deg)}to{transform:translate3d(6%,3%,0) scale(1.15) rotate(2deg)}}
 section.crd-light.crd-light{background:#BDEBD7!important;border-radius:22px!important;box-shadow:0 0 0 1.5px #3DBF8E,0 18px 40px -14px rgba(14,124,90,.5)!important}
 .crd-frame.crd-frame{background:linear-gradient(160deg,#BDEBD7,#8FDDBE)!important}
@@ -115,11 +115,19 @@ section.crd-glass.crd-glass::before{content:"";position:absolute;inset:0;border-
 .scn-pill-open .scn-pill-left{transform:translateX(-7px) rotate(-12deg)}
 .scn-pill-open .scn-pill-right{transform:translateX(7px) rotate(12deg)}
 .scn-pill-count{position:absolute;left:50%;top:50%;margin:-11px 0 0 -11px;width:22px;height:22px;border-radius:999px;background:#E8FF9C;color:#04261A;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.viv-wave{position:absolute;inset:0;border-radius:999px;background:#14A38F;animation:viv-wave 1s ease-out infinite}
+@keyframes viv-wave{0%{transform:scale(.7);opacity:.7}100%{transform:scale(1.9);opacity:0}}
+.viv-in{animation:viv-in .4s cubic-bezier(.2,.9,.3,1.2) both}
+@keyframes viv-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.viv-count{animation:scn-pop .4s cubic-bezier(.2,.9,.3,1.4) both}
+@media (prefers-reduced-motion:reduce){.viv-wave,.viv-in,.viv-count{animation:none}}
 @media (prefers-reduced-motion:reduce){section.crd-white.crd-white::after,.scn-pop,.scn-heart,.scn-cross-glow,.crd-cap-in,.crd-enter-croix,.crd-enter-gelule{animation:none}}
 `;
 
 /** La largeur de la petite bannière blanche : l'attente et le scan font exactement la même taille. */
 export const WHITE_PILL_WIDTH = 214;
+/** L'Île vivante (fondateur, 6 nov. 2026, proposition B) : la pilule s'élargit au scan, à la recherche et au résultat. */
+export const LIVING_PILL_WIDTH = 300;
 
 /** La croix de pharmacie verte de la petite bannière blanche : ses bras s'allument un à un pendant l'analyse. */
 export function GreenCross({ lit, size = 24 }: { lit: number; size?: number }) {
@@ -145,38 +153,53 @@ export type WhiteFound = { name: string; challenge?: boolean; shortDate?: boolea
  * boîte » et « Une question ? ») ; au scan, la croix qui s'allume sur le nom de la boîte ; trouvé, le nom des conseils avec
  * l'étoile du challenge ou le sablier de la date courte. Le contenu seul : la capsule blanche est la bannière autour.
  */
-export function WhitePill({ phase, done = 0, drug = "", found = [], open = false }: { phase: ScanPhase | "idle"; done?: number; drug?: string; found?: WhiteFound[]; open?: boolean }) {
-  const lit = phase === "idle" || phase === "found" ? 4 : phase === "analyse" ? Math.min(done, 4) : 0;
+export function WhitePill({ phase, done = 0, drug = "", found = [], open = false, total }: { phase: ScanPhase | "idle"; done?: number; drug?: string; found?: WhiteFound[]; open?: boolean; total?: number }) {
+  if (phase !== "idle") return <LivingPill phase={phase} done={done} drug={drug} count={total ?? found.length} />;
   return (
-    <div className="flex h-10 items-center justify-center gap-2.5 px-4" data-ile-attente={phase === "idle" ? "" : undefined} data-ile-scan={phase === "idle" ? undefined : "blanc"} data-ile-scan-phase={phase === "idle" ? undefined : phase}>
-      <GreenCross lit={lit} />
-      {phase === "idle" ? (
-        open ? (
-          <>
-            <span className="text-[10.5px] font-bold tracking-[0.2em] whitespace-nowrap text-[#0F2B26] uppercase">Scannez une boîte</span>
-            <span className="ml-1 rounded-full bg-[#0E8A7B] px-2.5 py-[3px] text-[10.5px] font-bold tracking-[0.08em] whitespace-nowrap text-white uppercase">Une question ?</span>
-          </>
-        ) : (
-          <span className="text-[11px] font-bold tracking-[0.22em] whitespace-nowrap text-[#0F2B26] uppercase">
-            Pharma<span className="text-[#0E8A7B]">boost</span>
-          </span>
-        )
-      ) : phase === "found" && found.length > 0 ? (
-        <span className="scn-pop flex items-center gap-3 whitespace-nowrap">
-          {found.map((item, i) => (
-            <span key={`${item.name}-${i}`} className="inline-flex items-center gap-1.5">
-              {i > 0 && <span className="mr-1.5 h-3.5 w-px bg-[#0E8A7B]/25" />}
-              {item.challenge ? (
-                <svg viewBox="0 0 24 24" className="size-3.5" aria-label="Challenge"><path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4 6.1 20.5l1.2-6.5L2.5 9.4l6.6-.9z" fill="#B8D400" stroke="#8AA000" strokeWidth="1.2" strokeLinejoin="round" /></svg>
-              ) : item.shortDate ? (
-                <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="#C23A2B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-label="Date courte"><path d="M5 22h14M5 2h14M17 22v-4.2a2 2 0 0 0-.6-1.4L12 12l-4.4 4.4a2 2 0 0 0-.6 1.4V22M7 2v4.2a2 2 0 0 0 .6 1.4L12 12l4.4-4.4a2 2 0 0 0 .6-1.4V2" /></svg>
-              ) : null}
-              <span className="max-w-[150px] break-words text-[12px] font-bold text-[#0F2B26]">{item.name}</span>
-            </span>
-          ))}
-        </span>
+    <div className="flex h-10 items-center justify-center gap-2.5 px-4" data-ile-attente="">
+      <GreenCross lit={4} />
+      {open ? (
+        <>
+          <span className="text-[10.5px] font-bold tracking-[0.2em] whitespace-nowrap text-[#0F2B26] uppercase">Scannez une boîte</span>
+          <span className="ml-1 rounded-full bg-[#0E8A7B] px-2.5 py-[3px] text-[10.5px] font-bold tracking-[0.08em] whitespace-nowrap text-white uppercase">Une question ?</span>
+        </>
       ) : (
-        <span className="break-words text-[11px] font-bold tracking-[0.14em] text-[#0F2B26] uppercase">{phase === "found" ? "Rien à ajouter" : drug || "Lecture de la boîte"}</span>
+        <span className="text-[11px] font-bold tracking-[0.22em] whitespace-nowrap text-[#0F2B26] uppercase">
+          Pharma<span className="text-[#0E8A7B]">boost</span>
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * L'Île vivante (fondateur, 6 nov. 2026 : « mets en place la B ») : une seule pilule blanche qui respire. Au scan, une onde
+ * menthe derrière la croix et le nom de la boîte ; à la recherche, un anneau qui se remplit autour de la croix ; trouvé,
+ * PHARMABOOST et le nombre de conseils qui surgit. Jamais de chiffre quand il n'y a rien à proposer.
+ */
+/** `count` : le même nombre que la pilule réduite qui suit (les conseils, plus la routine comptée une fois). */
+function LivingPill({ phase, done, drug, count }: { phase: ScanPhase; done: number; drug: string; count: number }) {
+  const ratio = Math.max(0, Math.min(1, done / SCAN_STEPS.length));
+  return (
+    <div className="flex h-10 items-center gap-3 pr-4 pl-1.5" data-ile-scan="vivante" data-ile-scan-phase={phase}>
+      <span className="relative flex size-8 shrink-0 items-center justify-center">
+        {phase === "scan" && <span className="viv-wave" aria-hidden="true" />}
+        {phase === "analyse" && (
+          <svg viewBox="0 0 40 40" className="absolute inset-0 size-8 -rotate-90" aria-hidden="true">
+            <circle cx="20" cy="20" r="18" fill="none" stroke="#E3F1EE" strokeWidth="3" />
+            <circle cx="20" cy="20" r="18" fill="none" stroke="#0E8A7B" strokeWidth="3" strokeLinecap="round" strokeDasharray="113" strokeDashoffset={113 * (1 - Math.max(0.08, ratio))} style={{ transition: "stroke-dashoffset .45s ease" }} />
+          </svg>
+        )}
+        <span className="relative"><GreenCross lit={4} size={18} /></span>
+      </span>
+      <span key={phase} className="viv-in min-w-0 flex-1 truncate text-[13.5px] leading-5 font-bold text-[#0F2B26]">
+        {phase === "scan" ? (drug || "Lecture de la boîte…")
+          : phase === "analyse" ? <span className="font-semibold text-[#3D5E57]">Recherche du meilleur conseil…</span>
+          : count > 0 ? <span className="text-[11px] tracking-[0.22em] uppercase">Pharma<span className="text-[#0E8A7B]">boost</span></span>
+          : "Rien à ajouter"}
+      </span>
+      {phase === "found" && count > 0 && (
+        <span className="viv-count flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-[#0E8A7B] px-1.5 text-[12px] font-extrabold text-white" aria-label={`${count} conseil${count > 1 ? "s" : ""}`}>{count}</span>
       )}
     </div>
   );
