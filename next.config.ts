@@ -7,6 +7,11 @@ const nextConfig: NextConfig = {
    * rechargement à chaud (et ses fichiers internes de développement), l'adresse n'étant pas « localhost ». Réseaux
    * privés uniquement ; aucun effet en production.
    */
+  /**
+   * Le petit rond noir « N » en bas à gauche de l'aperçu (fondateur, 6 nov. 2026 : « un petit fond noir avec une ombre ») :
+   * l'outil de développement de Next.js, jamais visible en production. Masqué pour que l'aperçu ressemble au vrai site.
+   */
+  devIndicators: false,
   allowedDevOrigins: ["192.168.*.*", "10.*.*.*", "172.*.*.*", "*.local"],
   images: {
     // Les photos de boîtes viennent des bases ouvertes Open Beauty/Products/Food Facts.
