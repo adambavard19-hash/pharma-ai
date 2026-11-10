@@ -152,7 +152,7 @@ export default async function SitePage() {
       <section id="probleme" className="scroll-mt-20 border-t border-border-subtle">
         <div className="mx-auto max-w-6xl px-5 py-20 text-center md:py-28">
           <Reveal>
-            <h2 className="text-[34px] leading-[1.05] font-semibold tracking-[-0.03em] text-text-primary text-balance md:text-[48px]">Le pharmacien ne peut pas penser à tout.</h2>
+            <h2 className="text-[34px] leading-[1.05] font-semibold tracking-[-0.03em] text-text-primary text-balance md:text-[48px]">Au comptoir, tout s&apos;enchaîne. Votre expertise mérite un copilote.</h2>
           </Reveal>
           <div className="mt-8">
             <LoadVisual />
