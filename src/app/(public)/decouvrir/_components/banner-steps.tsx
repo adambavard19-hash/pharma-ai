@@ -32,6 +32,44 @@ export function entryItems(entry: Pick<HostEntry, "items">): IslandAdvice[] {
   }));
 }
 
+/**
+ * La vente du site (fondateur, 10 nov. 2026 : « il n'y a pas de lien entre tous ces produits ») : Imodium à la place de Cicaplast
+ * Lèvres, avec l'étoile du challenge, puis Lactibiane Imedia en complément de l'Imodium. Le poste garde sa vente d'essai.
+ */
+const IMODIUM_ADVICE: HostEntry["items"][number] = {
+  ...ESSAI_ENTRY.items[0],
+  id: "site-imodium",
+  drug: "",
+  challenge: "Imodium · 1 € par boîte",
+  name: "Imodium 2 mg gélules",
+  price: "6,90 €",
+  margin: "2,10 €",
+  reason: "Diarrhée passagère de l'adulte.",
+  quantity: "9",
+  image: "",
+  sheet: {
+    name: "Imodium 2 mg gélules",
+    reasons: ["Diarrhée passagère de l'adulte."],
+    script: "",
+    contraindications: [],
+    usage: [{ text: "« Pour calmer la diarrhée, avec Lactibiane Imedia pour aider la flore à se remettre. Buvez beaucoup d'eau. »" }],
+    description: "",
+    more: { contraindications: 0, usage: 0 },
+    cut: false,
+    ask: ["Avez-vous de la fièvre ou du sang dans les selles ?"],
+    answers: [
+      { ask: 0, label: "Oui", say: "Pas d'Imodium : orientez vers le médecin." },
+      { ask: 0, label: "Non", say: "Imodium, et Lactibiane Imedia en complément pour la flore." },
+    ],
+  },
+};
+const LACTIBIANE_ADVICE: HostEntry["items"][number] = {
+  ...ESSAI_ENTRY.items[1],
+  drug: "IMODIUM 2 mg",
+  reason: "En complément de l'Imodium : aide la flore à se remettre de la diarrhée.",
+};
+export const SITE_ENTRY: Pick<HostEntry, "items"> = { items: [IMODIUM_ADVICE, LACTIBIANE_ADVICE, ...ESSAI_ENTRY.items.slice(2)] };
+
 const noop = () => undefined;
 
 /** Au survol, la bannière se soulève, comme les cartes du site (fondateur, 29 oct. 2026). */
@@ -117,7 +155,7 @@ function AppBilan({ brand }: { brand: string }) {
   );
 }
 
-export function BannerSteps({ entry = ESSAI_ENTRY, brand = "PharmaBoost" }: { entry?: Pick<HostEntry, "items">; brand?: string }) {
+export function BannerSteps({ entry = SITE_ENTRY, brand = "PharmaBoost" }: { entry?: Pick<HostEntry, "items">; brand?: string }) {
   const items = entryItems(entry);
   const found = items.filter((item) => !item.sheet?.routine).map((item) => ({ name: shortAdviceName(item.name), challenge: item.challenge, shortDate: Boolean(item.shortDate) }));
   return (

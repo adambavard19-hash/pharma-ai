@@ -69,10 +69,13 @@ export function headsByBox(items: readonly Pick<IslandAdvice, "drug">[], order: 
     const key = item.drug || index;
     if (!boxes.includes(key)) boxes.push(key);
   });
-  return boxes.map((key) => {
-    const mine = order.filter((index) => (items[index].drug || index) === key);
-    return mine.find((index) => !sold(index)) ?? mine[0];
-  });
+  // Une boîte dont tous les conseils sont des étapes de routine (hors de `order`) n'a pas de carte à elle.
+  return boxes
+    .map((key) => {
+      const mine = order.filter((index) => (items[index].drug || index) === key);
+      return mine.find((index) => !sold(index)) ?? mine[0];
+    })
+    .filter((head): head is number => head !== undefined);
 }
 
 /** Ce que la vente peut rapporter : la somme des marges connues des conseils (« jusqu'à 11,43 € »). */
