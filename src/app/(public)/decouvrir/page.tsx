@@ -78,11 +78,22 @@ const FEATURE_SLIDES: FeatureSlide[] = [
   },
 ];
 
+/** La marque pour Google (fondateur, 10 nov. 2026 : nom, icône et texte justes dans les résultats). */
+const BRAND_JSON_LD = {
+  "@context": "https://schema.org",
+  "@graph": [
+    { "@type": "WebSite", name: "PharmaBoost", alternateName: ["Pharma Boost", "PharmaBoost.app"], url: "https://pharmaboost.app/" },
+    { "@type": "Organization", name: "PharmaBoost", url: "https://pharmaboost.app/", logo: "https://pharmaboost.app/icon.png", email: "contact@pharmaboost.app" },
+  ],
+};
+
 export default async function SitePage() {
   const [pricing, live] = await Promise.all([loadPublicPricing(), loadLiveProof()]);
 
   return (
     <>
+      {/* Pour Google : le nom de la marque, son site et son logo (le robot en blouse), à la place d'une image devinée. */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(BRAND_JSON_LD) }} />
       {/* ---- Accueil ------------------------------------------------- */}
       {/* L'encre ADN de Dantora en fond du héros, comme sur la page de connexion : l'hélice à droite, son nuage qui déborde
           derrière le texte et les visuels, déformée par la souris. La section remonte sous l'en-tête translucide (-mt-16)
@@ -186,10 +197,10 @@ export default async function SitePage() {
       </section>
 
       {/* ---- 6. L'appli PharmaBoost : des patients qui choisissent une pharmacie PharmaBoost (fondateur, 22 oct. 2026) ---- */}
-      <section id="appli" className="scroll-mt-20 border-t border-border-subtle bg-surface-card">
+      <section id="appli" data-nosnippet="" className="scroll-mt-20 border-t border-border-subtle bg-surface-card">
         <div className="mx-auto grid grid-cols-1 max-w-6xl gap-12 px-5 py-20 md:py-28 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-16">
           <Reveal>
-            <SectionHead kicker="Bientôt · l'appli PharmaBoost" title="Des patients qui choisissent votre pharmacie.">
+            <SectionHead kicker="L'appli PharmaBoost" title="Des patients qui choisissent votre pharmacie.">
               {fr("Dans l'appli PharmaBoost, vos patients reçoivent vos offres et celles des laboratoires partenaires. Ces offres ne sont valables que dans les pharmacies PharmaBoost : pour en profiter, ils viennent chez vous.")}
             </SectionHead>
             <ul className="mt-8 grid gap-2.5">

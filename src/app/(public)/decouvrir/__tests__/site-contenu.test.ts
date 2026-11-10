@@ -137,7 +137,7 @@ describe("les métadonnées : un titre sans doublon, l'image de partage", () => 
   it("le partage reprend le premier écran de l'accueil, en grande image légère", () => {
     // Fondateur, 25 oct. 2026 : l'aperçu WhatsApp montrait encore « Scan. Conseil. Bilan. » et l'ancienne bannière.
     expect(siteMetadata.openGraph).toMatchObject({ title: "PharmaBoost — Le copilote IA du comptoir de votre pharmacie." });
-    expect(siteMetadata.openGraph?.description).toContain("À chaque boîte scannée");
+    expect(siteMetadata.openGraph?.description).toContain("à chaque boîte scannée");
     expect(JSON.stringify(siteMetadata)).not.toContain("Scan. Conseil. Bilan.");
     // L'image vient du fichier opengraph-image.jpg, plus d'un logo carré déclaré à la main.
     expect(JSON.stringify(siteMetadata)).not.toContain("logo-1200");
