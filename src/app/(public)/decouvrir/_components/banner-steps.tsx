@@ -176,8 +176,8 @@ export function BannerSteps({ entry = SITE_ENTRY, brand = "PharmaBoost" }: { ent
       <Moment
         n={2}
         title="Les conseils, en cartes"
-        text="Une carte par conseil : la photo, le prix, la marge, le stock en couleur. La routine attend juste en dessous. Un bouton « Réduire » libère l'écran à tout moment."
-        chips={[{ label: "Stock", tone: "#7BE0B0" }, { label: "Marge", tone: "#FFE58A" }, { label: "Routine", tone: "#E4DDFF" }, { label: "– Réduire", tone: "#DDF3EC" }]}
+        text="Une carte par conseil : la photo, le prix, le stock en couleur. La routine attend juste en dessous. Un bouton « Réduire » libère l'écran à tout moment."
+        chips={[{ label: "Stock", tone: "#7BE0B0" }, { label: "Routine", tone: "#E4DDFF" }, { label: "– Réduire", tone: "#DDF3EC" }]}
       >
         <LiveCards items={items} />
       </Moment>
@@ -192,8 +192,8 @@ export function BannerSteps({ entry = SITE_ENTRY, brand = "PharmaBoost" }: { ent
       <Moment
         n={4}
         title="Un clic : la routine"
-        text="La routine s'ouvre à la place du conseil : un produit de votre stock par étape, avec le prix et la marge de l'ensemble."
-        chips={[{ label: "Étape par étape", tone: "#E4DDFF" }, { label: "Prix et marge", tone: "#FFE58A" }]}
+        text="La routine s'ouvre à la place du conseil : un produit de votre stock par étape, avec le prix de l'ensemble."
+        chips={[{ label: "Étape par étape", tone: "#E4DDFF" }, { label: "Prix", tone: "#FFE58A" }]}
       >
         <LiveCards items={items} initialPanel="routine" />
       </Moment>
