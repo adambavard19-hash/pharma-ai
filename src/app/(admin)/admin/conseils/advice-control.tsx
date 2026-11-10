@@ -16,6 +16,8 @@ import { formatDate } from "@/lib/format";
 import { moduleLabel } from "@/core/ai/advice-modules";
 import { cn } from "@/lib/utils";
 import { GammePicker } from "./gamme-picker";
+import { RoutePicker } from "./route-picker";
+import { routesLabel } from "@/core/associations/routes";
 import { AssociationEditForm, EditHistory, MedicineTriggerPicker, RevertButton, RuleEditForm, type HistoryLine } from "./edit-forms";
 
 /**
@@ -269,6 +271,7 @@ export function AssociationItem({ association }: { association: AssociationCard 
                   <>
                     <Badge tone="neutral">{association.triggerKind === "MEDICINE" ? "Déclenché par un médicament" : association.triggerKind === "FAMILY" ? "Déclenché par une famille" : association.triggerKind === "ATC" ? "Déclenché par un code ATC" : "Déclenché par un produit"}</Badge>
                     {association.module && <Badge tone="success">Module {moduleLabel(association.module)}</Badge>}
+                    {routesLabel(association.routes) && <Badge tone="info">Forme : {routesLabel(association.routes)}</Badge>}
                     {association.fromRobot && <Badge tone="info">Proposé par le robot, validé</Badge>}
                     {association.modified && <Badge tone="info">Modifié{association.modified.by ? ` par ${association.modified.by}` : ""} le {formatDate(association.modified.at)}</Badge>}
                   </>
@@ -293,7 +296,7 @@ export function AssociationItem({ association }: { association: AssociationCard 
         </CardContent>
       </Card>
       <Modal open={editing} onClose={() => setEditing(false)} title="Modifier ce conseil" description={`Quand « ${association.triggerLabel} » est dans la vente. La modification vaut pour toutes les pharmacies.`} size="lg">
-        {editing && <AssociationEditForm id={association.id} advice={{ ean: association.adviceEan, name: association.adviceLabel, brand: null }} sentence={association.sentence} onDone={() => setEditing(false)} />}
+        {editing && <AssociationEditForm id={association.id} advice={{ ean: association.adviceEan, name: association.adviceLabel, brand: null }} sentence={association.sentence} routes={association.triggerKind === "PRODUCT" ? null : association.routes} onDone={() => setEditing(false)} />}
       </Modal>
     </li>
   );
@@ -529,6 +532,8 @@ export function NewAssociationForm({ onDone, families = [], initialFamilyId = nu
   // Plusieurs produits conseillés pour le même déclencheur : une association par produit, la même phrase pour tous.
   const [advices, setAdvices] = useState<KnownProduct[]>([]);
   const [sentence, setSentence] = useState("");
+  // Les formes du médicament déclencheur (à avaler, sur la peau…) ; rien de coché : toutes (fondateur, 10 nov. 2026).
+  const [routes, setRoutes] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const { push } = useToast();
@@ -563,7 +568,7 @@ export function NewAssociationForm({ onDone, families = [], initialFamilyId = nu
       let created = 0;
       for (const trigger of triggers) {
         for (const advice of advices) {
-          const result = await addCentralAssociationAction({ trigger, advice: { ean: advice.ean, name: advice.name }, sentence: sentence.trim() || null, module });
+          const result = await addCentralAssociationAction({ trigger, advice: { ean: advice.ean, name: advice.name }, sentence: sentence.trim() || null, module, routes: mode === "PRODUCT" ? [] : routes });
           if (result.ok) created += 1;
           else failed.push(`${advice.name} : ${result.error}`);
         }
@@ -716,6 +721,7 @@ export function NewAssociationForm({ onDone, families = [], initialFamilyId = nu
           )}
         </div>
       </div>
+      {mode !== "PRODUCT" && <RoutePicker value={routes} onChange={setRoutes} />}
       <Field label="Ce que dit le pharmacien (facultatif)" htmlFor="central-sentence" hint="Vos mots, tels quels, sur la carte du comptoir. Sans phrase, la carte n'affiche que l'association.">
         <Textarea id="central-sentence" value={sentence} maxLength={280} onChange={(event) => setSentence(event.target.value)} />
       </Field>

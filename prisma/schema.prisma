@@ -2694,6 +2694,9 @@ model CentralAssociation {
   /// Le module de conseil (« PHYTOTHERAPIE »…) : l'association ne vaut que dans les pharmacies qui ont choisi ce module.
   /// `null` : association commune à toutes les pharmacies.
   module           String?
+  /// Les formes du médicament déclencheur pour lesquelles l'association vaut (« ORAL » = à avaler, « SKIN » = sur la peau…,
+  /// voir core/associations/routes.ts). Vide : toutes les formes. Un IPP ne suit un anti-inflammatoire qu'à avaler.
+  routes           String[]           @default([])
   status           CentralStatus      @default(ACTIVE)
   sortOrder        Int                @default(0)
   decidedAt        DateTime?

@@ -2,6 +2,7 @@ import { normalizeSearchText } from "@/core/reference/search";
 import { unitMarginHt } from "@/core/catalog/margin";
 import type { AdviceOpportunityResult, CatalogProduct, PatientContext, ScoredAlternative, ScoredRecommendation } from "../types";
 import { suggestionVigilances } from "./population-vigilance";
+import { routesAllow } from "@/core/associations/routes";
 
 /**
  * Les associations de produits de l'officine : le SECOND axe du conseil.
@@ -52,6 +53,8 @@ export type ProductAssociationRule = {
   adviceProductId: string;
   /** Ce que le pharmacien dit au patient, écrit par lui. */
   sentence: string | null;
+  /** Les formes du médicament déclencheur pour lesquelles l'association vaut (« ORAL », « SKIN »…). Absent ou vide : toutes. */
+  routes?: string[];
   /** Le plus petit d'abord. */
   sortOrder: number;
 };
@@ -63,7 +66,7 @@ export type AssociationInput = {
    * Chaque ligne de la vente : les clés qu'elle porte (le médicament qu'elle est, le produit du stock qu'elle est) et, le
    * cas échéant, ce produit du stock — pour ne pas reproposer ce qui est déjà dans la vente.
    */
-  lines: { lineIndex: number; keys: string[]; productId: string | null }[];
+  lines: { lineIndex: number; keys: string[]; productId: string | null; /** Les formes du médicament de la ligne ; vide : inconnues. */ routes?: string[] }[];
 };
 
 /**
@@ -194,10 +197,10 @@ export function buildAssociationAdvice(args: {
   const lineNameOf = (lineIndex: number) => args.lines.find((line) => line.lineIndex === lineIndex)?.drugName ?? null;
 
   // Pour chaque clé de la vente : où elle se trouve, et sous quel nom elle est affichée.
-  const triggersByKey = new Map<string, { lineIndex: number; name: string; productId: string }[]>();
-  for (const { lineIndex, keys, productId } of args.association.lines) {
+  const triggersByKey = new Map<string, { lineIndex: number; name: string; productId: string; routes: string[] }[]>();
+  for (const { lineIndex, keys, productId, routes } of args.association.lines) {
     const name = spokenName(lineNameOf(lineIndex) ?? (productId ? catalogById.get(productId)?.name : undefined) ?? "ce produit");
-    for (const key of keys) triggersByKey.set(key, [...(triggersByKey.get(key) ?? []), { lineIndex, name, productId: productId ?? "" }]);
+    for (const key of keys) triggersByKey.set(key, [...(triggersByKey.get(key) ?? []), { lineIndex, name, productId: productId ?? "", routes: routes ?? [] }]);
   }
   const inSale = new Set(args.association.lines.map((line) => line.productId).filter((id): id is string => id !== null));
   // Un médicament proposé déjà dans la vente, sous cette forme ou une autre (même nom sans la forme) : pas reproposé.
@@ -209,9 +212,11 @@ export function buildAssociationAdvice(args: {
   const rules = [...args.association.rules].sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
 
   for (const rule of rules) {
-    const triggers = triggersByKey.get(rule.triggerKey);
+    // Une association limitée à certaines formes (« à avaler » pour un IPP sous anti-inflammatoire) ne part que des boîtes
+    // de cette forme : un gel ou un patch ne la déclenchent pas (fondateur, 10 nov. 2026).
+    const triggers = triggersByKey.get(rule.triggerKey)?.filter((trigger) => routesAllow(rule.routes, trigger.routes));
     // Le déclencheur n'est pas dans la vente : l'association ne s'applique pas, et il n'y a rien à dire.
-    if (!triggers) continue;
+    if (!triggers || triggers.length === 0) continue;
     const advice = catalogById.get(rule.adviceProductId);
     const note = (reason: AssociationSkipReason) => {
       skipped.push({ ruleId: rule.id, reason });

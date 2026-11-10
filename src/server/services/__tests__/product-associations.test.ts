@@ -66,8 +66,9 @@ describe("ce que chaque ligne de la vente est", () => {
       { productIds: [], drugKeys: new Set(["drug:CORYZALIA"]) },
     );
     expect(found).toEqual([
-      { lineIndex: 0, keys: ["drug:CORYZALIA"], productId: null },
-      { lineIndex: 1, keys: ["drug:CORYZALIA"], productId: null },
+      // La forme de la boîte suit la ligne : à avaler ici (fondateur, 10 nov. 2026).
+      { lineIndex: 0, keys: ["drug:CORYZALIA"], productId: null, routes: ["ORAL"] },
+      { lineIndex: 1, keys: ["drug:CORYZALIA"], productId: null, routes: ["ORAL"] },
     ]);
   });
 
@@ -109,8 +110,8 @@ describe("ce que le moteur reçoit", () => {
       { id: "a2", triggerKey: "drug:CORYZALIA", adviceProductId: "p3", sentence: "Pour le rhume.", sortOrder: 2 },
     ]);
     expect(input?.lines).toEqual([
-      { lineIndex: 0, keys: ["product:p1"], productId: "p1" },
-      { lineIndex: 1, keys: ["drug:CORYZALIA"], productId: null },
+      { lineIndex: 0, keys: ["product:p1"], productId: "p1", routes: ["EYE_EAR_NOSE"] },
+      { lineIndex: 1, keys: ["drug:CORYZALIA"], productId: null, routes: ["ORAL"] },
     ]);
     const where = mocks.prisma.productAssociation.findMany.mock.calls[0][0].where;
     expect(where).toMatchObject({ pharmacyId: "ph_1", isActive: true });
@@ -145,7 +146,7 @@ describe("les associations communes à toutes les officines", () => {
     expect(mocks.prisma.centralAssociation.findMany.mock.calls[0][0].where).toEqual({ status: "VALIDATED", OR: [{ module: null }] });
     expect(mocks.prisma.product.findMany.mock.calls[0][0].where).toMatchObject({ pharmacyId: "ph_1", ean: { in: ["3401111111111"] }, deletedAt: null });
     expect(input?.rules).toEqual([{ id: "central:ca1", triggerKey: "drug:CORYZALIA", adviceProductId: "p_advice", sentence: "Pour accompagner.", sortOrder: 1_000_000 }]);
-    expect(input?.lines).toEqual([{ lineIndex: 0, keys: ["drug:CORYZALIA"], productId: null }]);
+    expect(input?.lines).toEqual([{ lineIndex: 0, keys: ["drug:CORYZALIA"], productId: null, routes: ["ORAL"] }]);
   });
 
   it("les associations d'un module ne sont lues que pour une pharmacie qui a choisi ce module", async () => {
@@ -207,8 +208,8 @@ describe("les associations communes à toutes les officines", () => {
     ]);
     expect(input?.rules.map((rule) => rule.triggerKey)).toEqual(["atc:D10BA01", "atc:D07A"]);
     expect(input?.lines).toEqual([
-      { lineIndex: 0, keys: ["atc:D10BA01"], productId: null },
-      { lineIndex: 1, keys: ["atc:D07A"], productId: null },
+      { lineIndex: 0, keys: ["atc:D10BA01"], productId: null, routes: ["ORAL"] },
+      { lineIndex: 1, keys: ["atc:D07A"], productId: null, routes: ["SKIN"] },
     ]);
   });
 

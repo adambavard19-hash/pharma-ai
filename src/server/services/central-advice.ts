@@ -8,6 +8,7 @@ import { ADVICE_RULES, type AdviceRule } from "@/core/ai/engines/advice";
 import { atcKey, drugKey } from "@/core/ai/engines/associations";
 import { summariseRuleFeedback, type RuleFeedback } from "@/core/ai/rule-feedback";
 import { cleanSentence } from "@/core/associations/rules";
+import { cleanRoutes } from "@/core/associations/routes";
 import { officialTherapeuticClass } from "@/core/reference/atc/official-atc";
 import { ADVICE_VOCABULARY } from "@/core/catalog/product-vocabulary";
 import {
@@ -143,6 +144,8 @@ export type CentralAssociationView = {
   sentence: string | null;
   /** Le module de conseil de l'association ; `null` : commune à toutes les pharmacies. */
   module: string | null;
+  /** Les formes du médicament déclencheur pour lesquelles l'association vaut ; vide : toutes. */
+  routes: string[];
   status: CentralStatus;
   decidedBy: string | null;
   decidedAt: Date | null;
@@ -263,6 +266,7 @@ export async function listCentralAssociations(): Promise<CentralAssociationView[
     adviceEan: row.adviceEan,
     sentence: row.sentence,
     module: row.module,
+    routes: row.routes,
     status: row.status,
     decidedBy: row.status === "ACTIVE" ? null : row.decidedByName,
     decidedAt: row.status === "ACTIVE" ? null : row.decidedAt,
@@ -334,6 +338,8 @@ export type AssociationDraft = {
   sentence: string | null;
   /** Le module de conseil (Console → Gestion → Modules) : l'association ne vaut que chez les pharmacies de ce module. */
   module?: string | null;
+  /** Les formes du médicament déclencheur (« ORAL », « SKIN »…) pour lesquelles l'association vaut ; vide : toutes. */
+  routes?: string[];
 };
 
 export async function addCentralAssociation(admin: Admin, draft: AssociationDraft): Promise<{ ok: true; id: string } | Failure> {
@@ -378,12 +384,13 @@ export async function addCentralAssociation(admin: Admin, draft: AssociationDraf
         adviceLabel: draft.advice.name.slice(0, 160),
         sentence,
         module: adviceModule,
+        routes: draft.trigger.kind === "PRODUCT" ? [] : cleanRoutes(draft.routes),
         createdByAdminId: admin.id,
         createdByName: admin.fullName,
       },
       select: { id: true },
     });
-    await recordAudit({ action: "central_advice.association_created", entityType: "CentralAssociation", entityId: created.id, platformAdminId: admin.id, metadata: { triggerKey, adviceEan, module: adviceModule } });
+    await recordAudit({ action: "central_advice.association_created", entityType: "CentralAssociation", entityId: created.id, platformAdminId: admin.id, metadata: { triggerKey, adviceEan, module: adviceModule, routes: cleanRoutes(draft.routes) } });
     return { ok: true, id: created.id };
   } catch (error) {
     if (typeof error === "object" && error !== null && (error as { code?: string }).code === "P2002") return { ok: false, error: "Cette association existe déjà." };
@@ -547,18 +554,23 @@ export async function revertRule(admin: Admin, ruleKey: string): Promise<{ ok: t
   return { ok: true, title: origin.value.title };
 }
 
-type AssociationSnapshot = { adviceEan: string; adviceLabel: string; sentence: string | null };
+type AssociationSnapshot = { adviceEan: string; adviceLabel: string; sentence: string | null; routes?: string[] };
 
 /** Modifie une association commune (la phrase, le produit proposé) pour toutes les pharmacies ; « à relire » ensuite. */
-export async function editCentralAssociation(admin: Admin, id: string, draft: { advice: { ean: string; name: string }; sentence: string | null }): Promise<{ ok: true; label: string } | Failure> {
-  const row = await prisma.centralAssociation.findUnique({ where: { id }, select: { triggerKey: true, triggerLabel: true, adviceEan: true, adviceLabel: true, sentence: true, status: true } });
+export async function editCentralAssociation(admin: Admin, id: string, draft: { advice: { ean: string; name: string }; sentence: string | null; routes?: string[] }): Promise<{ ok: true; label: string } | Failure> {
+  const row = await prisma.centralAssociation.findUnique({ where: { id }, select: { triggerKind: true, triggerKey: true, triggerLabel: true, adviceEan: true, adviceLabel: true, sentence: true, status: true, routes: true } });
   if (!row) return { ok: false, error: "Association introuvable." };
-  const after: AssociationSnapshot = { adviceEan: draft.advice.ean.replace(/\D/g, ""), adviceLabel: draft.advice.name.trim().slice(0, 160), sentence: cleanSentence(draft.sentence) };
+  const routes = row.triggerKind === "PRODUCT" ? [] : draft.routes === undefined ? row.routes : cleanRoutes(draft.routes);
+  const after: AssociationSnapshot = { adviceEan: draft.advice.ean.replace(/\D/g, ""), adviceLabel: draft.advice.name.trim().slice(0, 160), sentence: cleanSentence(draft.sentence), routes };
   const problem = centralAssociationError({ triggerKey: row.triggerKey, adviceEan: after.adviceEan, sentence: after.sentence });
   if (problem) return { ok: false, error: problem };
   if (!after.adviceLabel) return { ok: false, error: "Choisissez le produit à proposer." };
-  const before: AssociationSnapshot = { adviceEan: row.adviceEan, adviceLabel: row.adviceLabel, sentence: row.sentence };
-  const changed = [...(before.adviceEan !== after.adviceEan ? ["Produit proposé"] : []), ...(before.sentence !== after.sentence ? ["Ce que dit le pharmacien"] : [])];
+  const before: AssociationSnapshot = { adviceEan: row.adviceEan, adviceLabel: row.adviceLabel, sentence: row.sentence, routes: row.routes };
+  const changed = [
+    ...(before.adviceEan !== after.adviceEan ? ["Produit proposé"] : []),
+    ...(before.sentence !== after.sentence ? ["Ce que dit le pharmacien"] : []),
+    ...(before.routes?.join() !== after.routes?.join() ? ["Forme du médicament"] : []),
+  ];
   if (changed.length === 0) return { ok: false, error: "Rien n'a changé." };
   try {
     await prisma.centralAssociation.update({ where: { id }, data: { ...after, ...(row.status === "REMOVED" ? {} : { status: "ACTIVE" as const }), decidedAt: null, decidedByAdminId: null, decidedByName: null } });
@@ -573,14 +585,15 @@ export async function editCentralAssociation(admin: Admin, id: string, draft: { 
 
 /** Remet une association commune telle qu'elle a été créée (le tout premier « avant » de son historique). */
 export async function revertCentralAssociation(admin: Admin, id: string): Promise<{ ok: true; label: string } | Failure> {
-  const row = await prisma.centralAssociation.findUnique({ where: { id }, select: { triggerLabel: true, adviceEan: true, adviceLabel: true, sentence: true, status: true } });
+  const row = await prisma.centralAssociation.findUnique({ where: { id }, select: { triggerLabel: true, adviceEan: true, adviceLabel: true, sentence: true, status: true, routes: true } });
   if (!row) return { ok: false, error: "Association introuvable." };
   const first = await prisma.centralAdviceEdit.findFirst({ where: { targetKind: "ASSOCIATION", targetKey: id, action: "EDIT" }, orderBy: { createdAt: "asc" }, select: { before: true } });
   const origin = first?.before as AssociationSnapshot | null | undefined;
   if (!origin || typeof origin.adviceEan !== "string") return { ok: false, error: "Cette association n'a pas été modifiée : elle est déjà dans sa version d'origine." };
-  const snapshot: AssociationSnapshot = { adviceEan: origin.adviceEan, adviceLabel: origin.adviceLabel, sentence: origin.sentence ?? null };
+  // Une association modifiée avant le choix des formes n'en avait aucune à l'origine : toutes les formes.
+  const snapshot: AssociationSnapshot = { adviceEan: origin.adviceEan, adviceLabel: origin.adviceLabel, sentence: origin.sentence ?? null, routes: cleanRoutes(origin.routes ?? []) };
   await prisma.centralAssociation.update({ where: { id }, data: { ...snapshot, ...(row.status === "REMOVED" ? {} : { status: "ACTIVE" as const }), decidedAt: null, decidedByAdminId: null, decidedByName: null } });
-  await prisma.centralAdviceEdit.create({ data: { targetKind: "ASSOCIATION", targetKey: id, action: "REVERT", changed: ["Version d'origine"], before: { adviceEan: row.adviceEan, adviceLabel: row.adviceLabel, sentence: row.sentence } as never, after: snapshot as never, adminId: admin.id, adminName: admin.fullName } });
+  await prisma.centralAdviceEdit.create({ data: { targetKind: "ASSOCIATION", targetKey: id, action: "REVERT", changed: ["Version d'origine"], before: { adviceEan: row.adviceEan, adviceLabel: row.adviceLabel, sentence: row.sentence, routes: row.routes } as never, after: snapshot as never, adminId: admin.id, adminName: admin.fullName } });
   await recordAudit({ action: "central_advice.association_reverted", entityType: "CentralAssociation", entityId: id, platformAdminId: admin.id, metadata: { after: snapshot } });
   return { ok: true, label: `${row.triggerLabel} → ${snapshot.adviceLabel}` };
 }

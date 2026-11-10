@@ -1,5 +1,6 @@
 "use client";
 
+import { RoutePicker } from "./route-picker";
 import { useState, useTransition } from "react";
 import { History, Plus, RotateCcw, Save, X } from "lucide-react";
 import { editCentralAssociationAction, editCentralRuleAction, revertCentralAssociationAction, revertCentralRuleAction } from "@/server/actions/admin-central-advice";
@@ -268,9 +269,10 @@ export function RuleEditForm({
 
 type KnownProduct = { ean: string; name: string; brand: string | null };
 
-export function AssociationEditForm({ id, advice, sentence: initialSentence, onDone }: { id: string; advice: KnownProduct; sentence: string | null; onDone: () => void }) {
+export function AssociationEditForm({ id, advice, sentence: initialSentence, routes: initialRoutes = null, onDone }: { id: string; advice: KnownProduct; sentence: string | null; /** `null` : déclencheur produit, pas de forme. */ routes?: string[] | null; onDone: () => void }) {
   const [product, setProduct] = useState<KnownProduct | null>(advice);
   const [sentence, setSentence] = useState(initialSentence ?? "");
+  const [routes, setRoutes] = useState<string[]>(initialRoutes ?? []);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const { push } = useToast();
@@ -281,7 +283,7 @@ export function AssociationEditForm({ id, advice, sentence: initialSentence, onD
       return;
     }
     startTransition(async () => {
-      const result = await editCentralAssociationAction({ id, advice: { ean: product.ean, name: product.name }, sentence: sentence.trim() || null });
+      const result = await editCentralAssociationAction({ id, advice: { ean: product.ean, name: product.name }, sentence: sentence.trim() || null, ...(initialRoutes === null ? {} : { routes }) });
       if (!result.ok) {
         setError(result.error);
         return;
@@ -303,6 +305,7 @@ export function AssociationEditForm({ id, advice, sentence: initialSentence, onD
         title={(item) => item.name}
         subtitle={(item) => [item.brand, item.ean].filter(Boolean).join(" · ")}
       />
+      {initialRoutes !== null && <RoutePicker value={routes} onChange={setRoutes} />}
       <Field label="Ce que dit le pharmacien (facultatif)" htmlFor="association-edit-sentence" hint="Vos mots, tels quels, sur la carte du comptoir.">
         <Textarea id="association-edit-sentence" value={sentence} maxLength={280} onChange={(event) => setSentence(event.target.value)} />
       </Field>

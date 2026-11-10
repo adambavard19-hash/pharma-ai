@@ -12,6 +12,7 @@ import type { CatalogProduct } from "@/core/ai/types";
 import type { TenantScope } from "@/server/db/tenant";
 import { loadAssociationDrugProducts } from "./catalog";
 import { loadAdviceModules } from "./advice-modules";
+import { drugRoutesOf } from "@/core/associations/routes";
 
 /**
  * Les associations de produits de l'officine : lecture pour le moteur, et gestion par le pharmacien.
@@ -55,7 +56,8 @@ export async function resolveLineTriggers(
       ? prisma.product.findMany({ where: { pharmacyId, id: { in: wanted.productIds }, ean: { in: codes }, deletedAt: null }, select: { id: true, ean: true } })
       : Promise.resolve([]),
     wanted.productIds.length ? prisma.product.findMany({ where: { pharmacyId, id: { in: wanted.productIds }, deletedAt: null }, select: { id: true, name: true } }) : Promise.resolve([]),
-    (wanted.drugKeys.size || wanted.families?.length) && specialtyIds.length ? prisma.drugSpecialty.findMany({ where: { id: { in: specialtyIds } }, select: { id: true, name: true } }) : Promise.resolve([]),
+    // Toujours lue : la forme du médicament (à avaler, sur la peau…) décide des associations limitées à certaines formes.
+    specialtyIds.length ? prisma.drugSpecialty.findMany({ where: { id: { in: specialtyIds } }, select: { id: true, name: true, pharmaceuticalForm: true, administrationRoutes: true } }) : Promise.resolve([]),
   ]);
 
   const productByCode = new Map<string, string>();
@@ -63,6 +65,7 @@ export async function resolveLineTriggers(
   for (const product of byEan) if (product.ean) productByCode.set(product.ean, product.id);
   const productByName = new Map(byName.map((product) => [normalizeSearchText(product.name), product.id]));
   const specialtyName = new Map(specialties.map((specialty) => [specialty.id, specialty.name]));
+  const specialtyById = new Map(specialties.map((specialty) => [specialty.id, specialty]));
 
   const found: AssociationInput["lines"] = [];
   for (const line of confirmed) {
@@ -97,7 +100,11 @@ export async function resolveLineTriggers(
       for (const family of wanted.families) if (belongsToFamily(family, candidate)) keys.push(familyKey(family.id));
     }
 
-    if (keys.length > 0) found.push({ lineIndex: line.position, keys, productId });
+    if (keys.length > 0) {
+      const specialty = line.drugSpecialtyId ? specialtyById.get(line.drugSpecialtyId) : undefined;
+      const routes = drugRoutesOf({ routes: specialty?.administrationRoutes, form: specialty?.pharmaceuticalForm, name: specialty?.name ?? line.drugName });
+      found.push({ lineIndex: line.position, keys, productId, ...(routes.size > 0 ? { routes: [...routes] } : {}) });
+    }
   }
   return found;
 }
@@ -114,7 +121,7 @@ async function loadCentralRules(pharmacyId: string): Promise<{ rules: Associatio
   const central = await prisma.centralAssociation.findMany({
     where: { status: "VALIDATED", OR: [{ module: null }, ...(modules.length > 0 ? [{ module: { in: modules } }] : [])] },
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }, { id: "asc" }],
-    select: { id: true, triggerKind: true, triggerKey: true, adviceEan: true, sentence: true, sortOrder: true },
+    select: { id: true, triggerKind: true, triggerKey: true, adviceEan: true, sentence: true, sortOrder: true, routes: true },
   });
   if (central.length === 0) return { rules: [], triggerProductIds: [], families: [] };
 
@@ -145,7 +152,7 @@ async function loadCentralRules(pharmacyId: string): Promise<{ rules: Associatio
       triggerProductIds.push(triggerProductId);
     }
     // Les associations de l'officine passent avant : elles sont la voix du pharmacien de cette officine.
-    rules.push({ id: `central:${row.id}`, triggerKey, adviceProductId, sentence: row.sentence, sortOrder: 1_000_000 + row.sortOrder });
+    rules.push({ id: `central:${row.id}`, triggerKey, adviceProductId, sentence: row.sentence, sortOrder: 1_000_000 + row.sortOrder, ...(row.routes?.length ? { routes: row.routes } : {}) });
   }
   return { rules, triggerProductIds, families };
 }

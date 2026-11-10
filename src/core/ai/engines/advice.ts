@@ -510,6 +510,9 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
     version: "1.0",
     validation: { status: "PENDING" },
     triggerMode: "CLASS_ONLY",
+    // Un anti-inflammatoire en gel, crème ou patch (Niflugel, Voltarène Emulgel, Flector) ne passe pas par l'estomac :
+    // jamais de conseil gastrique pour lui (fondateur, 10 nov. 2026).
+    systemicOnly: true,
     needTriggers: ["GASTRIC_DISCOMFORT"],
     question: "Le patient ressent-il des brûlures ou une gêne à l'estomac ?",
     category: "SOINS",
@@ -2209,7 +2212,8 @@ export function acceptsProductForRule(ruleKey: string, product: Pick<CatalogProd
 const norm = (value: string) => value.toLowerCase().trim();
 
 /** Les familles ATC d'usage local : peau, œil, oreille, voie vaginale, bouche, nez, gorge. */
-const LOCAL_ATC_PREFIXES = ["D", "S01", "S02", "S03", "G01", "A01", "R01", "R02"];
+// M02 : les topiques des douleurs articulaires et musculaires (Niflugel, Voltarène Emulgel, Flector patch).
+const LOCAL_ATC_PREFIXES = ["D", "S01", "S02", "S03", "G01", "A01", "R01", "R02", "M02"];
 /** Ce que porte le nom d'une forme locale quand le code ATC manque (classification sans code). */
 const LOCAL_FORM = /\b(cr[eè]me|pommade|gel|collyre|auriculaire|ovule|nasal|lotion|cutan[ée]e?|topique|bain de bouche|gingival)\b/i;
 

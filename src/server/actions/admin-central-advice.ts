@@ -52,6 +52,7 @@ const associationSchema = z.object({
   advice: z.object({ ean: z.string().trim().min(7).max(20), name: z.string().trim().min(1).max(200) }),
   sentence: z.string().max(600).nullable().optional(),
   module: z.string().max(40).nullable().optional(),
+  routes: z.array(z.string().max(20)).max(10).optional(),
 });
 
 export async function addCentralAssociationAction(payload: z.input<typeof associationSchema>): Promise<ActionResult<null>> {
@@ -99,13 +100,13 @@ export async function revertCentralRuleAction(payload: { ruleKey: string }): Pro
   return ok(null, `« ${result.title} » est revenu à sa version d'origine, pour toutes les pharmacies. Il est « à relire ».`);
 }
 
-const associationEditSchema = z.object({ id: z.string().min(1).max(64), advice: z.object({ ean: z.string().trim().min(7).max(20), name: z.string().trim().min(1).max(200) }), sentence: z.string().max(600).nullable() });
+const associationEditSchema = z.object({ id: z.string().min(1).max(64), advice: z.object({ ean: z.string().trim().min(7).max(20), name: z.string().trim().min(1).max(200) }), sentence: z.string().max(600).nullable(), routes: z.array(z.string().max(20)).max(10).optional() });
 
 export async function editCentralAssociationAction(payload: z.input<typeof associationEditSchema>): Promise<ActionResult<null>> {
   const session = await requirePlatformSession();
   const parsed = associationEditSchema.safeParse(payload);
   if (!parsed.success) return fail("Vérifiez le produit proposé et la phrase.");
-  const result = await editCentralAssociation({ id: session.admin.id, fullName: session.admin.fullName }, parsed.data.id, { advice: parsed.data.advice, sentence: parsed.data.sentence });
+  const result = await editCentralAssociation({ id: session.admin.id, fullName: session.admin.fullName }, parsed.data.id, { advice: parsed.data.advice, sentence: parsed.data.sentence, routes: parsed.data.routes });
   if (!result.ok) return fail(result.error);
   revalidatePath("/admin/conseils");
   return ok(null, `« ${result.label} » est modifié pour toutes les pharmacies. Il repasse « à relire ».`);
