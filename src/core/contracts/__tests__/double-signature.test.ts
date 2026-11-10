@@ -140,11 +140,11 @@ describe("contrat d'abonnement : montants lus depuis la source", () => {
       .sections.flatMap((s) => s.paragraphs)
       .join("\n");
 
-  it("sans offre de la console : l'offre officielle (126 € HT par mois, mise en service 200 € HT, engagement 12 mois)", () => {
+  it("sans offre de la console : l'offre officielle (149 € HT par mois, mise en service 200 € HT, engagement 12 mois)", () => {
     const amounts = resolveContractAmounts(null);
     expect(amounts).toEqual({ monthlyPriceCents: OFFICIAL_OFFER.monthlyPriceCents, setupFeeCents: OFFICIAL_OFFER.setupFeeCents, durationMonths: OFFICIAL_OFFER.commitmentMonths, source: "OFFICIAL" });
     const printed = text(amounts);
-    expect(printed).toContain("126,00 € HT par mois");
+    expect(printed).toContain("149,00 € HT par mois");
     expect(printed).toContain("mise en service unique de 200,00 € HT");
     expect(printed).toContain("durée d'engagement ferme de 12 mois");
     expect(printed).not.toContain("290");
@@ -154,7 +154,7 @@ describe("contrat d'abonnement : montants lus depuis la source", () => {
     const printed = text(resolveContractAmounts({ monthlyPriceCents: 9900, setupFeeCents: 5000 }));
     expect(printed).toContain("99,00 € HT par mois");
     expect(printed).toContain("mise en service unique de 50,00 € HT");
-    expect(printed).not.toContain("126,00");
+    expect(printed).not.toContain("149,00");
   });
 
   it("offre sans mise en service renseignée : la mise en service officielle ; tarif ajusté au dossier prioritaire", () => {

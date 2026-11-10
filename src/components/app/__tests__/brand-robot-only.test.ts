@@ -22,6 +22,7 @@ const BLUE_ICONS = /(?:\/logo(?:-256|-1200)?\.(?:png|svg)|apple-icon\.png|\/icon
 const ALLOWED = new Set([
   "src/app/manifest.ts", // icônes d'installation (PWA)
   "src/app/(mobile)/m/layout.tsx", // métadonnées : icône iOS de l'application mobile
+  "src/app/(public)/decouvrir/page.tsx", // données pour Google (JSON-LD) : le logo de la marque, jamais affiché à l'écran
 ]);
 
 function walk(dir: string, out: string[] = []): string[] {

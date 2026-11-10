@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { OFFICIAL_OFFER, formatPriceEuros, pricingPlanGaps, referrerPriceCents, resolvePublicPricing, resolveStandardCommissionCents, STANDARD_COMMISSION_MAX_CENTS } from "../official-offer";
 
 describe("l'offre officielle", () => {
-  it("dit un seul abonnement : 126 € HT par mois, engagement 12 mois, mise en service unique de 200 € HT, parrainage à 10 %", () => {
-    expect(OFFICIAL_OFFER).toMatchObject({ monthlyPriceCents: 12_600, setupFeeCents: 20_000, commitmentMonths: 12, referralDiscountPercent: 10, standardCommissionCents: 25_000 });
+  it("dit un seul abonnement : 149 € HT par mois, engagement 12 mois, mise en service unique de 200 € HT, parrainage à 10 %", () => {
+    expect(OFFICIAL_OFFER).toMatchObject({ monthlyPriceCents: 14_900, setupFeeCents: 20_000, commitmentMonths: 12, referralDiscountPercent: 10, standardCommissionCents: 25_000 });
   });
 
   it("n'a plus de formule annuelle", () => {
@@ -16,7 +16,7 @@ describe("resolvePublicPricing", () => {
   const plan = { name: "Offre console", monthlyPriceCents: 13_900, setupFeeCents: 31_000 };
 
   it("sans offre publiée : l'offre officielle", () => {
-    expect(resolvePublicPricing(null)).toEqual({ name: "PharmaBoost Officine", source: "OFFICIAL_DEFAULT", monthlyPriceCents: 12_600, setupFeeCents: 20_000, commitmentMonths: 12, referralDiscountPercent: 10 });
+    expect(resolvePublicPricing(null)).toEqual({ name: "PharmaBoost Officine", source: "OFFICIAL_DEFAULT", monthlyPriceCents: 14_900, setupFeeCents: 20_000, commitmentMonths: 12, referralDiscountPercent: 10 });
   });
 
   it("une offre COMPLÈTE de la console prime", () => {
@@ -25,7 +25,7 @@ describe("resolvePublicPricing", () => {
 
   it("une offre incomplète ne se mélange jamais à l'officielle : l'officielle d'un bloc", () => {
     for (const partial of [{ ...plan, setupFeeCents: null }, { ...plan, monthlyPriceCents: 0 }]) {
-      expect(resolvePublicPricing(partial)).toMatchObject({ source: "OFFICIAL_DEFAULT", monthlyPriceCents: 12_600, setupFeeCents: 20_000 });
+      expect(resolvePublicPricing(partial)).toMatchObject({ source: "OFFICIAL_DEFAULT", monthlyPriceCents: 14_900, setupFeeCents: 20_000 });
     }
   });
 

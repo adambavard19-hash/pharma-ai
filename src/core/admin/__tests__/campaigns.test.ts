@@ -271,13 +271,13 @@ describe("validation : l'offre honnête", () => {
     expect(warnings).toContain("Des conditions sont écrites mais le message ne les dit pas : écrivez {{conditions_offre}}.");
   });
 
-  it("avertit d'un parrainage inférieur à la remise de 10 % (12,60 € pour un abonnement à 126 € HT), pas d'un parrainage plus avantageux", () => {
+  it("avertit d'un parrainage inférieur à la remise de 10 % (14,90 € pour un abonnement à 149 € HT), pas d'un parrainage plus avantageux", () => {
     const low = valid(draftFor("REFERRAL_OFFER", { offerAmountCents: 500 })).warnings.join(" ");
     expect(low).toContain("inférieur à la remise de 10 % du parrainage");
-    expect(low).toContain("12,60 €");
-    expect(low).toContain("126 € HT");
+    expect(low).toContain("14,90 €");
+    expect(low).toContain("149 € HT");
     expect(valid(draftFor("REFERRAL_OFFER", { offerAmountCents: 1259 })).warnings.join(" ")).toContain("inférieur à la remise");
-    expect(valid(draftFor("REFERRAL_OFFER", { offerAmountCents: 1260 })).warnings.join(" ")).not.toContain("inférieur à la remise");
+    expect(valid(draftFor("REFERRAL_OFFER", { offerAmountCents: 1490 })).warnings.join(" ")).not.toContain("inférieur à la remise");
     expect(valid(draftFor("REFERRAL_OFFER", { offerAmountCents: 4000 })).warnings.join(" ")).not.toContain("inférieur à la remise");
   });
 

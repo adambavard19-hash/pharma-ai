@@ -3,7 +3,7 @@
  * quand la console n'a pas publié sa propre offre.
  *
  * Un seul abonnement par officine, engagement de 12 mois :
- *   - 126 € HT par mois ;
+ *   - 149 € HT par mois (126 € HT jusqu’au 10 nov. 2026) ;
  *   - une mise en service unique de 200 € HT (290 € HT jusqu'au 18 oct., 150 € HT jusqu'au 20 oct. 2026) : installation et configuration sur
  *     tous les postes de comptoir, paramétrage de l'officine et import du stock,
  *     tests de fonctionnement, formation de l'équipe ;
@@ -18,7 +18,7 @@
 export const OFFICIAL_OFFER = {
   code: "PHARMABOOST_OFFICINE",
   name: "PharmaBoost Officine",
-  monthlyPriceCents: 12_600,
+  monthlyPriceCents: 14_900,
   setupFeeCents: 20_000,
   commitmentMonths: 12,
   referralDiscountPercent: 10,
@@ -71,7 +71,7 @@ export function pricingPlanGaps(plan: PricingPlanInput | null | undefined): stri
   return gaps.length ? [`L'offre par défaut « ${plan.name} » est incomplète (${gaps.join(", ")}) : le site affiche l'offre officielle.`] : [];
 }
 
-/** Le prix mensuel d'une officine qui parraine, une fois la personne parrainée abonnée : 126 € moins 10 % = 113,40 €. */
+/** Le prix mensuel d'une officine qui parraine, une fois la personne parrainée abonnée : 149 € moins 10 % = 134,10 €. */
 export function referrerPriceCents(monthlyPriceCents: number, discountPercent: number = OFFICIAL_OFFER.referralDiscountPercent): number {
   return Math.round((monthlyPriceCents * (100 - discountPercent)) / 100);
 }

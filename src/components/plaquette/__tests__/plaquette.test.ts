@@ -91,13 +91,13 @@ describe("l'estimation : calculée par la fonction du simulateur, jamais recopi�
   it("dit que c'est une estimation, pas une promesse, et du chiffre d'affaires, pas une marge", () => {
     expect(generic).toContain("Estimation indicative, pas une promesse de résultat");
     expect(generic).toContain("C'est du chiffre d'affaires, pas une marge.");
-    expect(generic).toContain("Pour un abonnement de 126 € HT par mois.");
+    expect(generic).toContain("Pour un abonnement de 149 € HT par mois.");
   });
 });
 
 describe("le tarif : celui de l'offre publique, et ce que comprend la mise en service", () => {
-  it("126 € HT par mois, engagement de 12 mois, mise en service de 200 € HT une seule fois", () => {
-    expect(generic).toContain("126 € HT / mois");
+  it("149 € HT par mois, engagement de 12 mois, mise en service de 200 € HT une seule fois", () => {
+    expect(generic).toContain("149 € HT / mois");
     expect(generic).toContain("Engagement de 12 mois");
     expect(generic).toContain("200 € HT, une seule fois");
     for (const item of SETUP_INCLUDES) expect(generic).toContain(item);
@@ -111,9 +111,9 @@ describe("le tarif : celui de l'offre publique, et ce que comprend la mise en se
     }
   });
 
-  it("parrainage : 10 % de moins, 126 € deviennent 113,40 € HT", () => {
+  it("parrainage : 10 % de moins, 149 € deviennent 134,10 € HT", () => {
     expect(generic).toContain("Parrainez un confrère : 10 % de moins par mois");
-    expect(generic).toContain("vous ne payez plus 126 € mais 113,40 € HT par mois");
+    expect(generic).toContain("vous ne payez plus 149 € mais 134,10 € HT par mois");
   });
 
   it("suit l'offre de la console quand elle est publiée : aucun montant n'est écrit dans la plaquette", () => {
@@ -123,7 +123,7 @@ describe("le tarif : celui de l'offre publique, et ce que comprend la mise en se
     expect(text).toContain("390 € HT, une seule fois");
     expect(text).toContain("Pour un abonnement de 200 € HT par mois.");
     expect(text).toContain("Offre Test");
-    expect(text).not.toContain("126 €");
+    expect(text).not.toContain("149 €");
   });
 
   it("premier déploiement LGPI, les autres logiciels avec nous ; les trois prochaines étapes", () => {

@@ -61,19 +61,19 @@ beforeEach(() => {
 });
 
 const createdData = () => (db.prospect.create.mock.calls[0]?.[0] as { data: Record<string, unknown> }).data;
-// Les montants s'écrivent avec des espaces insécables (« 126 € ») : on les compare en espaces simples.
+// Les montants s'écrivent avec des espaces insécables (« 149 € ») : on les compare en espaces simples.
 const summaries = () => vi.mocked(events.recordProspectEvent).mock.calls.map((call) => (call[0] as { summary: string }).summary.replace(/[\u00a0\u202f]/g, " "));
 const adminNotices = () => notifications.notifyAdmins.mock.calls.map((call) => call[0] as { type: string; title: string; body: string; linkUrl?: string });
 const sentTo = () => messaging.sendEmail.mock.calls.map((call) => (call[0] as { to: string }).to);
 
 describe("souscription depuis le site : le contrat part tout seul (fondateur, 5 nov. 2026)", () => {
-  it("le dossier fige 126 € HT par mois (ce que le visiteur a vu), sans formule, et l'événement dit les conditions", async () => {
+  it("le dossier fige 149 € HT par mois (ce que le visiteur a vu), sans formule, et l'événement dit les conditions", async () => {
     const result = await subscriptions.requestSubscription({ ...request });
 
     expect(result).toMatchObject({ ok: true, outcome: { status: "RECEIVED", prospectId: "p-new" } });
-    expect(createdData()).toMatchObject({ monthlyPriceCents: 12_600, origin: "SELF_SERVICE_SITE" });
+    expect(createdData()).toMatchObject({ monthlyPriceCents: 14_900, origin: "SELF_SERVICE_SITE" });
     expect(createdData()).not.toHaveProperty("subscriptionFormula");
-    expect(summaries().join(" ")).toContain("abonnement à 126 € HT / mois, engagement 12 mois, mise en service 200 € HT");
+    expect(summaries().join(" ")).toContain("abonnement à 149 € HT / mois, engagement 12 mois, mise en service 200 € HT");
   });
 
   it("un nouveau dossier sans doute : le contrat part aussitôt (mise en service comprise), l'équipe est prévenue, pas d'accusé de réception en plus", async () => {
@@ -98,10 +98,10 @@ describe("souscription depuis le site : le contrat part tout seul (fondateur, 5 
   });
 
   it("le prix du dossier est celui que le visiteur a VU, pas celui d'une offre plus ancienne de la console", async () => {
-    // Offre par défaut INCOMPLÈTE (ancien tarif, pas de mise en service) : le site affichait l'offre officielle, le dossier fige 126 €.
+    // Offre par défaut INCOMPLÈTE (ancien tarif, pas de mise en service) : le site affichait l'offre officielle, le dossier fige 149 €.
     db.plan.findFirst.mockResolvedValue({ id: "plan-old", name: "Ancienne offre", monthlyPriceCents: 12_900, setupFeeCents: null, trialDays: 0, isActive: true });
     await subscriptions.requestSubscription({ ...request });
-    expect(createdData().monthlyPriceCents).toBe(12_600);
+    expect(createdData().monthlyPriceCents).toBe(14_900);
   });
 
   it("une offre de la console COMPLÈTE est celle qui s'affiche : son prix est figé et dit au dossier", async () => {
