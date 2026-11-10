@@ -9,6 +9,7 @@ import {
   APP_SESSION_COOKIE,
   cancelPlus,
   chooseHomePharmacy,
+  deleteAppMember,
   declareOutsidePharmacy,
   issueOfferCode,
   memberFromSession,
@@ -45,6 +46,16 @@ export async function requestAppLoginAction(email: string): Promise<ActionResult
 export async function logoutAppAction(): Promise<void> {
   (await cookies()).delete(APP_SESSION_COOKIE);
   refresh();
+}
+
+/** Supprimer son compte, depuis « Ma pharmacie » : définitif, puis déconnexion. */
+export async function deleteAppAccountAction(): Promise<ActionResult<null>> {
+  const member = await currentMember();
+  if (!member) return fail("Connectez-vous d'abord.");
+  await deleteAppMember(member.id);
+  (await cookies()).delete(APP_SESSION_COOKIE);
+  refresh();
+  return ok(null, "Votre compte est supprimé.");
 }
 
 export async function chooseHomePharmacyAction(pharmacyId: string): Promise<ActionResult<null>> {

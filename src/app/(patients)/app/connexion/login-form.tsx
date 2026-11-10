@@ -23,7 +23,7 @@ export function LoginForm() {
         <p className="mt-1 text-[14px] leading-6 text-[#4B6A62]">Un lien vient de partir vers {email}. Ouvrez-le sur ce téléphone : il reste valable 30 minutes.</p>
         {state.previewUrl && (
           <a href={state.previewUrl} data-app-lien-apercu="" className="mt-4 inline-block rounded-2xl px-4 py-3 text-[14px] font-bold text-white" style={{ background: GRAD }}>
-            Aperçu : ouvrir le lien
+            Ouvrir le lien
           </a>
         )}
       </Card>

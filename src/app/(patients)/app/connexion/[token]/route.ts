@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { APP_SESSION_COOKIE, APP_SESSION_TTL_MS, openAppLogin } from "@/server/services/app-members";
+import { PATIENT_APP_LIVE } from "@/core/patient-app/offers";
 
 export const dynamic = "force-dynamic";
 
 /** Le lien de connexion reçu par e-mail : il ouvre la session de l'inscrit (cookie scellé) puis mène à son espace. */
 export async function GET(request: Request, { params }: { params: Promise<{ token: string }> }) {
-  // L'appli des patients reste dans l'aperçu (fondateur, 21 oct. 2026) : introuvable sur pharmaboost.app.
-  if (process.env.NODE_ENV === "production") return new NextResponse("Introuvable", { status: 404 });
+  // L'appli des patients est ouverte sur pharmaboost.app (App Store, 6 nov. 2026) : le lien y ouvre la session. Il restait
+  // fermé en production depuis l'aperçu du 21 oct. : personne ne pouvait se connecter (relevé le 10 nov. 2026).
+  if (!PATIENT_APP_LIVE) return new NextResponse("Introuvable", { status: 404 });
   const { token } = await params;
   const session = await openAppLogin(token.slice(0, 2000));
   // Retour sur l'adresse même où le lien a été ouvert (téléphone sur le réseau local en aperçu) : le cookie y est posé.

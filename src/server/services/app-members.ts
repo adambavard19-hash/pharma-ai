@@ -32,6 +32,8 @@ const SESSION_PURPOSE = "app-member";
 const LOGIN_TTL_MS = 30 * 60 * 1000;
 export const APP_SESSION_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 export const APP_SESSION_COOKIE = "pb_patient";
+/** L'adresse donnée à Apple pour l'examen de l'appli : le lien de connexion s'affiche à l'écran au lieu de partir par e-mail. */
+export const APP_REVIEW_EMAIL = "revue-apple@pharmaboost.app";
 
 const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,190}\.[a-z]{2,}$/i;
 
@@ -88,6 +90,8 @@ export async function requestAppLogin(email: string): Promise<{ ok: true; previe
   const clean = email.trim().toLowerCase();
   if (!EMAIL.test(clean)) return { ok: false, error: "Cette adresse e-mail ne semble pas valide." };
   const url = publicUrl(`/app/connexion/${sealToken(LOGIN_PURPOSE, { e: clean }, LOGIN_TTL_MS)}`);
+  // Le compte de l'examen Apple : aucune boîte e-mail à ouvrir, le lien s'affiche à l'écran. Compte vide, sans donnée réelle.
+  if (clean === APP_REVIEW_EMAIL) return { ok: true, previewUrl: url };
   const text = `Bonjour,\n\nVoici votre lien pour ouvrir l'appli PharmaBoost (valable 30 minutes) :\n${url}\n\nSi vous n'avez rien demandé, ignorez ce message.\n\nPharmaBoost`;
   const html = `<p>Bonjour,</p><p>Voici votre lien pour ouvrir l'appli PharmaBoost (valable 30 minutes) :</p><p><a href="${url}" style="display:inline-block;padding:12px 20px;border-radius:12px;background:#0E8A7B;color:#fff;font-weight:700;text-decoration:none">Ouvrir PharmaBoost</a></p><p style="color:#64748b;font-size:13px">Si vous n'avez rien demandé, ignorez ce message.</p>`;
   try {
@@ -112,6 +116,14 @@ export async function openAppLogin(token: string): Promise<string | null> {
     select: { id: true },
   });
   return sealToken(SESSION_PURPOSE, { m: member.id }, APP_SESSION_TTL_MS);
+}
+
+/**
+ * Supprimer son compte (règle Apple 5.1.1(v), fondateur, 10 nov. 2026) : l'inscrit, ses codes d'offre et sa demande
+ * d'inscription de pharmacie disparaissent pour de bon. Le cookie de session ne mène plus à rien.
+ */
+export async function deleteAppMember(memberId: string): Promise<void> {
+  await prisma.appMember.deleteMany({ where: { id: memberId } });
 }
 
 /** L'inscrit de ce jeton de session, ou rien. */
