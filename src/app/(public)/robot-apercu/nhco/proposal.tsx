@@ -408,21 +408,65 @@ function Dashboard() {
 
 function Billing() {
   const steps = [
-    [<ScanLine key="a" className="size-5" />, "Le bip", "La boîte NHCO est bipée au comptoir après le conseil."],
-    [<Check key="b" className="size-5" />, "La vente confirmée", "Le logiciel de caisse confirme la vente : elle est comptée, rien n'est déclaré à la main."],
-    [<FileText key="c" className="size-5" />, "Le relevé mensuel", "Le 1er du mois : un PDF et un fichier, par pharmacie et par produit, avec les remises utilisées."],
-    [<Handshake key="d" className="size-5" />, "La facture", "PharmaBoost facture NHCO pour les boîtes vendues. NHCO compense les remises à chaque pharmacie, en avoir sur sa commande suivante."],
+    [<Tag key="a" className="size-5" />, "NHCO choisit son opération", "Les produits, le montant (−2 €), la période et un budget maximum : au plafond, plus aucun code n'est distribué."],
+    [<Bell key="b" className="size-5" />, "Le bon arrive au bon patient", "Dans l'appli, 7 jours avant la fin de sa cure : un code unique, valable une fois et 30 jours, dans sa pharmacie."],
+    [<ScanLine key="c" className="size-5" />, "Au comptoir, la preuve", "Le pharmacien fait −2 €. Le code et la bonne boîte NHCO doivent être dans la même vente, confirmée par la caisse."],
+    [<FileText key="d" className="size-5" />, "Le relevé part tout seul", "Chaque mois, au pharmacien dans son espace et au délégué NHCO en PDF : chaque remise, avec sa date et son produit."],
+    [<Handshake key="e" className="size-5" />, "NHCO compense la pharmacie", "Comme aujourd'hui, au choix du pharmacien : en avoir sur sa commande suivante, ou en produits."],
   ] as const;
+  const wins = [
+    ["Le pharmacien", ["Compensé sans listing ni paperasse", "En produits, des boîtes revendues au prix normal", "Les boîtes vendues comptent dans son ouverture de marché", "Ses patients reviennent pour la cure suivante"]],
+    ["NHCO", ["Un budget plafonné, ciblé sur les fins de cure", "La preuve de chaque remise, vente par vente", "En produits, chaque euro compensé coûte moins", "Des délégués qui n'ont plus qu'à valider"]],
+    ["PharmaBoost", ["1,50 € par boîte vendue grâce au rappel", "Option : 0,30 € par remise traitée", "Jamais d'argent des remises entre nos mains"]],
+  ] as const;
+  const rows = [
+    ["Patients en fin de cure Endomune, rappel reçu", "40"],
+    ["Patients revenus avec leur code −2 €", "15"],
+    ["Remises faites par la pharmacie", "30 €"],
+    ["Compensées par NHCO", "30 € en avoir, ou en boîtes"],
+    ["Cures rachetées, prouvées par la caisse", "15 boîtes"],
+    ["PharmaBoost : 15 × 1,50 €", "22,50 €"],
+  ];
   return (
-    <div className="grid gap-4 md:grid-cols-4">
-      {steps.map(([icon, title, text], index) => (
-        <Card key={title} className="relative">
-          <span className="flex size-11 items-center justify-center rounded-2xl text-white" style={{ background: BRAND }}>{icon}</span>
-          <p className="mt-4 text-[12px] font-bold" style={{ color: BRAND }}>Étape {index + 1}</p>
-          <p className="text-[17px] font-bold" style={{ color: INK }}>{title}</p>
-          <p className="mt-1 text-[14px] leading-6" style={{ color: SOFT }}>{text}</p>
+    <div className="space-y-8">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        {steps.map(([icon, title, text], index) => (
+          <Card key={title} className="relative">
+            <span className="flex size-11 items-center justify-center rounded-2xl text-white" style={{ background: BRAND }}>{icon}</span>
+            <p className="mt-4 text-[12px] font-bold" style={{ color: BRAND }}>Étape {index + 1}</p>
+            <p className="text-[16px] leading-snug font-bold" style={{ color: INK }}>{title}</p>
+            <p className="mt-1 text-[13.5px] leading-6" style={{ color: SOFT }}>{text}</p>
+          </Card>
+        ))}
+      </div>
+      <div className="grid gap-6 lg:grid-cols-[1fr_1.1fr]">
+        <Card>
+          <div className="flex items-center gap-3">
+            <p className="text-[16px] font-bold" style={{ color: INK }}>Pharmacie des Lilas · novembre</p>
+            <Example />
+          </div>
+          <div className="mt-4">
+            {rows.map(([label, value]) => (
+              <div key={label} className="flex items-center justify-between gap-4 border-b py-2.5 text-[14px] last:border-b-0" style={{ borderColor: LINE }}>
+                <span style={{ color: SOFT }}>{label}</span>
+                <span className="text-right font-bold tabular-nums" style={{ color: INK }}>{value}</span>
+              </div>
+            ))}
+          </div>
         </Card>
-      ))}
+        <div className="grid gap-4 sm:grid-cols-3">
+          {wins.map(([title, list]) => (
+            <Card key={title} className="p-5">
+              <p className="text-[15px] font-bold" style={{ color: BRAND }}>{title}</p>
+              <ul className="mt-3 space-y-2">
+                {list.map((text) => (
+                  <li key={text} className="flex gap-2 text-[13px] leading-5" style={{ color: SOFT }}><Check className="mt-0.5 size-3.5 shrink-0" style={{ color: BRAND }} />{text}</li>
+                ))}
+              </ul>
+            </Card>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -581,7 +625,7 @@ const NAV = [
   ["appli", "L'appli"],
   ["visibilite", "Visibilité"],
   ["chiffres", "Vos chiffres"],
-  ["facturation", "Facturation"],
+  ["facturation", "Remises"],
   ["simulateur", "Simulateur"],
   ["formules", "Formules"],
   ["avantages", "Avantages"],
@@ -651,7 +695,7 @@ export function NhcoProposal() {
       <Section id="chiffres" n="04" kicker="Vos chiffres" title="Ce qui se vend vraiment, pharmacie par pharmacie." intro="Un espace NHCO pour suivre, chaque mois, les conseils affichés, les boîtes vendues et les cures rachetées.">
         <Dashboard />
       </Section>
-      <Section id="facturation" n="05" kicker="Facturation" title="Compté au bip, prouvé par la caisse." intro="Pas de déclaration, pas d'estimation : seules les ventes confirmées par le logiciel de la pharmacie comptent.">
+      <Section id="facturation" n="05" kicker="Remises et facturation" title="Le bon de réduction : prouvé, plafonné, compensé." intro="Le bon de réduction immédiate que NHCO connaît déjà, sans listing à préparer ni à croire sur parole : seules les ventes confirmées par la caisse comptent.">
         <Billing />
       </Section>
       <Section id="simulateur" n="06" kicker="Simulateur" title="Combien de boîtes, pour quel investissement ?">
