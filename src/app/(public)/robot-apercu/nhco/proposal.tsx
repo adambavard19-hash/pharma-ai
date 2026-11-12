@@ -185,7 +185,7 @@ function Counter() {
         </p>
         <div className="space-y-4">
           <Point icon={<ShieldCheck className="size-4.5" />} title="L'ordre de soin est respecté">
-            NHCO prend la première place de son besoin, ici les défenses. Le besoin le plus important (la flore sous antibiotique) reste en tête, et rien n'est retiré.
+            NHCO prend la première place de son besoin, ici les défenses. Le besoin le plus important (la flore sous antibiotique) reste en tête, et rien n&apos;est retiré.
           </Point>
           <Point icon={<BadgeCheck className="size-4.5" />} title="Seulement si c'est juste">
             Conseil validé par nos pharmaciens, produit en stock, aucune contre-indication pour ce patient.
@@ -297,7 +297,7 @@ function PatientApp() {
           Déjà en place. Le patient revient racheter sa cure, dans la même pharmacie. C&apos;est le moment idéal pour une remise.
         </Point>
         <Point icon={<Tag className="size-4.5" />} title="Les remises NHCO">
-          −2 € sur la boîte suivante, financés par NHCO. Le code se montre au comptoir et chaque remise utilisée est comptée.
+          −2 € sur la boîte suivante, financés par NHCO. Le code se montre au comptoir, chaque remise utilisée est comptée, et NHCO la compense à la pharmacie sur sa commande suivante.
         </Point>
         <Point icon={<Smartphone className="size-4.5" />} title="L'espace Découvrir">
           La vitrine NHCO dans l&apos;appli : gammes, conseil de saison, nouveautés. Elle grandit avec le nombre de pharmacies.
@@ -306,6 +306,30 @@ function PatientApp() {
           Pas de publicité pour des médicaments, aucune donnée de santé transmise. Le patient choisit de recevoir les offres.
         </Point>
       </div>
+    </div>
+  );
+}
+
+/* ───────────────────────── Les idées de visibilité ───────────────────────── */
+
+function Ideas() {
+  const ideas = [
+    [<Smartphone key="a" className="size-5" />, "L'espace Découvrir", "La vitrine NHCO dans l'appli : les gammes, les nouveautés, le laboratoire."],
+    [<Bell key="b" className="size-5" />, "Le conseil de saison", "L'hiver pour les défenses, le printemps pour la vitalité : le bon message au bon moment."],
+    [<TrendingUp key="c" className="size-5" />, "Le lancement d'une nouveauté", "Poussée au comptoir et dans l'appli la même semaine, dans toutes les pharmacies partenaires."],
+    [<FileText key="d" className="size-5" />, "Le produit à découvrir", "Une ligne NHCO dans le bilan envoyé au patient après sa vente, quand elle a du sens."],
+    [<Users key="e" className="size-5" />, "La formation des équipes", "De courtes vidéos NHCO dans l'espace des pharmaciens : connaître le produit pour mieux le conseiller."],
+    [<Tag key="f" className="size-5" />, "Les offres aux patients", "Une remise à la fin de la cure, pour que le patient renouvelle dans sa pharmacie."],
+  ] as const;
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {ideas.map(([icon, title, text]) => (
+        <Card key={title}>
+          <span className="flex size-11 items-center justify-center rounded-2xl" style={{ background: "#E7F4EE", color: BRAND }}>{icon}</span>
+          <p className="mt-4 text-[17px] font-bold" style={{ color: INK }}>{title}</p>
+          <p className="mt-1 text-[14px] leading-6" style={{ color: SOFT }}>{text}</p>
+        </Card>
+      ))}
     </div>
   );
 }
@@ -387,7 +411,7 @@ function Billing() {
     [<ScanLine key="a" className="size-5" />, "Le bip", "La boîte NHCO est bipée au comptoir après le conseil."],
     [<Check key="b" className="size-5" />, "La vente confirmée", "Le logiciel de caisse confirme la vente : elle est comptée, rien n'est déclaré à la main."],
     [<FileText key="c" className="size-5" />, "Le relevé mensuel", "Le 1er du mois : un PDF et un fichier, par pharmacie et par produit, avec les remises utilisées."],
-    [<Handshake key="d" className="size-5" />, "La facture", "PharmaBoost facture NHCO. Les remises sont reversées aux pharmacies."],
+    [<Handshake key="d" className="size-5" />, "La facture", "PharmaBoost facture NHCO pour les boîtes vendues. NHCO compense les remises à chaque pharmacie, en avoir sur sa commande suivante."],
   ] as const;
   return (
     <div className="grid gap-4 md:grid-cols-4">
@@ -507,18 +531,17 @@ function Plans() {
             "1,50 € par boîte vendue après un conseil PharmaBoost",
             "Pastille Partenaire et challenge de l'équipe",
             "Tableau de bord NHCO et relevé mensuel",
-            "Remises financées par NHCO, reversées aux pharmacies",
+            "Remises compensées par NHCO, preuve fournie par PharmaBoost",
           ].map((text) => (
             <p key={text} className="flex gap-2"><Check className="mt-0.5 size-4 shrink-0" style={{ color: BRAND }} />{text}</p>
           ))}
         </div>
       </Card>
       <Card className="border-dashed">
-        <p className="text-[15px] font-bold" style={{ color: INK }}>Option : partenaire référent d&apos;une famille</p>
+        <p className="text-[15px] font-bold" style={{ color: INK }}>Option : le lancement d&apos;une nouveauté</p>
         <p className="mt-1 text-[14px] leading-6" style={{ color: SOFT }}>
-          NHCO devient la référence d&apos;une famille (par exemple : défenses ou énergie) et passe en premier dans ce besoin. Les autres marques restent
-          proposées en repli : le pharmacien garde le choix. En échange, NHCO offre aux pharmacies partenaires de meilleures conditions d&apos;achat, la
-          formation de l&apos;équipe et des échantillons.
+          Pendant un mois, une nouveauté NHCO est poussée au comptoir (challenge renforcé pour l&apos;équipe) et dans l&apos;appli (espace Découvrir,
+          conseil de saison), la même semaine dans toutes les pharmacies partenaires. Toujours dans les besoins validés par nos pharmaciens.
         </p>
       </Card>
     </div>
@@ -530,7 +553,7 @@ function Plans() {
 function Benefits() {
   const columns = [
     [<TrendingUp key="n" className="size-5" />, "NHCO", ["Présent au moment où le pharmacien conseille", "Payé uniquement sur les boîtes vendues", "Des cures rachetées grâce au rappel", "Ses vrais chiffres de vente, en direct", "Une vitrine dans l'appli des patients"]],
-    [<Store key="p" className="size-5" />, "Le pharmacien", ["Un conseil validé, prêt à dire", "Une équipe motivée par le challenge", "Des patients qui reviennent", "De meilleures conditions d'achat NHCO", "La transparence : pastille Partenaire"]],
+    [<Store key="p" className="size-5" />, "Le pharmacien", ["Un conseil validé, prêt à dire", "Une équipe motivée par le challenge", "Des patients qui reviennent", "Des remises compensées sans paperasse", "La transparence : pastille Partenaire"]],
     [<Users key="u" className="size-5" />, "Le patient", ["Le bon conseil avec son traitement", "Un rappel avant la fin de sa cure", "Des remises dans sa pharmacie", "Aucune donnée de santé partagée"]],
     [<Pill key="b" className="size-5" />, "PharmaBoost", ["Un revenu lié aux résultats", "Un laboratoire français de référence", "Des pharmacies présentées par l'équipe NHCO"]],
   ] as const;
@@ -556,6 +579,7 @@ function Benefits() {
 const NAV = [
   ["comptoir", "Au comptoir"],
   ["appli", "L'appli"],
+  ["visibilite", "Visibilité"],
   ["chiffres", "Vos chiffres"],
   ["facturation", "Facturation"],
   ["simulateur", "Simulateur"],
@@ -621,19 +645,22 @@ export function NhcoProposal() {
       <Section id="appli" n="02" kicker="L'appli des patients" title="Après la vente, NHCO reste dans la poche du patient.">
         <PatientApp />
       </Section>
-      <Section id="chiffres" n="03" kicker="Vos chiffres" title="Ce qui se vend vraiment, pharmacie par pharmacie." intro="Un espace NHCO pour suivre, chaque mois, les conseils affichés, les boîtes vendues et les cures rachetées.">
+      <Section id="visibilite" n="03" kicker="Visibilité" title="Toutes les façons de faire connaître NHCO." intro="Au comptoir, dans l'appli, auprès des équipes : la visibilité grandit avec le nombre de pharmacies et de patients.">
+        <Ideas />
+      </Section>
+      <Section id="chiffres" n="04" kicker="Vos chiffres" title="Ce qui se vend vraiment, pharmacie par pharmacie." intro="Un espace NHCO pour suivre, chaque mois, les conseils affichés, les boîtes vendues et les cures rachetées.">
         <Dashboard />
       </Section>
-      <Section id="facturation" n="04" kicker="Facturation" title="Compté au bip, prouvé par la caisse." intro="Pas de déclaration, pas d'estimation : seules les ventes confirmées par le logiciel de la pharmacie comptent.">
+      <Section id="facturation" n="05" kicker="Facturation" title="Compté au bip, prouvé par la caisse." intro="Pas de déclaration, pas d'estimation : seules les ventes confirmées par le logiciel de la pharmacie comptent.">
         <Billing />
       </Section>
-      <Section id="simulateur" n="05" kicker="Simulateur" title="Combien de boîtes, pour quel investissement ?">
+      <Section id="simulateur" n="06" kicker="Simulateur" title="Combien de boîtes, pour quel investissement ?">
         <Simulator />
       </Section>
-      <Section id="formules" n="06" kicker="Formules" title="Un partenariat qui grandit avec le réseau." intro="La rémunération à la boîte ne change pas. Le forfait de visibilité suit le nombre de pharmacies, donc le nombre de patients qui voient NHCO.">
+      <Section id="formules" n="07" kicker="Formules" title="Un partenariat qui grandit avec le réseau." intro="La rémunération à la boîte ne change pas. Le forfait de visibilité suit le nombre de pharmacies, donc le nombre de patients qui voient NHCO.">
         <Plans />
       </Section>
-      <Section id="avantages" n="07" kicker="Avantages" title="Gagnant pour chacun.">
+      <Section id="avantages" n="08" kicker="Avantages" title="Gagnant pour chacun.">
         <Benefits />
       </Section>
 
