@@ -31,6 +31,10 @@ import { GreenCross, SCAN_CSS, WHITE_PILL_WIDTH, WhitePill, shortAdviceName, whi
 const C = islandTheme({ ...BANNER.colors, ...PHARMABOOST_GREEN, ...MIX_PAPER });
 const T = BANNER.text;
 
+/** La pastille « Partenaire » : bleu ardoise, discrète, à part des pastilles qui poussent à vendre. */
+const PARTNER_BG = "#E3E9F6";
+const PARTNER_FG = "#28406E";
+
 /** La pastille « Surstock » : orange, à part du challenge (vert citron) et de la date courte (rouge). */
 const OVERSTOCK_BG = "#FFB547";
 const OVERSTOCK_FG = "#3D2300";
@@ -332,6 +336,7 @@ export function MixIsland({ items: rawItems, outcomes, open, narrow, look, auror
                             {advice.price && advice.stock !== "UNKNOWN" && <span className="text-[13px] font-bold tabular-nums" style={{ color: L.green }}>{advice.price}</span>}
                             {advice.margin && <span className="inline-block rounded-md bg-[#FFE58A] px-1.5 text-[11px] font-bold whitespace-nowrap text-[#4A3500] tabular-nums">Marge {advice.margin}</span>}
                             {advice.overstock && <span className="rounded-full px-1.5" style={{ background: OVERSTOCK_BG, color: OVERSTOCK_FG }}>{OVERSTOCK_LABEL}</span>}
+                            {advice.partner && <span className="rounded-full px-1.5" style={{ background: PARTNER_BG, color: PARTNER_FG }}>Partenaire</span>}
                             <span className="inline-flex items-center gap-1 rounded-full px-1.5" style={{ color: stockInk(advice), background: stockTint(advice) }}>
                               <span className="size-1.5 rounded-full" style={{ background: stockInk(advice) }} />
                               {stockLabel(advice)}
@@ -469,6 +474,7 @@ export function MixIsland({ items: rawItems, outcomes, open, narrow, look, auror
                       rupture), marge jaune, challenge vert citron, date courte rouge. */}
                   <span data-ile-mix-repere="" className="mt-0.5 flex flex-wrap items-center gap-1">
                     {advice.overstock && <HeadChip bg={OVERSTOCK_BG} fg={OVERSTOCK_FG}>{OVERSTOCK_LABEL}</HeadChip>}
+                    {advice.partner && <HeadChip bg={PARTNER_BG} fg={PARTNER_FG}>Partenaire</HeadChip>}
                     <HeadChip {...stockColors(advice)}>{stockLabel(advice)}</HeadChip>
                     {advice.margin && <HeadChip bg="#FFE58A" fg="#4A3500">Marge {advice.margin}</HeadChip>}
                     {advice.challenge && <HeadChip bg={C.challengeBg} fg={C.challengeFg}>★ {T.challenge}</HeadChip>}
@@ -684,6 +690,7 @@ function Tags({ item, margin }: { item: IslandAdvice; /** La marge, pour le phar
   return (
     <div className="mt-1.5 flex flex-wrap gap-1">
       {item.overstock && <Chip bg={OVERSTOCK_BG} fg={OVERSTOCK_FG}>{OVERSTOCK_LABEL} · à proposer en priorité</Chip>}
+      {item.partner && <Chip bg={PARTNER_BG} fg={PARTNER_FG}>Partenaire · {item.partner}</Chip>}
       {margin && <Chip bg="#FFF5D6" fg="#9A6400">Marge {margin}</Chip>}
       {item.challenge && <Chip bg={C.challengeBg} fg={C.challengeFg}>★ {item.challengeLabel ? (/^challenge\b/i.test(item.challengeLabel) ? item.challengeLabel : `${T.challenge} ${item.challengeLabel}`) : T.challenge}</Chip>}
       {item.shortDate && <Chip bg={C.dateBg} fg={C.dateFg}>{T.shortDate} {item.shortDate}</Chip>}

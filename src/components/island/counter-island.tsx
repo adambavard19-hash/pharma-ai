@@ -50,6 +50,11 @@ export type IslandAdvice = {
   challengeLabel?: string;
   /** Un produit de la campagne de surstock de l'officine : il passe en premier, pastille « Surstock ». */
   overstock?: boolean;
+  /**
+   * La marque partenaire de ce conseil (« NHCO »), quand c'en est une : pastille « Partenaire » sur la carte, en toute
+   * transparence pour le pharmacien. N'entre dans aucun tri (fondateur, 11 nov. 2026).
+   */
+  partner?: string;
   shortDate?: string;
   stock?: "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK" | "UNKNOWN";
   quantity?: number;
