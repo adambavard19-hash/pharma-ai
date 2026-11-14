@@ -1,12 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Activity, FileText, ListChecks, UserRound } from "lucide-react";
+import { FileText, UserRound } from "lucide-react";
 import { validateBloodReading, type ClaimedBloodResult } from "@/core/blood-test/reading";
 import { proposeForBloodTest, type BloodProduct } from "@/core/blood-test/propose";
-import { libraryEntry } from "@/core/blood-test/library";
-import { AnalysisRow, BloodBodyMap, KIND, kindOf, proposalFor, summary, worst } from "./body-map";
-import { ORGANS } from "./anatomy";
+import { BloodExplained } from "./blood-steps";
 
 /**
  * Démonstration de la prise de sang expliquée (fondateur, 14 nov. 2026) : le site et la présentation de Donna montrent
@@ -97,7 +95,6 @@ const SHELF: BloodProduct[] = [
 
 export function BloodDemo({ className = "", compact = false }: { className?: string; compact?: boolean }) {
   const [profileKey, setProfileKey] = useState(PROFILES[0].key);
-  const [view, setView] = useState<"carte" | "jauges">("carte");
   const profile = PROFILES.find((p) => p.key === profileKey) ?? PROFILES[0];
 
   const { analyses, proposals } = useMemo(() => {
@@ -105,14 +102,6 @@ export function BloodDemo({ className = "", compact = false }: { className?: str
     if (!reading.ok) return { analyses: [], proposals: [] };
     return { analyses: reading.analyses, proposals: proposeForBloodTest({ findings: reading.findings, validatedRuleKeys: new Set(), products: SHELF, includeUnvalidated: true }) };
   }, [profile]);
-
-  const groups = useMemo(() => {
-    const items = analyses.map((a) => ({ a, kind: kindOf(a, proposals), proposal: proposalFor(a, proposals), organ: libraryEntry(a.libraryId)?.organ ?? null }));
-    const out = ORGANS.map((o) => ({ key: o.key as string, label: o.label, items: items.filter((i) => i.organ === o.key) })).filter((g) => g.items.length > 0);
-    const others = items.filter((i) => i.organ === null);
-    if (others.length) out.push({ key: "autre", label: "Autres analyses", items: others });
-    return { out, kinds: items.map((i) => i.kind) };
-  }, [analyses, proposals]);
 
   return (
     <div data-int="" style={compact ? { zoom: 0.94 } : undefined} className={`rounded-[28px] border border-[#DCE8E4] bg-white p-3 shadow-[0_30px_60px_-30px_rgba(15,47,42,.35)] sm:p-4 ${className}`}>
@@ -129,43 +118,8 @@ export function BloodDemo({ className = "", compact = false }: { className?: str
         ))}
       </div>
 
-      <div className="mt-2 grid grid-cols-2 gap-1 rounded-2xl bg-[#F1F5F4] p-1">
-        {([
-          { key: "carte", label: "Carte du corps", icon: Activity },
-          { key: "jauges", label: "Toutes les jauges", icon: ListChecks },
-        ] as const).map((t) => (
-          <button key={t.key} type="button" onClick={() => setView(t.key)} className={`flex items-center justify-center gap-1.5 rounded-xl py-2 text-[13px] font-bold transition-all ${view === t.key ? "bg-white text-[#0F2F2A] shadow-sm" : "text-[#4B6A62]"}`}>
-            <t.icon className="size-4" aria-hidden /> {t.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="mt-3 px-0.5">
-        {view === "carte" ? (
-          <BloodBodyMap key={profile.key} analyses={analyses} proposals={proposals} audience="counter" />
-        ) : (
-          <div key={profile.key}>
-            <p className="text-[15.5px] leading-6 text-[#0F2F2A]">{summary(groups.kinds)}</p>
-            <div className={`mt-2 space-y-4 overflow-y-auto pr-1 ${compact ? "max-h-[560px]" : "max-h-[620px]"}`}>
-              {groups.out.map((g) => {
-                const k = worst(g.items.map((i) => i.kind));
-                return (
-                  <section key={g.key}>
-                    <h4 className="mb-1.5 flex items-center gap-2 text-[13px] font-extrabold tracking-wide text-[#4B6A62] uppercase">
-                      <span className="size-2.5 rounded-full" style={{ background: KIND[k].dot }} /> {g.label}
-                      <span className="font-semibold text-[#94A3A0]">{g.items.length}</span>
-                    </h4>
-                    <div className="space-y-2">
-                      {g.items.map((item, i) => (
-                        <AnalysisRow key={item.a.libraryId ?? item.a.label} a={item.a} kind={item.kind} proposal={item.proposal} audience="counter" delay={150 + i * 70} />
-                      ))}
-                    </div>
-                  </section>
-                );
-              })}
-            </div>
-          </div>
-        )}
+      <div className="mt-2 px-0.5">
+        <BloodExplained key={profile.key} analyses={analyses} proposals={proposals} audience="counter" />
       </div>
       {!compact && <p className="mt-3 text-center text-[11.5px] leading-4 text-[#94A3A0]">Données fictives. Une explication générale, jamais un diagnostic : le pharmacien décide.</p>}
     </div>

@@ -9,7 +9,7 @@ import { Alert } from "@/components/ui/feedback";
 import { readBloodTestAction } from "@/server/actions/blood-test";
 import type { BloodProposal } from "@/core/blood-test/propose";
 import type { BloodAnalysis } from "@/core/blood-test/reading";
-import { BloodBodyMap } from "@/components/blood-test/body-map";
+import { BloodExplained } from "@/components/blood-test/blood-steps";
 
 const euros = (cents: number) => (cents > 0 ? `${(cents / 100).toFixed(2).replace(".", ",")} €` : null);
 
@@ -76,7 +76,7 @@ export function BloodTestReader({ available }: { available: boolean }) {
       {analyses.length > 0 && (
         <Card className="lg:sticky lg:top-4">
           <CardContent className="py-5">
-            <BloodBodyMap analyses={analyses} proposals={proposals} audience="counter" title="Sur le corps" />
+            <BloodExplained analyses={analyses} proposals={proposals} audience="counter" />
           </CardContent>
         </Card>
       )}

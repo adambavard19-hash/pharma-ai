@@ -6,7 +6,7 @@ import { Download, Droplet, Store } from "lucide-react";
 import { readBloodTestForPatientAction } from "@/server/actions/blood-test";
 import type { BloodProposal } from "@/core/blood-test/propose";
 import type { BloodAnalysis } from "@/core/blood-test/reading";
-import { BloodBodyMap } from "@/components/blood-test/body-map";
+import { BloodExplained } from "@/components/blood-test/blood-steps";
 import { ACCENT, Card, GRAD } from "../_components/ui";
 
 type Pharmacy = { name: string; city: string | null } | null;
@@ -124,7 +124,7 @@ export function BloodTestPatient({ pharmacy }: { pharmacy: Pharmacy }) {
 
       {proposals && analyses.length > 0 && (
         <Card>
-          <BloodBodyMap analyses={analyses} proposals={proposals} audience="patient" pharmacyName={pharmacy?.name ?? null} title="Votre prise de sang, sur votre corps" />
+          <BloodExplained analyses={analyses} proposals={proposals} audience="patient" pharmacyName={pharmacy?.name ?? null} title="Votre prise de sang" />
         </Card>
       )}
 

@@ -66,7 +66,6 @@ export const BLOOD_RULES: BloodRule[] = [
     pharmacistSentence: "La vitamine D est sous les normes du laboratoire : un complément de vitamine D3 peut être évoqué, à confirmer avec le médecin.",
     patientSentence: "Votre vitamine D est un peu basse. Un complément de vitamine D peut vous aider : votre pharmacien vous conseille, et votre médecin confirme la dose.",
     cautions: [
-      "Ne pas cumuler avec une vitamine D déjà prescrite (ampoule, gouttes).",
       "Calculs rénaux, calcium élevé ou maladie des reins : avis du médecin avant tout complément.",
     ],
   },

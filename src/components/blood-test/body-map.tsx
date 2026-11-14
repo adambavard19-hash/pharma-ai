@@ -79,7 +79,7 @@ function useMounted(delay: number) {
 }
 
 /** Jauge : bande verte = normes du laboratoire, curseur = la valeur. Sans aucune borne imprimée : la valeur seule. */
-function Gauge({ a, kind, delay = 80 }: { a: BloodAnalysis; kind: Kind; delay?: number }) {
+export function Gauge({ a, kind, delay = 80 }: { a: BloodAnalysis; kind: Kind; delay?: number }) {
   const on = useMounted(delay);
   if (a.refLow === null && a.refHigh === null) {
     return <p className="pt-1 pb-3 text-[13px]" style={{ color: SOFT }}>Valeur : <b style={{ color: INK }}>{fr(a.value)}{a.unit ? ` ${a.unit}` : ""}</b> · pas de norme imprimée</p>;
@@ -116,7 +116,7 @@ function Gauge({ a, kind, delay = 80 }: { a: BloodAnalysis; kind: Kind; delay?: 
   );
 }
 
-function Help({ proposal, audience, pharmacyName }: { proposal: BloodProposal; audience: BodyMapProps["audience"]; pharmacyName?: string | null }) {
+export function Help({ proposal, audience, pharmacyName }: { proposal: BloodProposal; audience: BodyMapProps["audience"]; pharmacyName?: string | null }) {
   if (proposal.kind === "DOCTOR") {
     return (
       <div className="mt-3 flex gap-2.5 rounded-2xl bg-[#FDECEC] p-3">

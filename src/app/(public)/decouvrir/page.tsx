@@ -206,7 +206,7 @@ export default async function SitePage() {
             </SectionHead>
             <ul className="mt-8 grid gap-2.5">
               {[
-                "Essayez l'exemple : touchez un organe, ouvrez une jauge, changez de patient",
+                "Essayez l'exemple : la carte du corps, ou le pas à pas, valeur par valeur",
                 "Une jauge par analyse : la zone normale et la valeur du patient",
                 "C'est quoi ? Pourquoi en dessous ou au-dessus ? En mots simples, pour l'expliquer au patient",
                 "Pour une vitamine ou un minéral un peu bas : les compléments sans ordonnance de votre stock, validés par notre pharmacienne",
