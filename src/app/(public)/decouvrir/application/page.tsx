@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import Image from "next/image";
-import { ArrowRight, BadgePercent, Bell, Check, Droplet, FlaskConical, MapPin, Megaphone, Pill, ScanLine, Store, Users } from "lucide-react";
+import { ArrowRight, BadgePercent, Bell, Check, FlaskConical, MapPin, Megaphone, Pill, ScanLine, Store, Users } from "lucide-react";
 import { HAIRLINE, Kicker, SectionHead, fr } from "../_components/site-shell";
 import { AppPhoneVisual, StoreBadges } from "../_components/app-visual";
 import { PLUS_PRICE_LABEL } from "@/core/patient-app/offers";
@@ -26,7 +25,6 @@ const FOR_PATIENT: { icon: ReactNode; title: string; line: string }[] = [
   { icon: <BadgePercent className="size-5" />, title: "Les offres", line: "Celles de sa pharmacie et celles des laboratoires partenaires, avec un code-barres à montrer au comptoir." },
   { icon: <Pill className="size-5" />, title: "Mon armoire", line: "Ses boîtes à la maison et leurs dates de péremption. Elle reste sur son téléphone." },
   { icon: <MapPin className="size-5" />, title: "Trouver une pharmacie", line: "Les pharmacies PharmaBoost autour de lui, là où les offres sont valables." },
-  { icon: <Droplet className="size-5" />, title: "Ma prise de sang expliquée", line: "Il dépose ses résultats : une carte du corps montre ce qui va bien et ce qui sort des normes, en mots simples." },
   { icon: <Bell className="size-5" />, title: "Prévenu des nouvelles offres", line: "Par e-mail, seulement s'il l'a demandé. Retirable d'un clic." },
 ];
 
@@ -92,35 +90,6 @@ export default function ApplicationPage() {
               {fr("Le scan, la fiche, l'armoire et les offres ouvertes à tous s'utilisent sans abonnement. PharmaBoost+ ouvre en plus les offres réservées aux abonnés : les nouvelles gammes de sa pharmacie, les meilleures remises des laboratoires.")}
             </p>
           </div>
-        </div>
-      </section>
-
-      {/* ---- Ma prise de sang expliquée (fondateur, 14 nov. 2026) ---- */}
-      <section id="prise-de-sang" className="mx-auto max-w-6xl scroll-mt-20 px-5 py-20 md:py-28">
-        <div className="grid grid-cols-1 items-center gap-14 lg:grid-cols-[1.1fr_0.9fr]">
-          <div>
-            <SectionHead kicker="Nouveau dans l'appli" title="Sa prise de sang, enfin claire.">
-              {fr("Le patient dépose la photo ou le PDF de ses résultats. Une carte du corps montre chaque analyse sur son organe : en vert ce qui va bien, en orange ce qui est un peu bas, en rouge ce qui est à montrer au médecin.")}
-            </SectionHead>
-            <ul className="mt-8 grid gap-2.5">
-              {[
-                "Une jauge par analyse : la zone normale et « vous êtes ici »",
-                "C'est quoi ? Pourquoi en dessous ou au-dessus ? En mots simples",
-                "Les compléments sans ordonnance validés par notre pharmacienne",
-                "Une fiche à présenter dans sa pharmacie PharmaBoost",
-                "Rien n'est enregistré : les résultats sont lus, puis oubliés",
-              ].map((t) => (
-                <li key={t} className="flex items-center gap-2.5 rounded-2xl border border-border-subtle bg-surface-card px-4 py-3 text-[15px] font-semibold text-text-primary">
-                  <Check className="size-4 shrink-0 text-brand-600" aria-hidden="true" /> {fr(t)}
-                </li>
-              ))}
-            </ul>
-            <p className="mt-5 text-[13.5px] leading-5 text-text-tertiary">{fr("Une explication générale, jamais un diagnostic. Une valeur haute ou très basse renvoie toujours vers le médecin.")}</p>
-          </div>
-          <figure className="mx-auto w-full max-w-[340px]">
-            <Image src="/images/appli-prise-de-sang.png" alt="L'appli PharmaBoost : une prise de sang expliquée sur une carte du corps" width={800} height={1680} className="h-auto w-full rounded-[40px]" />
-            <figcaption className="mt-3 text-center text-[12.5px] text-text-tertiary">Exemple d&apos;écran</figcaption>
-          </figure>
         </div>
       </section>
 

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowRight, Check, ShieldCheck } from "lucide-react";
 import { fr, Kicker, SectionHead } from "./_components/site-shell";
 import { AutoVideo } from "./_components/auto-video";
@@ -196,6 +197,36 @@ export default async function SitePage() {
         </div>
       </section>
 
+      {/* ---- Prise de sang au comptoir (fondateur, 14 nov. 2026) : le pharmacien dépose les résultats, rien n'est enregistré ---- */}
+      <section id="prise-de-sang" className="scroll-mt-20 border-t border-border-subtle">
+        <div className="mx-auto grid grid-cols-1 max-w-6xl gap-12 px-5 py-20 md:py-28 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-16">
+          <Reveal>
+            <SectionHead kicker="Nouveau au comptoir" title="La prise de sang, expliquée en un coup d'œil.">
+              {fr("Le patient vous tend ses résultats ? Photographiez-les ou déposez le PDF du laboratoire. PharmaBoost place chaque analyse sur une carte du corps : en vert ce qui va bien, en orange ce qui est un peu bas, en rouge ce qui est à montrer au médecin.")}
+            </SectionHead>
+            <ul className="mt-8 grid gap-2.5">
+              {[
+                "Une jauge par analyse : la zone normale et la valeur du patient",
+                "C'est quoi ? Pourquoi en dessous ou au-dessus ? En mots simples, pour l'expliquer au patient",
+                "Pour une vitamine ou un minéral un peu bas : les compléments sans ordonnance de votre stock, validés par notre pharmacienne",
+                "Rien n'est enregistré : les résultats sont lus, puis oubliés",
+              ].map((t) => (
+                <li key={t} className="flex items-center gap-2.5 rounded-2xl border border-border-subtle bg-surface-app px-4 py-3 text-[15px] font-semibold text-text-primary">
+                  <Check className="size-4 shrink-0 text-brand-600" /> {fr(t)}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-5 text-[13.5px] leading-5 text-text-tertiary">{fr("Une explication générale, jamais un diagnostic. Une valeur haute ou très basse renvoie toujours vers le médecin. Le pharmacien décide.")}</p>
+          </Reveal>
+          <Reveal delay={2}>
+            <figure className="mx-auto w-full max-w-[340px]">
+              <Image src="/images/appli-prise-de-sang.png" alt="Une prise de sang expliquée sur une carte du corps" width={800} height={1680} className="h-auto w-full rounded-[40px]" />
+              <figcaption className="mt-3 text-center text-[12.5px] text-text-tertiary">Exemple d&apos;écran</figcaption>
+            </figure>
+          </Reveal>
+        </div>
+      </section>
+
       {/* ---- 6. L'appli PharmaBoost : des patients qui choisissent une pharmacie PharmaBoost (fondateur, 22 oct. 2026) ---- */}
       <section id="appli" data-nosnippet="" className="scroll-mt-20 border-t border-border-subtle bg-surface-card">
         <div className="mx-auto grid grid-cols-1 max-w-6xl gap-12 px-5 py-20 md:py-28 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-16">
@@ -204,7 +235,7 @@ export default async function SitePage() {
               {fr("Dans l'appli PharmaBoost, vos patients reçoivent vos offres et celles des laboratoires partenaires. Ces offres ne sont valables que dans les pharmacies PharmaBoost : pour en profiter, ils viennent chez vous.")}
             </SectionHead>
             <ul className="mt-8 grid gap-2.5">
-              {["Vos campagnes : une nouvelle gamme à -20 % pour vos patients", "Les offres des laboratoires, seulement en pharmacie PharmaBoost", "Le code de l'offre scanné à votre comptoir, une seule fois", "Leur prise de sang expliquée sur une carte du corps", "Parapharmacie et compléments, jamais un médicament"].map((t) => (
+              {["Vos campagnes : une nouvelle gamme à -20 % pour vos patients", "Les offres des laboratoires, seulement en pharmacie PharmaBoost", "Le code de l'offre scanné à votre comptoir, une seule fois", "Parapharmacie et compléments, jamais un médicament"].map((t) => (
                 <li key={t} className="flex items-center gap-2.5 rounded-2xl border border-border-subtle bg-surface-app px-4 py-3 text-[15px] font-semibold text-text-primary">
                   <Check className="size-4 shrink-0 text-brand-600" /> {t}
                 </li>
