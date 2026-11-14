@@ -101,10 +101,10 @@ describe("parrainage vu du titulaire : sans offre", () => {
 
 describe("parrainage vu du titulaire : avec une offre", () => {
   it("l'écran annonce l'offre en cours ; la remise est le plus avantageux entre les 10 % et le montant d'offre figé du filleul", async () => {
-    db.state.offers = [offer("a", 4000, { endsAt: day("2026-11-01") })];
+    db.state.offers = [offer("a", 4000, { endsAt: day("2099-11-01") })];
     db.state.filleuls = [filleul("Avant l'offre"), filleul("Pendant l'offre", { referralAmountCents: 4000 })];
     const summary = await referralSummary("ph_1");
-    expect(summary.currentOffer).toEqual({ amountCents: 4000, endsAt: day("2026-11-01"), label: "Offre a" });
+    expect(summary.currentOffer).toEqual({ amountCents: 4000, endsAt: day("2099-11-01"), label: "Offre a" });
     expect(summary.referrals.map((r) => r.offerAmountCents)).toEqual([null, 4000]);
     // 40 € (le seul filleul d'offre) contre 12,60 € (10 %) : l'offre est prioritaire, sans s'ajouter aux 10 %.
     expect(summary).toMatchObject({ discountCents: 4000, discountBasis: "OFFERS" });

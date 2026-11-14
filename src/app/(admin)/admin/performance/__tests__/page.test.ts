@@ -68,6 +68,8 @@ describe("la page Performance de la console", () => {
   });
 
   it("une ligne par pharmacie, la plus rentable d'abord, qui mène à son rapport sur la même période", async () => {
+    // Ventes datées dans la période demandée (et non « aujourd'hui », qui sort d'octobre dès novembre).
+    mocks.salesBy.ph_b = (mocks.salesBy.ph_b as ClosedSale[]).map((s) => ({ ...s, closedAt: new Date("2026-10-15T10:00:00Z") }));
     const html = await render({ periode: "2026-10" });
     expect(html.indexOf("Pharmacie B")).toBeLessThan(html.indexOf("Pharmacie A"));
     expect(html).toContain("/admin/pharmacies/ph_b?onglet=performance&amp;periode=2026-10");
