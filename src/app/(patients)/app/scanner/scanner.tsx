@@ -17,24 +17,59 @@ export function Scanner() {
   const video = useRef<HTMLVideoElement>(null);
   const [state, setState] = useState<CameraState>("starting");
   const [text, setText] = useState("");
+  const [opening, setOpening] = useState(false);
 
   useEffect(() => {
     let stop: (() => void) | null = null;
     let done = false;
+    const found = (code: string) => {
+      if (done || !code) return;
+      done = true;
+      navigator.vibrate?.(60);
+      setOpening(true);
+      router.push(`/app/fiche?code=${encodeURIComponent(code)}`);
+    };
+    // Haute définition et mise au point continue : un code-barres de boîte est petit, la définition par défaut (640 × 480)
+    // le rend illisible tant que le téléphone n'est pas collé à la boîte.
+    const constraints: MediaStreamConstraints = {
+      video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 }, advanced: [{ focusMode: "continuous" } as MediaTrackConstraintSet] },
+    };
     (async () => {
       if (!navigator.mediaDevices?.getUserMedia || !video.current) {
         setState("unavailable");
         return;
       }
       try {
+        // Le lecteur natif du téléphone quand il existe (Android, Chrome) : bien plus rapide que la lecture en JavaScript.
+        const Native = (window as unknown as { BarcodeDetector?: { new (options: { formats: string[] }): { detect(source: HTMLVideoElement): Promise<{ rawValue: string }[]> }; getSupportedFormats?: () => Promise<string[]> } }).BarcodeDetector;
+        const nativeFormats = Native?.getSupportedFormats ? await Native.getSupportedFormats().catch(() => []) : [];
+        if (Native && nativeFormats.includes("ean_13")) {
+          const stream = await navigator.mediaDevices.getUserMedia(constraints);
+          const element = video.current;
+          element.srcObject = stream;
+          await element.play();
+          const detector = new Native({ formats: ["ean_13", "ean_8", "code_128", "data_matrix"].filter((format) => nativeFormats.includes(format)) });
+          let timer: ReturnType<typeof setTimeout> | null = null;
+          const tick = async () => {
+            if (done) return;
+            const codes = await detector.detect(element).catch(() => []);
+            if (codes[0]?.rawValue) return found(codes[0].rawValue);
+            timer = setTimeout(tick, 60);
+          };
+          stop = () => {
+            if (timer) clearTimeout(timer);
+            stream.getTracks().forEach((track) => track.stop());
+          };
+          setState("on");
+          void tick();
+          return;
+        }
         const [{ BrowserMultiFormatReader }, { BarcodeFormat, DecodeHintType }] = await Promise.all([import("@zxing/browser"), import("@zxing/library")]);
-        const hints = new Map([[DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.CODE_128, BarcodeFormat.DATA_MATRIX]]]);
-        const reader = new BrowserMultiFormatReader(hints);
-        const controls = await reader.decodeFromConstraints({ video: { facingMode: "environment" } }, video.current, (result) => {
-          if (!result || done) return;
-          done = true;
-          navigator.vibrate?.(60);
-          router.push(`/app/fiche?code=${encodeURIComponent(result.getText())}`);
+        const hints = new Map([[DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.EAN_13, BarcodeFormat.DATA_MATRIX, BarcodeFormat.EAN_8, BarcodeFormat.CODE_128]]]);
+        // Une tentative toutes les 60 ms au lieu de 500 (réglage par défaut) : c'était l'essentiel de l'attente.
+        const reader = new BrowserMultiFormatReader(hints, { delayBetweenScanAttempts: 60, delayBetweenScanSuccess: 300 });
+        const controls = await reader.decodeFromConstraints(constraints, video.current, (result) => {
+          if (result) found(result.getText());
         });
         stop = () => controls.stop();
         setState("on");
@@ -60,6 +95,7 @@ export function Scanner() {
       <style>{`@keyframes pb-scan{0%,100%{top:12%}50%{top:84%}}`}</style>
       <div className="relative mt-4 aspect-[4/3] overflow-hidden rounded-[28px] bg-[#0B1513]">
         <video ref={video} className="size-full object-cover" muted playsInline aria-label="Caméra" />
+        {opening && <div className="absolute inset-0 z-10 grid place-items-center bg-[#0B1513]/70 text-[15px] font-bold text-white">Code lu · ouverture de la fiche…</div>}
         {state === "on" && <span className="absolute inset-x-8 h-[3px] rounded-full bg-[#5EEAD4] shadow-[0_0_18px_#5EEAD4]" style={{ animation: "pb-scan 1.6s ease-in-out infinite" }} />}
         {state !== "on" && (
           <div className="absolute inset-0 grid place-items-center p-6 text-center text-[14px] text-white/80">

@@ -32,6 +32,8 @@ vi.mock("@/server/services/trigger-families", () => ({ listTriggerFamilies: asyn
 vi.mock("@/server/services/cure-reminders", () => ({ listCureDurations: async () => ({ families: [], products: [] }) }));
 vi.mock("@/server/services/counter-pitches", () => ({ listAdminPitches: async () => [] }));
 vi.mock("@/server/actions/admin-counter-pitches", () => ({}));
+vi.mock("@/server/services/blood-test", () => ({ listBloodRules: async () => [] }));
+vi.mock("@/server/actions/blood-test", () => ({}));
 vi.mock("@/server/services/advice-hub", async () => {
   const actual = await vi.importActual<typeof import("@/server/services/advice-hub")>("@/server/services/advice-hub");
   return { ...actual, robotOriginKeys: mocks.robotOriginKeys, listPreviewPharmacies: mocks.listPreviewPharmacies };

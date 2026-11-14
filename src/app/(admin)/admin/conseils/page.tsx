@@ -17,6 +17,8 @@ import { CureDurations } from "./cure-durations";
 import { listCureDurations } from "@/server/services/cure-reminders";
 import { listAdminPitches } from "@/server/services/counter-pitches";
 import { CounterPitches } from "./counter-pitches";
+import { BloodTestRules } from "./blood-test-rules";
+import { listBloodRules } from "@/server/services/blood-test";
 
 export const metadata: Metadata = { title: "Conseils" };
 
@@ -32,7 +34,7 @@ const lines = (entries: EditHistoryEntry[] | undefined): HistoryLine[] => (entri
 export default async function AdminAdvicePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requirePlatformSession();
   const query = await searchParams;
-  const [rules, associations, robot, history, associationEdits, robotKeys, pharmacies, families, cureDurations, pitches] = await Promise.all([
+  const [rules, associations, robot, history, associationEdits, robotKeys, pharmacies, families, cureDurations, pitches, bloodRules] = await Promise.all([
     listCentralRules(PRODUCT_CATEGORY_LABELS),
     listCentralAssociations(),
     listRobotProposals(),
@@ -43,6 +45,7 @@ export default async function AdminAdvicePage({ searchParams }: { searchParams: 
     listTriggerFamilies(),
     listCureDurations(),
     listAdminPitches(),
+    listBloodRules(),
   ]);
   const ruleTitles = new Map(rules.map((rule) => [rule.ruleKey, rule.title]));
 
@@ -96,6 +99,7 @@ export default async function AdminAdvicePage({ searchParams }: { searchParams: 
       <CounterPitches
         rows={pitches.map((pitch) => ({ ...pitch, ruleTitle: ruleTitles.get(pitch.ruleKey) ?? (pitch.ruleKey.startsWith("association:") ? "Association de produits" : "Suggestion du robot"), updatedAt: pitch.updatedAt.toISOString() }))}
       />
+      <BloodTestRules rules={bloodRules} />
       <CureDurations families={cureDurations.families} products={cureDurations.products.map((row) => ({ key: row.key, label: row.label, days: row.days }))} />
       <details className="group rounded-xl border border-border-subtle bg-surface-card p-4">
         <summary className="cursor-pointer text-[14px] font-semibold text-text-primary">Comment le moteur décide</summary>

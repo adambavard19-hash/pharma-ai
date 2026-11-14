@@ -184,6 +184,7 @@ export type AuditAction =
   | "counter_window.patient_report_sent"
   | "counter_window.monthly_report_sent"
   | "central_advice.rule_decided"
+  | "blood_test.read"
   | "central_advice.priorities_saved"
   | "advice.modules_saved"
   | "admin.carnet_changed"

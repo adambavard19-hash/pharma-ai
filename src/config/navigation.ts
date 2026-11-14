@@ -87,7 +87,7 @@ export const NAVIGATION: NavItem[] = [
     label: "Au comptoir",
     icon: ScanLine,
     permission: PERMISSIONS.PRESCRIPTION_CREATE,
-    match: ["/vente", "/ordonnances", "/au-comptoir"],
+    match: ["/vente", "/ordonnances", "/au-comptoir", "/prise-de-sang"],
     description: "Les délivrances en cours et les ventes terminées du jour",
     primary: true,
   },

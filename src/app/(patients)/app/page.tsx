@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, Mail, MapPin, Pill, ScanLine, Search, Tag } from "lucide-react";
+import { ChevronRight, Mail, MapPin, Pill, ScanLine, Search, Tag, Droplet } from "lucide-react";
 import { Robot } from "@/components/robot";
 import { ACCENT, Card, Dna, GRAD, SectionTitle } from "./_components/ui";
 
@@ -41,6 +41,15 @@ export default function PatientHome() {
             <span className="block text-[12.5px] text-white/80">Le QR code scanné à ma pharmacie</span>
           </span>
           <ChevronRight className="size-5" aria-hidden="true" />
+        </Link>
+
+        <Link href="/app/prise-de-sang" className="mt-2.5 flex items-center gap-3 rounded-[20px] bg-white p-4 shadow-sm">
+          <Droplet className="size-6 shrink-0" style={{ color: ACCENT }} aria-hidden="true" />
+          <span className="flex-1">
+            <span className="block text-[16px] font-bold">Ma prise de sang</span>
+            <span className="block text-[12.5px] text-[#4B6A62]">Les compléments à demander à mon pharmacien</span>
+          </span>
+          <ChevronRight className="size-5 text-[#94A3A0]" aria-hidden="true" />
         </Link>
 
         <div className="mt-2.5 grid grid-cols-2 gap-2.5">

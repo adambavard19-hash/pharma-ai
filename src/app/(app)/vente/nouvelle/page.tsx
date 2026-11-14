@@ -17,6 +17,8 @@ import { CounterDashboard } from "./counter-dashboard";
 import { NewPrescriptionForm } from "./new-prescription-form";
 import { CounterRequestCard } from "./counter-request";
 import { TIME_ZONE } from "@/config/constants";
+import Link from "next/link";
+import { Droplet } from "lucide-react";
 
 export const metadata: Metadata = { title: "Au comptoir" };
 
@@ -97,6 +99,14 @@ export default async function NewPrescriptionPage({
         />
         <CounterRequestCard today={requestsToday} />
       </CounterDashboard>
+
+      <Link href="/prise-de-sang" className="flex items-center gap-3 rounded-2xl border border-border-subtle bg-surface-card px-4 py-3.5 shadow-card transition-colors hover:border-brand-400 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none sm:px-5">
+        <span className="grid size-9 place-items-center rounded-full bg-brand-50 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300"><Droplet className="size-4" aria-hidden /></span>
+        <span className="flex-1">
+          <span className="block text-[14.5px] font-semibold text-text-primary">Lire une prise de sang</span>
+          <span className="block text-[13px] text-text-secondary">Les compléments sans ordonnance à proposer quand une vitamine ou un minéral est bas.</span>
+        </span>
+      </Link>
     </div>
   );
 }
