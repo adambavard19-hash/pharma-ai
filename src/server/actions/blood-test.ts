@@ -10,17 +10,18 @@ import { BLOOD_MAX_BYTES, adviseBloodTestAtCounter, adviseBloodTestForPatient, d
 import { APP_SESSION_COOKIE, memberFromSession } from "@/server/services/app-members";
 import { PATIENT_BLOOD_TEST_ENABLED } from "@/core/blood-test/rules";
 import type { BloodProposal } from "@/core/blood-test/propose";
+import type { BloodAnalysis } from "@/core/blood-test/reading";
 import { fail, ok, type ActionResult } from "./types";
 
 /** Au comptoir : le pharmacien dépose la prise de sang, PharmaBoost la lit et l'oublie aussitôt. */
-export async function readBloodTestAction(formData: FormData): Promise<ActionResult<{ proposals: BloodProposal[] }>> {
+export async function readBloodTestAction(formData: FormData): Promise<ActionResult<{ proposals: BloodProposal[]; analyses: BloodAnalysis[] }>> {
   const session = await requirePermission(PERMISSIONS.PRESCRIPTION_CREATE);
   const file = formData.get("fichier");
   if (!(file instanceof File) || file.size === 0) return fail("Ajoutez une photo ou un PDF de la prise de sang.");
   if (file.size > BLOOD_MAX_BYTES) return fail("Le fichier dépasse 10 Mo.");
   const result = await adviseBloodTestAtCounter(session.scope, { bytes: new Uint8Array(await file.arrayBuffer()), mimeType: file.type });
   if (!result.ok) return fail(result.error);
-  return ok({ proposals: result.proposals });
+  return ok({ proposals: result.proposals, analyses: result.analyses });
 }
 
 const DECISION_MESSAGES = {
@@ -40,7 +41,7 @@ export async function decideBloodRuleAction(payload: { ruleKey: string; decision
 }
 
 /** Appli des patients : l'inscrit dépose sa prise de sang ; rien n'est enregistré, ni l'image ni le résultat. */
-export async function readBloodTestForPatientAction(formData: FormData): Promise<ActionResult<{ proposals: BloodProposal[] }>> {
+export async function readBloodTestForPatientAction(formData: FormData): Promise<ActionResult<{ proposals: BloodProposal[]; analyses: BloodAnalysis[] }>> {
   if (!PATIENT_BLOOD_TEST_ENABLED) return fail("La lecture des prises de sang n'est pas disponible dans l'application pour le moment.");
   const member = await memberFromSession((await cookies()).get(APP_SESSION_COOKIE)?.value);
   if (!member) return fail("Connectez-vous pour faire lire votre prise de sang.");
@@ -49,5 +50,5 @@ export async function readBloodTestForPatientAction(formData: FormData): Promise
   if (file.size > BLOOD_MAX_BYTES) return fail("Le fichier dépasse 10 Mo.");
   const result = await adviseBloodTestForPatient({ bytes: new Uint8Array(await file.arrayBuffer()), mimeType: file.type });
   if (!result.ok) return fail(result.error);
-  return ok({ proposals: result.proposals });
+  return ok({ proposals: result.proposals, analyses: result.analyses });
 }

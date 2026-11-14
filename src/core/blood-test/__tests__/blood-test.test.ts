@@ -23,6 +23,26 @@ describe("lecture d'une prise de sang", () => {
   it("refuse un document qui n'est pas une prise de sang", () => {
     expect(validateBloodReading({ isBloodTest: false, results: [row({})] }).ok).toBe(false);
   });
+  it("garde les valeurs normales dans les analyses, pas dans les valeurs hors normes", () => {
+    const reading = validateBloodReading({ isBloodTest: true, results: [row({}), row({ label: "Hémoglobine", analysisId: "hb", marker: "AUTRE", value: 14, unit: "g/dL", refLow: 13, refHigh: 17 })] });
+    if (!reading.ok) throw new Error(reading.error);
+    expect(reading.findings.map((f) => f.marker)).toEqual(["VITAMIN_D"]);
+    expect(reading.analyses.map((a) => [a.libraryId, a.status])).toEqual([["vitd", "low"], ["hb", "ok"]]);
+  });
+  it("une analyse inconnue de la bibliothèque devient « autre », une ligne sans valeur est écartée", () => {
+    const reading = validateBloodReading({ isBloodTest: true, results: [row({ label: "Lipase", analysisId: "AUTRE", marker: "AUTRE", value: 40, refLow: 13, refHigh: 60 }), row({ label: "Sérologie", analysisId: "AUTRE", marker: "AUTRE", value: null, refLow: null, refHigh: null })] });
+    if (!reading.ok) throw new Error(reading.error);
+    expect(reading.analyses).toEqual([expect.objectContaining({ libraryId: null, label: "Lipase", status: "ok" })]);
+  });
+  it("sans fourchette ni marque, la valeur est montrée sans être jugée", () => {
+    const reading = validateBloodReading({ isBloodTest: true, results: [row({ refLow: null, refHigh: null, labFlag: null })] });
+    expect(reading.ok && reading.analyses[0].status).toBe("unknown");
+    expect(reading.ok && reading.findings).toEqual([]);
+  });
+  it("une ligne rattachée à la fiche vitamine D ouvre le conseil même si le marqueur est resté à AUTRE", () => {
+    const reading = validateBloodReading({ isBloodTest: true, results: [row({ analysisId: "vitd", marker: "AUTRE" })] });
+    expect(reading.ok && reading.findings[0].marker).toBe("VITAMIN_D");
+  });
   it("marque une valeur très basse (moins de la moitié de la borne)", () => {
     const reading = validateBloodReading({ isBloodTest: true, results: [row({ value: 9 })] });
     expect(reading.ok && reading.findings[0].veryLow).toBe(true);

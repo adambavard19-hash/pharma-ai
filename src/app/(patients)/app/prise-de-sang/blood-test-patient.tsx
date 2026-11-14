@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
-import { Download, Droplet, Stethoscope, Store } from "lucide-react";
+import { Download, Droplet, Store } from "lucide-react";
 import { readBloodTestForPatientAction } from "@/server/actions/blood-test";
 import type { BloodProposal } from "@/core/blood-test/propose";
-import { ACCENT, Card, GRAD, SectionTitle } from "../_components/ui";
+import type { BloodAnalysis } from "@/core/blood-test/reading";
+import { BloodBodyMap } from "@/components/blood-test/body-map";
+import { ACCENT, Card, GRAD } from "../_components/ui";
 
 type Pharmacy = { name: string; city: string | null } | null;
 
@@ -69,18 +71,23 @@ export function BloodTestPatient({ pharmacy }: { pharmacy: Pharmacy }) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [proposals, setProposals] = useState<BloodProposal[] | null>(null);
+  const [analyses, setAnalyses] = useState<BloodAnalysis[]>([]);
 
   const read = (file: File | undefined) => {
     if (!file) return;
     setError(null);
     setProposals(null);
+    setAnalyses([]);
     const data = new FormData();
     data.set("fichier", file);
     start(async () => {
       const result = await readBloodTestForPatientAction(data);
       if (input.current) input.current.value = "";
       if (!result.ok) setError(result.error);
-      else setProposals(result.data.proposals);
+      else {
+        setProposals(result.data.proposals);
+        setAnalyses(result.data.analyses);
+      }
     });
   };
 
@@ -100,9 +107,6 @@ export function BloodTestPatient({ pharmacy }: { pharmacy: Pharmacy }) {
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
   };
 
-  const advice = proposals?.filter((p) => p.kind === "ADVICE") ?? [];
-  const doctor = proposals?.filter((p) => p.kind === "DOCTOR") ?? [];
-
   return (
     <div className="mt-5 space-y-4">
       <Card className="text-center">
@@ -118,24 +122,9 @@ export function BloodTestPatient({ pharmacy }: { pharmacy: Pharmacy }) {
       {error && <Card><p className="text-[14px] font-semibold text-[#B42318]">{error}</p></Card>}
       {proposals && proposals.length === 0 && <Card><p className="text-[14.5px] font-semibold">Votre laboratoire ne signale aucune valeur hors normes sur ce document.</p></Card>}
 
-      {advice.length > 0 && (
-        <>
-          <SectionTitle>Ce que votre pharmacien peut vous conseiller</SectionTitle>
-          {advice.map((p) => (
-            <Card key={p.rule?.key ?? p.finding.label}>
-              <p className="text-[15.5px] font-bold">{p.finding.label} <span className="ml-1 rounded-full bg-[#FFF4E5] px-2 py-0.5 text-[11px] font-bold text-[#B54708]">basse</span></p>
-              <p className="text-[12.5px] text-[#4B6A62]">{valueLine(p.finding)}</p>
-              <p className="mt-2 text-[14px] leading-6">{p.rule?.patientSentence}</p>
-              <ul className="mt-2 space-y-1 text-[12.5px] leading-5 text-[#4B6A62]">{p.rule?.cautions.map((c) => <li key={c}>• {c}</li>)}</ul>
-            </Card>
-          ))}
-        </>
-      )}
-
-      {doctor.length > 0 && (
+      {proposals && analyses.length > 0 && (
         <Card>
-          <p className="flex items-center gap-2 text-[15px] font-bold"><Stethoscope className="size-4" aria-hidden="true" /> À montrer à votre médecin</p>
-          <ul className="mt-2 space-y-1.5 text-[13.5px] leading-5">{doctor.map((p) => <li key={`${p.finding.label}-${p.finding.direction}`}><span className="font-semibold">{p.finding.label}</span> — {p.finding.direction === "LOW" ? "basse" : "élevée"}, {valueLine(p.finding)}</li>)}</ul>
+          <BloodBodyMap analyses={analyses} proposals={proposals} audience="patient" pharmacyName={pharmacy?.name ?? null} title="Votre prise de sang, sur votre corps" />
         </Card>
       )}
 

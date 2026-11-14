@@ -15,7 +15,7 @@ export const metadata: Metadata = { title: "Prise de sang" };
 export default async function BloodTestPage() {
   const session = await requirePermission(PERMISSIONS.PRESCRIPTION_CREATE);
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6">
       <PageHeader title="Prise de sang" description="Les compléments sans ordonnance à proposer quand le laboratoire signale une vitamine ou un minéral bas." />
       <BloodTestReader available={bloodReadingAvailable() && !session.scope.isDemo} />
     </div>

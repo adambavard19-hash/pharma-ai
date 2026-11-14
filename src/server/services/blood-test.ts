@@ -4,7 +4,7 @@ import { prisma } from "@/server/db/client";
 import { getEnv } from "@/config/env";
 import type { TenantScope } from "@/server/db/tenant";
 import { recordAudit } from "@/server/audit/log";
-import { BLOOD_SCHEMA, BLOOD_SYSTEM_PROMPT, BLOOD_TOOL_NAME, BLOOD_USER_PROMPT, validateBloodReading, type BloodReading, type ClaimedBloodTest } from "@/core/blood-test/reading";
+import { BLOOD_SCHEMA, BLOOD_SYSTEM_PROMPT, BLOOD_TOOL_NAME, BLOOD_USER_PROMPT, validateBloodReading, type BloodAnalysis, type BloodReading, type ClaimedBloodTest } from "@/core/blood-test/reading";
 import { BLOOD_RULES, BLOOD_RULE_PREFIX, bloodRuleKey } from "@/core/blood-test/rules";
 import { productFitsRule, proposeForBloodTest, type BloodProduct, type BloodProposal } from "@/core/blood-test/propose";
 
@@ -39,7 +39,7 @@ export async function readBloodTest(file: { bytes: Uint8Array; mimeType: string 
   try {
     const response = await new Anthropic({ apiKey: env.ANTHROPIC_API_KEY }).messages.create({
       model: env.OCR_MODEL,
-      max_tokens: 4000,
+      max_tokens: 8000,
       system: [{ type: "text", text: BLOOD_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
       messages: [{ role: "user", content: [attachment, { type: "text", text: BLOOD_USER_PROMPT }] }],
       tools: [{ name: BLOOD_TOOL_NAME, description: "Enregistre les analyses hors normes recopiées du compte rendu.", input_schema: BLOOD_SCHEMA as never, strict: true } as never],
@@ -102,22 +102,24 @@ export async function loadBloodProducts(scope: TenantScope): Promise<BloodProduc
 }
 
 /** Au comptoir : lecture + propositions dans le stock de CETTE pharmacie. Seules les règles validées proposent un produit. */
-export async function adviseBloodTestAtCounter(scope: TenantScope, file: { bytes: Uint8Array; mimeType: string }): Promise<{ ok: true; proposals: BloodProposal[] } | { ok: false; error: string }> {
+export type BloodAdvice = { ok: true; proposals: BloodProposal[]; analyses: BloodAnalysis[] } | { ok: false; error: string };
+
+export async function adviseBloodTestAtCounter(scope: TenantScope, file: { bytes: Uint8Array; mimeType: string }): Promise<BloodAdvice> {
   if (scope.isDemo) return { ok: false, error: "Officine de démonstration : aucune image n'est transmise pour lecture." };
   const reading = await readBloodTest(file);
   if (!reading.ok) return reading;
   const [validated, products] = await Promise.all([validatedBloodRuleKeys(), loadBloodProducts(scope)]);
   const proposals = proposeForBloodTest({ findings: reading.findings, validatedRuleKeys: validated, products: products.filter((product) => product.stockQuantity > 0) });
-  await recordAudit({ action: "blood_test.read", entityType: "BloodTest", pharmacyId: scope.pharmacyId, userId: scope.userId, metadata: { outOfRange: reading.findings.length, advised: proposals.filter((p) => p.kind === "ADVICE").length } }).catch(() => undefined);
-  return { ok: true, proposals };
+  await recordAudit({ action: "blood_test.read", entityType: "BloodTest", pharmacyId: scope.pharmacyId, userId: scope.userId, metadata: { analyses: reading.analyses.length, outOfRange: reading.findings.length, advised: proposals.filter((p) => p.kind === "ADVICE").length } }).catch(() => undefined);
+  return { ok: true, proposals, analyses: reading.analyses };
 }
 
 /** Dans l'appli des patients : lecture + règles validées, sans stock (la pharmacie choisira la référence). */
-export async function adviseBloodTestForPatient(file: { bytes: Uint8Array; mimeType: string }): Promise<{ ok: true; proposals: BloodProposal[] } | { ok: false; error: string }> {
+export async function adviseBloodTestForPatient(file: { bytes: Uint8Array; mimeType: string }): Promise<BloodAdvice> {
   const reading = await readBloodTest(file);
   if (!reading.ok) return reading;
   const proposals = proposeForBloodTest({ findings: reading.findings, validatedRuleKeys: await validatedBloodRuleKeys(), products: [] });
-  return { ok: true, proposals };
+  return { ok: true, proposals, analyses: reading.analyses };
 }
 
 // --- Console → Conseils ----------------------------------------------------------------------------------------------

@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Alert } from "@/components/ui/feedback";
 import { readBloodTestAction } from "@/server/actions/blood-test";
 import type { BloodProposal } from "@/core/blood-test/propose";
+import type { BloodAnalysis } from "@/core/blood-test/reading";
+import { BloodBodyMap } from "@/components/blood-test/body-map";
 
 const euros = (cents: number) => (cents > 0 ? `${(cents / 100).toFixed(2).replace(".", ",")} €` : null);
 
@@ -22,18 +24,23 @@ export function BloodTestReader({ available }: { available: boolean }) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [proposals, setProposals] = useState<BloodProposal[] | null>(null);
+  const [analyses, setAnalyses] = useState<BloodAnalysis[]>([]);
 
   function read(file: File | undefined) {
     if (!file) return;
     setError(null);
     setProposals(null);
+    setAnalyses([]);
     const data = new FormData();
     data.set("fichier", file);
     start(async () => {
       const result = await readBloodTestAction(data);
       if (input.current) input.current.value = "";
       if (!result.ok) setError(result.error);
-      else setProposals(result.data.proposals);
+      else {
+        setProposals(result.data.proposals);
+        setAnalyses(result.data.analyses);
+      }
     });
   }
 
@@ -64,7 +71,17 @@ export function BloodTestReader({ available }: { available: boolean }) {
 
       {error && <Alert tone="danger" title="Lecture impossible">{error}</Alert>}
 
-      {proposals && proposals.length === 0 && (
+      {proposals && (
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)]">
+      {analyses.length > 0 && (
+        <Card className="lg:sticky lg:top-4">
+          <CardContent className="py-5">
+            <BloodBodyMap analyses={analyses} proposals={proposals} audience="counter" title="Sur le corps" />
+          </CardContent>
+        </Card>
+      )}
+      <div className="space-y-4">
+      {proposals.length === 0 && (
         <Alert tone="success" title="Aucune valeur hors normes">Le laboratoire ne signale aucune valeur en dehors de ses normes sur ce document.</Alert>
       )}
 
@@ -118,8 +135,12 @@ export function BloodTestReader({ available }: { available: boolean }) {
         </Card>
       )}
 
+      </div>
+      </div>
+      )}
+
       {proposals && (
-        <button type="button" onClick={() => setProposals(null)} className="inline-flex items-center gap-1.5 text-[13.5px] font-medium text-text-secondary hover:text-text-primary">
+        <button type="button" onClick={() => { setProposals(null); setAnalyses([]); }} className="inline-flex items-center gap-1.5 text-[13.5px] font-medium text-text-secondary hover:text-text-primary">
           <RotateCcw className="size-3.5" aria-hidden /> Effacer de l&apos;écran
         </button>
       )}

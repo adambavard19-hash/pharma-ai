@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { ChevronLeft, ChevronRight, Download, MapPin, ShieldCheck, Stethoscope, X } from "lucide-react";
-import { ANALYSES, FAMILIES, HELP, STATUS_COLORS, SUMMARY, fmt, goesToDoctor, statusOf, type Analysis, type Status } from "./data";
-import { ORGANS, SILHOUETTE, type Organ, type OrganKey } from "./anatomy";
+import { ChevronLeft, Download, MapPin, ShieldCheck, Stethoscope, X } from "lucide-react";
+import { ANALYSES, FAMILIES, HELP, STATUS_COLORS, SUMMARY, fmt, goesToDoctor, statusOf, type Analysis } from "./data";
+import { BloodBodyMap } from "@/components/blood-test/body-map";
+import { ruleForMarker } from "@/core/blood-test/rules";
+import type { BloodAnalysis } from "@/core/blood-test/reading";
+import type { BloodProposal } from "@/core/blood-test/propose";
 
 const ACCENT = "#0E8A7B";
 const GRAD = "linear-gradient(135deg,#0E8A7B 0%,#0796B4 100%)";
@@ -195,200 +198,38 @@ function Sheet({ open, onClose, children }: { open: boolean; onClose: () => void
 
 /* ------------------------------------------------------------------ Version 1 : carte du corps */
 
-const SHORT: Record<OrganKey, string> = {
-  thyroide: "Thyroïde",
-  coeur: "Cœur",
-  foie: "Foie",
-  estomac: "Intestin",
-  pancreas: "Pancréas",
-  reins: "Reins",
-  sang: "Sang",
-  os: "Os",
-  muscles: "Muscles",
-};
+/** Version 1 : la carte du corps PARTAGÉE (src/components/blood-test/body-map.tsx), nourrie ici par la fausse prise de sang. */
+const RULES_BY_ID = { vitd: ruleForMarker("VITAMIN_D"), b12: ruleForMarker("B12") } as const;
 
-function organAnalyses(o: Organ): Analysis[] {
-  return o.analyses.map((id) => ANALYSES.find((a) => a.id === id)!).filter(Boolean);
-}
+const FAKE_ANALYSES: BloodAnalysis[] = ANALYSES.map((a) => {
+  const status = statusOf(a);
+  return {
+    libraryId: a.id,
+    label: a.name,
+    marker: a.id === "vitd" ? "VITAMIN_D" : a.id === "b12" ? "B12" : a.id === "b9" ? "FOLATE" : a.id === "ferritine" ? "FERRITIN" : a.id === "mg" ? "MAGNESIUM" : a.id === "zinc" ? "ZINC" : null,
+    value: a.value,
+    unit: a.unit,
+    refLow: a.low === 0 ? null : a.low,
+    refHigh: a.high,
+    status,
+    veryLow: status === "low" && a.value < a.low / 2,
+  };
+});
 
-function organStatus(o: Organ): Status | "doctor" {
-  const list = organAnalyses(o);
-  if (list.some(goesToDoctor)) return "doctor";
-  if (list.some((a) => statusOf(a) !== "ok")) return "low";
-  return "ok";
-}
-
-function SummaryLine() {
-  return (
-    <p className="text-[17px] leading-7" style={{ color: INK }}>
-      Sur <b>{SUMMARY.total} analyses</b>, <b className="text-[#0F7A5A]">{SUMMARY.ok} sont dans les normes</b>, <b className="text-[#A75A00]">{SUMMARY.low} un peu basses</b> et <b className="text-[#B42323]">{SUMMARY.doctor} à montrer au médecin</b>.
-    </p>
-  );
-}
-
-const W = 240;
-const H = 480;
+const FAKE_PROPOSALS: BloodProposal[] = FAKE_ANALYSES.filter((a) => a.status !== "ok").map((a) => {
+  const finding = { label: a.label, marker: a.marker, direction: a.status === "high" ? ("HIGH" as const) : ("LOW" as const), value: a.value, unit: a.unit, refLow: a.refLow, refHigh: a.refHigh, veryLow: a.veryLow };
+  const rule = a.libraryId === "vitd" || a.libraryId === "b12" ? RULES_BY_ID[a.libraryId] : null;
+  if (!rule || a.status === "high") return { finding, kind: "DOCTOR", reason: "Valeur au-dessus des normes du laboratoire : à montrer à votre médecin.", rule: null, products: [] };
+  return { finding, kind: "ADVICE", reason: rule.pharmacistSentence, rule: { key: rule.key, title: rule.title, pharmacistSentence: rule.pharmacistSentence, patientSentence: rule.patientSentence, cautions: rule.cautions }, products: [] };
+});
 
 function BodyMap() {
-  const [organKey, setOrganKey] = useState<OrganKey | null>(null);
-  const [analysis, setAnalysis] = useState<Analysis | null>(null);
-  const organ = ORGANS.find((o) => o.key === organKey) ?? null;
-  const zoom = organ
-    ? { transform: `translate(${50 - (organ.cx / W) * 100}%, ${24 - (organ.cy / H) * 100}%) scale(2.2)`, transformOrigin: `${(organ.cx / W) * 100}% ${(organ.cy / H) * 100}%` }
-    : { transform: "none", transformOrigin: "50% 50%" };
-
   return (
-    <div className="relative">
-      <div className="px-5 pt-5">
-        <ExampleTag />
-        <h2 className="mt-3 text-[28px] leading-[1.1] font-extrabold tracking-[-0.03em]" style={{ color: INK }}>Votre prise de sang, sur votre corps</h2>
-        <div className="mt-3"><SummaryLine /></div>
-      </div>
-
-      <div className="relative mt-3 h-[470px] overflow-hidden">
-        <div className="absolute top-[10px] left-1/2 h-[440px] w-[220px] -translate-x-1/2">
-          <div className="absolute inset-0 transition-transform duration-[700ms] ease-[cubic-bezier(.2,.9,.25,1)]" style={zoom}>
-            <svg viewBox={`0 0 ${W} ${H}`} className="absolute inset-0 size-full overflow-visible" aria-hidden>
-              <defs>
-                <linearGradient id="pb-skin" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0" stopColor="#E3F4EF" />
-                  <stop offset="1" stopColor="#D3ECF2" />
-                </linearGradient>
-              </defs>
-              <circle cx={SILHOUETTE.head.cx} cy={SILHOUETTE.head.cy} r={SILHOUETTE.head.r} fill="url(#pb-skin)" />
-              <path d={SILHOUETTE.body} fill="url(#pb-skin)" />
-              {/* traits de repère : côtes, bassin */}
-              <path d="M96 124 C108 132 132 132 144 124 M92 140 C108 150 132 150 148 140 M90 156 C108 166 132 166 150 156" stroke="#FFFFFF" strokeWidth="1.6" fill="none" opacity=".8" />
-              <path d="M92 270 C104 282 136 282 148 270" stroke="#FFFFFF" strokeWidth="1.6" fill="none" opacity=".8" />
-              {ORGANS.map((o) => {
-                const st = organStatus(o);
-                const c = STATUS_COLORS[st];
-                const dim = organ && organ.key !== o.key;
-                return (
-                  <g
-                    key={o.key}
-                    className="cursor-pointer transition-opacity duration-500"
-                    style={{ opacity: dim ? 0.18 : 1, pointerEvents: "auto" }}
-                    onClick={() => { setOrganKey(o.key); setAnalysis(null); }}
-                  >
-                    {o.paths.map((d, k) => {
-                      const closed = d.trim().endsWith("Z");
-                      return (
-                        <path
-                          key={k}
-                          d={d}
-                          fill={closed ? c.dot : "none"}
-                          fillOpacity={closed ? 0.26 : 0}
-                          stroke={c.dot}
-                          strokeOpacity={0.9}
-                          strokeWidth={closed ? 1.4 : 2}
-                          strokeDasharray={o.behind ? "3 2.5" : undefined}
-                          strokeLinecap="round"
-                        />
-                      );
-                    })}
-                    {organAnalyses(o).map((a, k, all) => {
-                      const ac = badge(a);
-                      const [x, y] = o.dots[k] ?? [o.cx + (k - (all.length - 1) / 2) * 7.5, o.cy];
-                      return (
-                        <g key={a.id}>
-                          {statusOf(a) !== "ok" && (
-                            <circle cx={x} cy={y} r="4" fill={ac.dot} opacity=".5">
-                              <animate attributeName="r" values="4;9;4" dur="2s" repeatCount="indefinite" />
-                              <animate attributeName="opacity" values=".5;0;.5" dur="2s" repeatCount="indefinite" />
-                            </circle>
-                          )}
-                          <circle cx={x} cy={y} r="3.6" fill={ac.dot} stroke="#FFFFFF" strokeWidth="1.4" />
-                        </g>
-                      );
-                    })}
-                    {/* trait vers l'étiquette */}
-                    {!organ && (
-                      <path
-                        d={`M${o.cx} ${o.cy} L${o.side === "l" ? 30 : 210} ${o.labelY}`}
-                        stroke={c.dot}
-                        strokeOpacity=".45"
-                        strokeWidth="1"
-                        strokeDasharray="2 2"
-                        fill="none"
-                      />
-                    )}
-                  </g>
-                );
-              })}
-            </svg>
-          </div>
-
-          {ORGANS.map((o, i) => {
-            const st = organStatus(o);
-            const c = STATUS_COLORS[st];
-            const n = organAnalyses(o).length;
-            return (
-              <button
-                key={o.key}
-                type="button"
-                onClick={() => { setOrganKey(o.key); setAnalysis(null); }}
-                className={`absolute -translate-y-1/2 transition-opacity duration-300 ${organ ? "pointer-events-none opacity-0" : "opacity-100"}`}
-                style={{ top: `${(o.labelY / H) * 100}%`, ...(o.side === "l" ? { right: `${100 - (30 / W) * 100}%` } : { left: `${(210 / W) * 100}%` }) }}
-              >
-                <span className={`flex items-center gap-1.5 rounded-full bg-white/90 py-1 pr-2.5 pl-2 shadow-[0_6px_14px_-8px_rgba(15,47,42,.45)] whitespace-nowrap ${o.side === "l" ? "flex-row-reverse pr-2 pl-2.5" : ""}`} style={{ animation: `pbRise .5s ${i * 60}ms both` }}>
-                  <span className="size-2 shrink-0 rounded-full" style={{ background: c.dot }} />
-                  <span className="text-[12.5px] leading-none font-bold" style={{ color: st === "ok" ? INK : c.fg }}>{SHORT[o.key]}</span>
-                  <span className="text-[11px] leading-none font-semibold text-[#94A3A0]">{n}</span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* le panneau de l'organe choisi */}
-        <div
-          className={`absolute inset-x-3 bottom-3 max-h-[58%] overflow-y-auto rounded-[24px] bg-white/95 p-4 shadow-[0_20px_40px_-20px_rgba(15,47,42,.5)] backdrop-blur transition-all duration-500 ease-[cubic-bezier(.2,.9,.25,1)] ${organ ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-8 opacity-0"}`}
-        >
-          {organ && (
-            <div key={organ.key}>
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-[21px] leading-tight font-extrabold tracking-[-0.02em]" style={{ color: INK }}>{organ.label}</h3>
-                  <p className="mt-1 text-[14px] leading-5" style={{ color: SOFT }}>{organ.what}</p>
-                </div>
-                <button type="button" onClick={() => setOrganKey(null)} aria-label="Revoir tout le corps" className="grid size-8 shrink-0 place-items-center rounded-full bg-[#F1F5F4]"><X className="size-4" aria-hidden /></button>
-              </div>
-              <div className="mt-2 space-y-2">
-                {organAnalyses(organ).map((a, i) => (
-                  <button key={a.id} type="button" onClick={() => setAnalysis(a)} className="block w-full rounded-2xl border border-[#E3ECE9] bg-white px-3.5 pt-2.5 text-left transition active:scale-[.99]">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[15px] font-bold" style={{ color: INK }}>{a.name}</span>
-                      <span className="inline-flex items-center gap-1 text-[12px] font-semibold" style={{ color: ACCENT }}>Comprendre <ChevronRight className="size-3.5" aria-hidden /></span>
-                    </div>
-                    <p className="mt-0.5 text-[12.5px] leading-[1.35]" style={{ color: SOFT }}>{a.what}</p>
-                    <Gauge a={a} delay={350 + i * 90} />
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="mx-5 flex flex-wrap justify-center gap-x-3 gap-y-1.5 text-[12px] font-semibold" style={{ color: SOFT }}>
-        {(["ok", "low", "doctor"] as const).map((k) => (
-          <span key={k} className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full" style={{ background: STATUS_COLORS[k].dot }} />{STATUS_COLORS[k].label}</span>
-        ))}
-        <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full border border-[#94A3A0]" /> Un point = une analyse</span>
-        <span className="inline-flex items-center gap-1.5"><span className="h-0 w-4 border-t-2 border-dashed border-[#94A3A0]" /> Dans le dos</span>
-      </div>
-      <p className="mt-3 text-center text-[13px]" style={{ color: SOFT }}>{organ ? "Touchez une analyse pour la comprendre." : "Touchez un organe pour zoomer."}</p>
-      <div className="px-5"><Footer /></div>
-
-      <Sheet open={analysis !== null} onClose={() => setAnalysis(null)}>
-        {analysis && organ && (
-          <div>
-            <button type="button" onClick={() => setAnalysis(null)} className="mb-2 inline-flex items-center gap-1 text-[13.5px] font-semibold" style={{ color: ACCENT }}><ChevronLeft className="size-4" aria-hidden /> {organ.label}</button>
-            <Detail a={analysis} />
-          </div>
-        )}
-      </Sheet>
+    <div className="px-5 pt-5">
+      <ExampleTag />
+      <h2 className="mt-3 text-[28px] leading-[1.1] font-extrabold tracking-[-0.03em]" style={{ color: INK }}>Votre prise de sang, sur votre corps</h2>
+      <div className="mt-2"><BloodBodyMap analyses={FAKE_ANALYSES} proposals={FAKE_PROPOSALS} audience="patient" pharmacyName="Pharmacie du Centre" /></div>
+      <Footer />
     </div>
   );
 }
