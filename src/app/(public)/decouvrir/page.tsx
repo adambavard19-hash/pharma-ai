@@ -204,7 +204,7 @@ export default async function SitePage() {
               {fr("Dans l'appli PharmaBoost, vos patients reçoivent vos offres et celles des laboratoires partenaires. Ces offres ne sont valables que dans les pharmacies PharmaBoost : pour en profiter, ils viennent chez vous.")}
             </SectionHead>
             <ul className="mt-8 grid gap-2.5">
-              {["Vos campagnes : une nouvelle gamme à -20 % pour vos patients", "Les offres des laboratoires, seulement en pharmacie PharmaBoost", "Le code de l'offre scanné à votre comptoir, une seule fois", "Parapharmacie et compléments, jamais un médicament"].map((t) => (
+              {["Vos campagnes : une nouvelle gamme à -20 % pour vos patients", "Les offres des laboratoires, seulement en pharmacie PharmaBoost", "Le code de l'offre scanné à votre comptoir, une seule fois", "Leur prise de sang expliquée sur une carte du corps", "Parapharmacie et compléments, jamais un médicament"].map((t) => (
                 <li key={t} className="flex items-center gap-2.5 rounded-2xl border border-border-subtle bg-surface-app px-4 py-3 text-[15px] font-semibold text-text-primary">
                   <Check className="size-4 shrink-0 text-brand-600" /> {t}
                 </li>
