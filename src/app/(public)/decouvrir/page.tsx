@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
+import { BloodDemo } from "@/components/blood-test/blood-demo";
 import { ArrowRight, Check, ShieldCheck } from "lucide-react";
 import { fr, Kicker, SectionHead } from "./_components/site-shell";
 import { AutoVideo } from "./_components/auto-video";
@@ -206,6 +206,7 @@ export default async function SitePage() {
             </SectionHead>
             <ul className="mt-8 grid gap-2.5">
               {[
+                "Essayez l'exemple : touchez un organe, ouvrez une jauge, changez de patient",
                 "Une jauge par analyse : la zone normale et la valeur du patient",
                 "C'est quoi ? Pourquoi en dessous ou au-dessus ? En mots simples, pour l'expliquer au patient",
                 "Pour une vitamine ou un minéral un peu bas : les compléments sans ordonnance de votre stock, validés par notre pharmacienne",
@@ -219,10 +220,7 @@ export default async function SitePage() {
             <p className="mt-5 text-[13.5px] leading-5 text-text-tertiary">{fr("Une explication générale, jamais un diagnostic. Une valeur haute ou très basse renvoie toujours vers le médecin. Le pharmacien décide.")}</p>
           </Reveal>
           <Reveal delay={2}>
-            <figure className="mx-auto w-full max-w-[340px]">
-              <Image src="/images/appli-prise-de-sang.png" alt="Une prise de sang expliquée sur une carte du corps" width={800} height={1680} className="h-auto w-full rounded-[40px]" />
-              <figcaption className="mt-3 text-center text-[12.5px] text-text-tertiary">Exemple d&apos;écran</figcaption>
-            </figure>
+            <BloodDemo className="mx-auto w-full max-w-[460px]" />
           </Reveal>
         </div>
       </section>

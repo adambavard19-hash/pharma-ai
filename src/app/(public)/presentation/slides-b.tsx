@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ArrowRight, CalendarCheck, Check, Database, Download, FileText, GraduationCap, KeyRound, Lock, Megaphone, MousePointerClick, Plus, RefreshCw, ShieldCheck, Sparkles, Star, Store, Trophy, UserRound, Users, Video } from "lucide-react";
 import { Robot } from "@/components/robot";
+import { BloodDemo } from "@/components/blood-test/blood-demo";
 import { ESTIMATE_ASSUMPTIONS, estimateAdditionalRevenue } from "@/core/pricing/revenue-estimate";
 import { referrerPriceCents } from "@/core/pricing/official-offer";
 import { cn } from "@/lib/utils";
@@ -15,26 +16,22 @@ const PAD = "absolute inset-0 px-[88px] pt-[72px] pb-[64px]";
 /* 13 ----------------------------------------------------------------- */
 export function BloodSlide() {
   return (
-    <div className={cn(PAD, "grid grid-cols-[1fr_420px] items-center gap-16")}>
+    <div className={cn(PAD, "grid grid-cols-[1fr_600px] items-center gap-14")}>
       <div>
-        <Kick>Le patient · nouveau</Kick>
+        <Kick>Au comptoir · nouveau</Kick>
         <Title className="text-[56px]">
           Sa prise de sang, <Grad>enfin claire.</Grad>
         </Title>
-        <Lead>Le patient dépose sa prise de sang dans l&apos;appli. Il la voit sur une carte du corps, chaque analyse expliquée simplement.</Lead>
+        <Lead>Le patient tend ses résultats, le pharmacien les dépose. Chaque analyse se place sur une carte du corps, expliquée simplement. Touchez un organe pour voir.</Lead>
         <ul className="mt-8 space-y-3">
           <Point icon={<Sparkles className="size-5" />} delay={350}>Un point de couleur par analyse, sur son organe</Point>
-          <Point icon={<Check className="size-5" />} delay={470}>Les compléments validés, à récupérer chez vous</Point>
+          <Point icon={<Check className="size-5" />} delay={470}>Pour un manque léger : les compléments validés de votre stock</Point>
           <Point icon={<ShieldCheck className="size-5" />} delay={590}>Une valeur haute ou très basse : à montrer au médecin</Point>
           <Point icon={<Lock className="size-5" />} delay={710}>Rien n&apos;est enregistré</Point>
         </ul>
       </div>
       <div className="pz-right relative" style={d(250)}>
-        <div className="pz-float">
-          {/* eslint-disable-next-line @next/next/no-img-element -- capture de la maquette, locale */}
-          <img src="/images/appli-prise-de-sang.png" alt="La prise de sang sur une carte du corps : vert dans les normes, orange un peu bas, rouge à montrer au médecin" className="mx-auto block h-[740px] w-auto drop-shadow-[0_40px_60px_rgba(15,47,42,0.35)]" />
-        </div>
-        <ExampleMark className="mt-3 block text-center" />
+        <BloodDemo compact className="w-full" />
       </div>
     </div>
   );

@@ -20,9 +20,9 @@ const ACCENT = "#0E8A7B";
 const INK = "#0F2F2A";
 const SOFT = "#4B6A62";
 
-type Kind = "ok" | "advice" | "doctor" | "unknown";
+export type Kind = "ok" | "advice" | "doctor" | "unknown";
 
-const KIND: Record<Kind, { dot: string; bg: string; fg: string; label: string }> = {
+export const KIND: Record<Kind, { dot: string; bg: string; fg: string; label: string }> = {
   ok: { dot: "#22B07D", bg: "#E6F6EF", fg: "#0F7A5A", label: "Dans les normes" },
   advice: { dot: "#F29A1F", bg: "#FFF3E0", fg: "#A75A00", label: "Un peu bas" },
   doctor: { dot: "#E5484D", bg: "#FDECEC", fg: "#B42323", label: "À montrer au médecin" },
@@ -53,11 +53,11 @@ export type BodyMapProps = {
   title?: string;
 };
 
-function proposalFor(a: BloodAnalysis, proposals: BloodProposal[]): BloodProposal | null {
+export function proposalFor(a: BloodAnalysis, proposals: BloodProposal[]): BloodProposal | null {
   return proposals.find((p) => (a.marker !== null && p.finding.marker === a.marker) || p.finding.label === a.label) ?? null;
 }
 
-function kindOf(a: BloodAnalysis, proposals: BloodProposal[]): Kind {
+export function kindOf(a: BloodAnalysis, proposals: BloodProposal[]): Kind {
   if (a.status === "ok") return "ok";
   if (a.status === "unknown") return "unknown";
   return proposalFor(a, proposals)?.kind === "ADVICE" ? "advice" : "doctor";
@@ -65,7 +65,7 @@ function kindOf(a: BloodAnalysis, proposals: BloodProposal[]): Kind {
 
 const RANK: Record<Kind, number> = { doctor: 3, advice: 2, ok: 1, unknown: 0 };
 
-function worst(kinds: Kind[]): Kind {
+export function worst(kinds: Kind[]): Kind {
   return kinds.reduce<Kind>((acc, k) => (RANK[k] > RANK[acc] ? k : acc), "unknown");
 }
 
@@ -162,7 +162,7 @@ function Help({ proposal, audience, pharmacyName }: { proposal: BloodProposal; a
   );
 }
 
-function AnalysisRow({ a, kind, proposal, audience, pharmacyName, delay }: { a: BloodAnalysis; kind: Kind; proposal: BloodProposal | null; audience: BodyMapProps["audience"]; pharmacyName?: string | null; delay: number }) {
+export function AnalysisRow({ a, kind, proposal, audience, pharmacyName, delay }: { a: BloodAnalysis; kind: Kind; proposal: BloodProposal | null; audience: BodyMapProps["audience"]; pharmacyName?: string | null; delay: number }) {
   const [open, setOpen] = useState(kind === "advice" || kind === "doctor");
   const entry = libraryEntry(a.libraryId);
   const text = entry ?? OTHER_ANALYSIS_TEXT;
@@ -191,7 +191,7 @@ function AnalysisRow({ a, kind, proposal, audience, pharmacyName, delay }: { a: 
   );
 }
 
-function summary(kinds: Kind[]): string {
+export function summary(kinds: Kind[]): string {
   const n = kinds.length;
   const ok = kinds.filter((k) => k === "ok").length;
   const advice = kinds.filter((k) => k === "advice").length;
