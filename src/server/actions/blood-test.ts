@@ -8,6 +8,7 @@ import { PERMISSIONS } from "@/server/rbac/permissions";
 import { cookies } from "next/headers";
 import { BLOOD_MAX_BYTES, adviseBloodTestAtCounter, adviseBloodTestForPatient, decideBloodRule } from "@/server/services/blood-test";
 import { APP_SESSION_COOKIE, memberFromSession } from "@/server/services/app-members";
+import { PATIENT_BLOOD_TEST_ENABLED } from "@/core/blood-test/rules";
 import type { BloodProposal } from "@/core/blood-test/propose";
 import { fail, ok, type ActionResult } from "./types";
 
@@ -40,6 +41,7 @@ export async function decideBloodRuleAction(payload: { ruleKey: string; decision
 
 /** Appli des patients : l'inscrit dépose sa prise de sang ; rien n'est enregistré, ni l'image ni le résultat. */
 export async function readBloodTestForPatientAction(formData: FormData): Promise<ActionResult<{ proposals: BloodProposal[] }>> {
+  if (!PATIENT_BLOOD_TEST_ENABLED) return fail("La lecture des prises de sang n'est pas disponible dans l'application pour le moment.");
   const member = await memberFromSession((await cookies()).get(APP_SESSION_COOKIE)?.value);
   if (!member) return fail("Connectez-vous pour faire lire votre prise de sang.");
   const file = formData.get("fichier");

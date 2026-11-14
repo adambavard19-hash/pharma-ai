@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { notFound } from "next/navigation";
+import { PATIENT_BLOOD_TEST_ENABLED } from "@/core/blood-test/rules";
 import { ACCENT, Card, GRAD, PageTitle } from "../_components/ui";
 import { getAppMember } from "../_components/member";
 import { bloodReadingAvailable } from "@/server/services/blood-test";
@@ -13,6 +15,7 @@ export const metadata: Metadata = { title: "Ma prise de sang" };
  * sa pharmacie PharmaBoost. Rien n'est enregistré : ni l'image, ni les valeurs (pas d'hébergement HDS).
  */
 export default async function PatientBloodTestPage() {
+  if (!PATIENT_BLOOD_TEST_ENABLED) notFound();
   const member = await getAppMember();
   return (
     <div className="px-5 pt-4 pb-6">

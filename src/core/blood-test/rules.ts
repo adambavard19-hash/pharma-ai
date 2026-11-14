@@ -16,6 +16,13 @@
  * Module pur : aucune base, aucun réseau.
  */
 
+/**
+ * Prise de sang dans l'appli des patients : CACHÉE (fondateur, 14 nov. 2026) tant que l'avocat n'a pas dit si la lecture
+ * d'analyses par le patient, sans pharmacien, fait de PharmaBoost un dispositif médical (dossier avocat, question 33).
+ * Le comptoir (le pharmacien décide) reste ouvert.
+ */
+export const PATIENT_BLOOD_TEST_ENABLED = false;
+
 export const BLOOD_RULE_PREFIX = "prise-de-sang:";
 
 export type BloodMarkerKey = "VITAMIN_D" | "FERRITIN" | "IRON" | "B12" | "FOLATE" | "MAGNESIUM" | "ZINC";
