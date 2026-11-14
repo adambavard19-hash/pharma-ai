@@ -92,7 +92,7 @@ export const DEMO_PRODUCTS: DemoProduct[] = [
     ean: "3400900000042",
     description: "Comprimés à croquer, 1 par jour.",
     commercialClaims: ["Contribue au maintien d'une ossature normale"],
-    precautions: ["Ne pas cumuler avec une supplémentation prescrite."],
+    precautions: [],
     matchingTags: ["vitamine", "vitamine d", "os", "ossature", "calcium", "immunité"],
     contraindications: [],
     purchasePriceCents: 310,

@@ -675,12 +675,12 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
     rationaleTemplate:
       "Le traitement ({drug}) s'inscrit dans un contexte osseux. Le statut en vitamine D mérite d'être évoqué avec le patient.",
     counterScriptTemplate:
-      "« Votre traitement ({drug}) concerne la santé osseuse. Votre vitamine D a-t-elle été contrôlée récemment ? Si aucune supplémentation n'est déjà prescrite, {product} est à évoquer avec votre médecin. »",
+      "« Votre traitement ({drug}) concerne la santé osseuse. Votre vitamine D a-t-elle été contrôlée récemment ? {product} est à évoquer avec votre médecin. »",
     patientReasonTemplate:
-      "Votre traitement concerne la santé de vos os. {product} apporte de la vitamine D, à évoquer avec votre médecin si vous n'en prenez pas déjà.",
+      "Votre traitement concerne la santé de vos os. {product} apporte de la vitamine D, à évoquer avec votre médecin.",
     clinicalContext:
-      "Vérifier qu'une supplémentation n'est pas déjà prescrite avant tout conseil.",
-    safetyNotes: ["Ne pas cumuler avec une supplémentation déjà en cours."],
+      "Contexte osseux : le statut en vitamine D mérite d'être évoqué avec le patient.",
+    safetyNotes: [],
     adjustPriority: (patient) =>
       patient.ageYears !== null && patient.ageYears >= 65 ? 12 : -8,
   },
