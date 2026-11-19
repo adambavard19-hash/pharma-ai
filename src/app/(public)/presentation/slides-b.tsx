@@ -523,7 +523,7 @@ export function CalculatorSlide() {
 }
 
 /* 23 ----------------------------------------------------------------- */
-const INCLUDED = ["Tous vos postes de comptoir", "La bibliothèque de conseils validés", "La Base Claude Bernard et le copilote IA", "Les mises à jour automatiques", "Le support, depuis PharmaBoost", "L'application mobile et ses formations"];
+const INCLUDED = ["Tous vos postes de comptoir", "La bibliothèque de conseils validés", "Le copilote IA", "Les mises à jour automatiques", "Le support, depuis PharmaBoost", "L'application mobile et ses formations"];
 
 export function PriceSlide() {
   const [referrals, setReferrals] = useState(0);

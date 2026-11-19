@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { BookOpen, Camera, Check, ClipboardList, Clock, FileText, Heart, Lightbulb, Mail, MessageCircle, Pill, Play, RefreshCw, ScanLine, Send, ShieldCheck, Sparkles, Star, Store, Users, Zap } from "lucide-react";
+import { BookOpen, Camera, Check, ClipboardList, Clock, Heart, Lightbulb, Mail, MessageCircle, Play, RefreshCw, ScanLine, Send, ShieldCheck, Star, Store, Users, Zap } from "lucide-react";
 import { Robot } from "@/components/robot";
 import { ean13Modules } from "@/core/patient-app/offers";
 import { cn } from "@/lib/utils";
@@ -278,63 +278,6 @@ export function ValidatedSlide() {
 }
 
 /* 9 ------------------------------------------------------------------ */
-const FICHES = [
-  { kind: "Médicament", title: "La fiche complète", lines: ["Indications", "Posologie", "Contre-indications", "Précautions et interactions"], image: null },
-  { kind: "Hors médicament", title: "Parapharmacie et compléments", lines: ["À quoi il sert", "Comment l'utiliser", "Précautions"], image: "/site/produits/creme-solaire-spf50.webp" },
-  { kind: "Avec la photo", title: "On reconnaît la boîte", lines: ["La photo du produit", "Les dernières mises à jour"], image: "/site/produits/flore-equilibre-10-milliards.webp" },
-];
-
-export function ClaudeBernardSlide() {
-  const [top, setTop] = useState(0);
-  return (
-    <div className={cn(PAD, "grid grid-cols-[1fr_640px] items-center gap-12")}>
-      <div>
-        <Kick>Le savoir · Base Claude Bernard</Kick>
-        <Title className="text-[58px]">
-          Toutes les fiches, <Grad>toujours à jour.</Grad>
-        </Title>
-        <Lead>PharmaBoost s&apos;appuie sur la Base Claude Bernard, base de données médicaments agréée par la HAS : médicaments et hors médicaments, avec la photo.</Lead>
-        <div className="mt-9 flex flex-wrap gap-3">
-          <span className="pz-pop inline-flex items-center gap-2 rounded-full bg-white/80 px-5 py-2.5 text-[17px] font-semibold text-brand-800 shadow-sm" style={d(450)}>
-            <ShieldCheck className="size-5" /> Agréée par la HAS
-          </span>
-          <span className="pz-pop inline-flex items-center gap-2 rounded-full bg-[#E8FF9C] px-5 py-2.5 text-[17px] font-bold text-[#14302A]" style={d(600)}>
-            <Sparkles className="size-5" /> Comprise dans l&apos;abonnement
-          </span>
-        </div>
-      </div>
-      <button type="button" onClick={() => setTop((t) => (t + 1) % FICHES.length)} className="pz-right relative h-[600px] w-[600px]" style={d(300)} aria-label="Fiche suivante">
-        {FICHES.map((f, i) => {
-          const pos = (i - top + FICHES.length) % FICHES.length;
-          return (
-            <Glass
-              key={f.kind}
-              className="absolute top-10 left-10 flex h-[460px] w-[480px] flex-col p-9 text-left transition-all duration-700 ease-[cubic-bezier(.2,.8,.2,1)]"
-              style={{ transform: `translate(${pos * 36}px, ${pos * 34}px) rotate(${pos * 3}deg) scale(${1 - pos * 0.05})`, zIndex: 10 - pos, opacity: pos === 0 ? 1 : 0.85 }}
-            >
-              <div className="flex items-center justify-between">
-                <span className="rounded-full bg-brand-50 px-4 py-1.5 text-[14px] font-bold tracking-[0.1em] text-brand-700 uppercase">{f.kind}</span>
-                <FileText className="size-7 text-brand-600" />
-              </div>
-              {/* eslint-disable-next-line @next/next/no-img-element -- photo locale */}
-              {f.image ? <img src={f.image} alt="" className="mt-6 h-[120px] w-[120px] rounded-2xl bg-white object-contain p-2 shadow-sm" /> : <span className="mt-6 grid h-[120px] w-[120px] place-items-center rounded-2xl bg-white text-brand-700 shadow-sm"><Pill className="size-14" /></span>}
-              <p className="mt-6 text-[30px] font-bold tracking-[-0.03em] text-text-primary">{f.title}</p>
-              <ul className="mt-4 space-y-2">
-                {f.lines.map((l) => (
-                  <li key={l} className="flex items-center gap-2.5 text-[18px] text-text-secondary">
-                    <Check className="size-4 text-brand-600" /> {l}
-                  </li>
-                ))}
-              </ul>
-            </Glass>
-          );
-        })}
-        <span className="absolute right-6 bottom-0 text-[15px] font-semibold text-brand-700">Touchez pour la fiche suivante →</span>
-      </button>
-    </div>
-  );
-}
-
 /* 10 ----------------------------------------------------------------- */
 const QA = [
   { q: "Le patient prend un antibiotique : quel probiotique de mon stock ?", a: "Une levure probiotique, à prendre pendant toute la durée du traitement. Demandez d'abord s'il est allergique à la levure. Vous en avez en stock.", image: "/site/produits/ultra-levure-200-mg.webp", name: "Levure probiotique" },
@@ -372,7 +315,7 @@ export function CopilotSlide() {
         <Title className="text-[58px]">
           Posez-lui <Grad>n&apos;importe quelle question.</Grad>
         </Title>
-        <Lead>Un médicament, un produit conseil, une question du patient : le copilote répond avec la Base Claude Bernard, photo à l&apos;appui.</Lead>
+        <Lead>Un médicament, un produit conseil, une question du patient : le copilote répond avec les données officielles des médicaments.</Lead>
         <div className="mt-8 flex gap-3">
           <span className="pz-pop rounded-full bg-white/80 px-5 py-2.5 text-[17px] font-semibold text-brand-800" style={d(450)}>Pour se former</span>
           <span className="pz-pop rounded-full bg-white/80 px-5 py-2.5 text-[17px] font-semibold text-brand-800" style={d(560)}>Face au patient</span>
@@ -385,7 +328,7 @@ export function CopilotSlide() {
           </span>
           <div>
             <p className="text-[19px] font-bold text-text-primary">Copilote PharmaBoost</p>
-            <p className="text-[14px] text-text-tertiary">Base Claude Bernard</p>
+            <p className="text-[14px] text-text-tertiary">Données officielles des médicaments</p>
           </div>
         </div>
         <div className="flex flex-1 flex-col justify-end gap-4 py-5">
