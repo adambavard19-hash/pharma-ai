@@ -213,6 +213,7 @@ model Pharmacy {
 
   // L'appli des patients (22 oct. 2026)
   appMembers    AppMember[]
+  patientReviews PatientReview[]
   patientOffers PatientOffer[]
 
   @@index([organizationId])
@@ -636,6 +637,7 @@ model User {
   personalObjectives      PersonalObjective[]
   bonusAuthorizations     BonusAuthorization[]
   trainingRecommendations TrainingRecommendation[]
+  patientReviews          PatientReview[]         @relation("ReviewStaff")
 
   @@index([organizationId])
   @@map("users")
@@ -6264,6 +6266,7 @@ model AppMember {
   homePharmacy Pharmacy?            @relation(fields: [homePharmacyId], references: [id], onDelete: SetNull)
   codes        PatientOfferCode[]
   joinRequest  PharmacyJoinRequest?
+  reviews      PatientReview[]
 
   @@index([homePharmacyId])
   @@map("app_members")
@@ -6341,4 +6344,31 @@ model PharmacyJoinRequest {
 
   @@index([key])
   @@map("pharmacy_join_requests")
+}
+
+/// L'avis d'un patient sur son passage en pharmacie, laissé dans l'appli (18 nov. 2026) : une note et des mots tout prêts
+/// (`tags`, voir src/core/patient-app/reviews.ts), JAMAIS de texte libre — aucune donnée de santé. `staffUserId` : le
+/// collaborateur choisi par le patient (vide = « l'équipe ») ; `staffFirstName` garde son prénom si le compte disparaît.
+/// `publicConsent` : le patient accepte que PharmaBoost publie son avis (prénom `publicName`) sur son site.
+model PatientReview {
+  id             String   @id @default(cuid())
+  pharmacyId     String
+  appMemberId    String?
+  staffUserId    String?
+  staffFirstName String?
+  rating         Int
+  tags           String[] @default([])
+  publicConsent  Boolean  @default(false)
+  publicName     String?
+  createdAt      DateTime @default(now())
+
+  pharmacy  Pharmacy   @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  appMember AppMember? @relation(fields: [appMemberId], references: [id], onDelete: SetNull)
+  staffUser User?      @relation("ReviewStaff", fields: [staffUserId], references: [id], onDelete: SetNull)
+
+  @@index([pharmacyId, createdAt])
+  @@index([staffUserId])
+  @@index([appMemberId, createdAt])
+  @@index([publicConsent, createdAt])
+  @@map("patient_reviews")
 }

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { publicTestimonials } from "@/server/services/patient-reviews";
 import Link from "next/link";
 import { BloodDemo } from "@/components/blood-test/blood-demo";
 import { ArrowRight, Check, ShieldCheck } from "lucide-react";
@@ -89,7 +90,7 @@ const BRAND_JSON_LD = {
 };
 
 export default async function SitePage() {
-  const [pricing, live] = await Promise.all([loadPublicPricing(), loadLiveProof()]);
+  const [pricing, live, testimonials] = await Promise.all([loadPublicPricing(), loadLiveProof(), publicTestimonials().catch(() => [])]);
 
   return (
     <>
@@ -248,6 +249,25 @@ export default async function SitePage() {
           </Reveal>
         </div>
       </section>
+
+      {/* ---- Ce que disent les patients : avis laissés dans l'appli, publiés avec leur accord (18 nov. 2026) ---- */}
+      {testimonials.length >= 3 && (
+        <section id="avis" className="scroll-mt-20 border-t border-border-subtle">
+          <div className="mx-auto max-w-6xl px-5 py-20 md:py-24">
+            <SectionHead kicker="Avis de patients" title="Ce que les patients disent de leur pharmacie PharmaBoost." />
+            <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {testimonials.map((t) => (
+                <figure key={t.id} className="rounded-3xl border border-border-subtle bg-surface-card p-6">
+                  <p className="text-[18px] tracking-[2px] text-[#F5A524]" aria-label={`${t.rating} sur 5`}>{"★".repeat(t.rating)}{"☆".repeat(5 - t.rating)}</p>
+                  <blockquote className="mt-3 text-[16px] leading-7 font-medium text-text-primary">« {t.sentence} »</blockquote>
+                  <figcaption className="mt-3 text-[13.5px] text-text-secondary">{t.name}{t.city ? `, ${t.city}` : ""}</figcaption>
+                </figure>
+              ))}
+            </div>
+            <p className="mt-6 text-[12.5px] text-text-secondary">Avis laissés par des patients dans l&apos;appli PharmaBoost après leur passage en pharmacie, publiés avec leur accord. Seuls les avis de 4 étoiles et plus sont affichés ici.</p>
+          </div>
+        </section>
+      )}
 
       {/* ---- Tarif : deux formules, une source (console ou offre officielle) ---- */}
       <PricingSection pricing={pricing} />

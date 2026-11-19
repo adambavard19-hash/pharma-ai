@@ -202,7 +202,7 @@ export const NAVIGATION: NavItem[] = [
     // Ouverte à l'équipe (consigne du 13 oct. 2026) : un collaborateur voit les bilans de SES ventes ; le titulaire
     // (ANALYTICS_VIEW_TEAM_PERFORMANCE) voit toute l'officine, tous comptoirs confondus.
     permission: PERMISSIONS.PATIENT_EMAILS_VIEW,
-    match: ["/emails-patients", "/nouveautes", "/offres-patients"],
+    match: ["/emails-patients", "/nouveautes", "/offres-patients", "/avis-patients"],
     description: "Les bilans envoyés par e-mail depuis le comptoir : quand, par qui, quels produits, envoyé ou non",
     group: "pharmacie",
   },
@@ -347,6 +347,7 @@ export const SECTIONS: Record<SectionKey, { href: string; label: string; permiss
   patients: [
     { href: "/emails-patients", label: "Bilans envoyés", permission: PERMISSIONS.PATIENT_EMAILS_VIEW },
     { href: "/nouveautes", label: "Actualités aux patients", permission: PERMISSIONS.NEWS_VIEW },
+    ...(PATIENT_APP_LIVE ? [{ href: "/avis-patients", label: "Avis patients", permission: PERMISSIONS.PATIENT_EMAILS_VIEW }] : []),
     ...(PATIENT_APP_LIVE ? [{ href: "/offres-patients", label: "Offres patients", permission: PERMISSIONS.NEWS_MANAGE }] : []),
   ],
   aide: [

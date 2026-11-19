@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ChevronRight, Crown, LogIn, Mail, Pill, Tag } from "lucide-react";
+import { ChevronRight, Crown, LogIn, Mail, Pill, Star, Tag } from "lucide-react";
 import { Robot } from "@/components/robot";
 import { listPublicPharmacies } from "@/server/services/patient-app";
 import { PLUS_OFFERED, PLUS_PRICE_LABEL } from "@/core/patient-app/offers";
@@ -55,6 +55,19 @@ export default async function MyPharmacyPage({ searchParams }: { searchParams: P
               declared={member.declared}
               pharmacies={pharmacies.map((pharmacy) => ({ id: pharmacy.id, name: pharmacy.name, city: [pharmacy.postalCode, pharmacy.city].filter(Boolean).join(" ") }))}
             />
+
+            {member.homePharmacy && (
+              <Link href="/app/avis" className="mt-2.5 block">
+                <Card className="flex items-center gap-3">
+                  <Star className="size-5 shrink-0" style={{ color: "#F5A524" }} aria-hidden="true" />
+                  <span className="flex-1">
+                    <span className="block text-[15px] font-bold">Donner mon avis</span>
+                    <span className="block text-[12.5px] text-[#4B6A62]">L&apos;équipe de ma pharmacie le reçoit</span>
+                  </span>
+                  <ChevronRight className="size-5 text-[#94A3A0]" aria-hidden="true" />
+                </Card>
+              </Link>
+            )}
 
             {PLUS_OFFERED && (
               <>

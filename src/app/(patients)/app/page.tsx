@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { PATIENT_BLOOD_TEST_ENABLED } from "@/core/blood-test/rules";
-import { ChevronRight, Mail, MapPin, Pill, ScanLine, Search, Tag, Droplet } from "lucide-react";
+import { ChevronRight, Mail, MapPin, Pill, ScanLine, Search, Star, Tag, Droplet } from "lucide-react";
 import { Robot } from "@/components/robot";
 import { ACCENT, Card, Dna, GRAD, SectionTitle } from "./_components/ui";
 
@@ -54,6 +54,15 @@ export default function PatientHome() {
             <ChevronRight className="size-5 text-[#94A3A0]" aria-hidden="true" />
           </Link>
         )}
+
+        <Link href="/app/avis" data-app-avis-entree="" className="mt-2.5 flex items-center gap-3 rounded-[20px] bg-white p-4 shadow-sm">
+          <Star className="size-6 shrink-0" style={{ color: "#F5A524" }} aria-hidden="true" />
+          <span className="flex-1">
+            <span className="block text-[16px] font-bold">Donner mon avis</span>
+            <span className="block text-[12.5px] text-[#4B6A62]">Sur mon passage dans ma pharmacie</span>
+          </span>
+          <ChevronRight className="size-5 text-[#94A3A0]" aria-hidden="true" />
+        </Link>
 
         <div className="mt-2.5 grid grid-cols-2 gap-2.5">
           <Link href="/app/offres">
