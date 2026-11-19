@@ -19,9 +19,9 @@ function askAppleRating(): boolean {
   return true;
 }
 
-export function ReviewForm({ pharmacyName, team }: { pharmacyName: string; team: { userId: string; firstName: string }[] }) {
+export function ReviewForm({ pharmacyName, team, initialStaff = null }: { pharmacyName: string; team: { userId: string; firstName: string }[]; initialStaff?: string | null }) {
   const [rating, setRating] = useState(0);
-  const [staff, setStaff] = useState<string | null>(null);
+  const [staff, setStaff] = useState<string | null>(initialStaff);
   const [tags, setTags] = useState<string[]>([]);
   const [consent, setConsent] = useState(false);
   const [name, setName] = useState("");

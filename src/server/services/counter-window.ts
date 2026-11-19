@@ -26,6 +26,7 @@ import { getEnv } from "@/config/env";
 import { counterEmailPurgeCutoff } from "@/core/counter/email-retention";
 import { outcomeOf, type NoticeOutcome } from "@/core/counter/notice";
 import { zonedStartOfDay } from "@/core/performance/periods";
+import { ROLE_LABELS } from "@/server/rbac/permissions";
 
 /**
  * La fenêtre du poste de caisse, côté serveur : ce que le pharmacien déclare pendant la vente, et ce qui se passe à « Vente terminée ».
@@ -49,8 +50,18 @@ const ANSWERABLE = new Set(["PROPOSED", "PRESENTED", "ACCEPTED", "MODIFIED", "PU
 async function ownedSale(agent: AgentContext, prescriptionId: string) {
   return prisma.prescription.findFirst({
     where: { id: prescriptionId, pharmacyId: agent.scope.pharmacyId, source: "COUNTER_SCAN" },
-    select: { id: true, counterPost: true, handledByUserId: true, counterFollowUp: { select: { id: true, closedAt: true } } },
+    select: { id: true, counterPost: true, counterPostId: true, handledByUserId: true, counterFollowUp: { select: { id: true, closedAt: true } } },
   });
+}
+
+/** Qui a conseillé : la personne qui a fait la vente, à défaut celle à qui le comptoir est attribué. Prénom et métier seulement. */
+async function saleAdvisor(pharmacyId: string, sale: { handledByUserId: string | null; counterPostId: string | null }): Promise<BilanContent["advisor"]> {
+  let userId = sale.handledByUserId;
+  if (!userId && sale.counterPostId) userId = (await prisma.counterPost.findFirst({ where: { id: sale.counterPostId, pharmacyId }, select: { assignedUserId: true } }))?.assignedUserId ?? null;
+  if (!userId) return null;
+  const membership = await prisma.membership.findFirst({ where: { pharmacyId, userId, isActive: true }, select: { role: true, user: { select: { firstName: true } } } });
+  if (!membership) return null;
+  return { userId, firstName: membership.user.firstName.trim().split(/\s+/)[0] ?? membership.user.firstName, roleLabel: ROLE_LABELS[membership.role] ?? "Équipe officinale" };
 }
 
 async function ensureFollowUp(pharmacyId: string, prescriptionId: string): Promise<void> {
@@ -461,9 +472,10 @@ export async function createBilanQr(agent: AgentContext, input: { prescriptionId
   const sold = (read?.notice.items ?? []).filter((item) => item.outcome === "SOLD");
   const soldIds = sold.map((item) => item.id).filter((value): value is string => Boolean(value));
   if (soldIds.length === 0) return { ok: false, error: "Aucun conseil vendu : marquez d'abord ce que le patient prend." };
-  const [parts, cures] = await Promise.all([
+  const [parts, cures, advisor] = await Promise.all([
     composeReportParts({ agent, prescriptionId: sale.id, soldIds, fallbackNames: sold.map((item) => item.name), fast: true }),
     planCureReminders(pharmacyId, soldIds, now).catch(() => []),
+    saleAdvisor(pharmacyId, sale).catch(() => null),
   ]);
   const { pharmacy, products } = parts;
   const content: BilanContent = {
@@ -480,6 +492,8 @@ export async function createBilanQr(agent: AgentContext, input: { prescriptionId
       imageUrl: product.imageUrl ?? null,
     })),
     cures: cures.map((cure) => ({ name: cure.productName, remindOn: cure.sendAt.toISOString().slice(0, 10) })),
+    pharmacyId,
+    advisor,
   };
   const { key, payload } = sealJson(content);
   const version = (await prisma.sealedDocument.count({ where: { prescriptionId: sale.id } })) + 1;

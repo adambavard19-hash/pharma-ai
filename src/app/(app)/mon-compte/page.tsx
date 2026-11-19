@@ -3,6 +3,7 @@ import { requireSession } from "@/server/auth/session";
 import { PageHeader, DataItem } from "@/components/ui/page";
 import { Card, CardContent } from "@/components/ui/card";
 import { PasswordForm } from "./password-form";
+import { AdvisorSheetCard } from "@/components/performance/advisor-sheet-card";
 
 export const metadata: Metadata = { title: "Mon compte" };
 
@@ -27,6 +28,8 @@ export default async function AccountPage() {
           <DataItem label="Officine">{session.pharmacy.name}</DataItem>
         </CardContent>
       </Card>
+
+      <AdvisorSheetCard firstName={session.user.firstName} />
 
       <PasswordForm />
     </div>

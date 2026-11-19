@@ -12,8 +12,8 @@ export const metadata: Metadata = { title: "Mon avis" };
  * « Mon avis » (18 nov. 2026) : le patient note son passage dans SA pharmacie PharmaBoost et dit qui l'a servi. L'avis arrive au
  * collaborateur et au titulaire ; puis l'appli l'invite à noter PharmaBoost sur l'App Store et sur Google.
  */
-export default async function ReviewPage() {
-  const member = await getAppMember();
+export default async function ReviewPage({ searchParams }: { searchParams: Promise<{ conseiller?: string }> }) {
+  const [member, { conseiller }] = await Promise.all([getAppMember(), searchParams]);
   const team = member ? await teamForMember(member) : [];
   return (
     <div className="relative px-5 pt-4 pb-6">
@@ -41,7 +41,7 @@ export default async function ReviewPage() {
             </Card>
           </Link>
         ) : (
-          <ReviewForm pharmacyName={member.homePharmacy.name} team={team} />
+          <ReviewForm pharmacyName={member.homePharmacy.name} team={team} initialStaff={team.some((t) => t.userId === conseiller) ? (conseiller ?? null) : null} />
         )}
       </div>
     </div>

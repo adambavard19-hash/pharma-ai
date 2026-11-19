@@ -6372,3 +6372,22 @@ model PatientReview {
   @@index([publicConsent, createdAt])
   @@map("patient_reviews")
 }
+
+/// Une fiche « Conseiller certifié PharmaBoost » émise (19 nov. 2026) : le collaborateur la télécharge depuis son espace ; son
+/// code court (`code`, imprimé avec un QR code) permet à un recruteur de vérifier sur pharmaboost.app/certificat/<code> que la
+/// fiche est authentique. `stats` : les chiffres figés au jour de l'émission. Aucune donnée de patient, aucun montant.
+model AdvisorCertificate {
+  id           String   @id @default(cuid())
+  code         String   @unique
+  userId       String
+  pharmacyId   String
+  fullName     String
+  roleLabel    String
+  pharmacyName String
+  pharmacyCity String?
+  stats        Json
+  issuedAt     DateTime @default(now())
+
+  @@index([userId, issuedAt])
+  @@map("advisor_certificates")
+}

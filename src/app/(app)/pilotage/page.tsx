@@ -15,6 +15,7 @@ import { myComptoirs } from "@/server/services/comptoirs";
 import { loadSoldCounter } from "@/server/services/sold-counter";
 import { SoldCounter } from "@/components/performance/sold-counter";
 import { MyPlaceAndProducts, TeamSoldBoard } from "@/components/performance/sold-blocks";
+import { AdvisorSheetCard } from "@/components/performance/advisor-sheet-card";
 
 export const metadata: Metadata = { title: "Performances" };
 
@@ -49,6 +50,7 @@ export default async function PilotagePage({ searchParams }: { searchParams: Pro
       <div className="space-y-6">
         <SectionTabs section="resultats" active="/pilotage" permissions={session.permissions} />
         <PageHeader title="Mes performances" description={`${session.user.firstName}, voici les conseils que vous avez vendus au comptoir.`} />
+        <AdvisorSheetCard firstName={session.user.firstName} />
         <SoldCounter periods={mine.periods} title="Mes conseils vendus" subtitle="Vos ventes terminées, déclarées « Vendu »" initial={2} money={false} />
         <MyPlaceAndProducts me={session.user.fullName} ranking={team.reports[2].byPerson} products={mine.reports[2].topProducts} />
       </div>
@@ -72,6 +74,7 @@ export default async function PilotagePage({ searchParams }: { searchParams: Pro
     <div className="space-y-6">
       <SectionTabs section="resultats" active="/pilotage" permissions={session.permissions} />
       <PageHeader title="Performances" description="Les conseils vendus par toute l'officine et par vous, le classement de chacun et les challenges. Ces chiffres ne sont visibles que de vous." />
+      <AdvisorSheetCard firstName={session.user.firstName} />
 
       <SoldCounter periods={officine.periods} title="Toute l'officine" subtitle="Conseils vendus au comptoir, déclarés « Vendu »" initial={2} />
       <SoldCounter periods={mine.periods} title="Mes ventes et mon poste" subtitle={`${session.user.firstName}, vos ventes et celles de vos comptoirs`} initial={2} rateLabel="Votre taux de conseil" />

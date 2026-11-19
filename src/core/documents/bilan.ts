@@ -12,6 +12,11 @@ export type BilanContent = {
   products: { name: string; reason: string | null; benefits: string[]; precautions: string[]; posology: string | null; imageUrl: string | null }[];
   /** Les compléments en cure : le rappel se programme sur le téléphone, jamais chez PharmaBoost. « 2026-12-01 » = le jour du rappel. */
   cures: { name: string; remindOn: string }[];
+  /** La pharmacie (identifiant), pour rattacher un avis à la bonne équipe. Absent des bilans d'avant le 19 nov. 2026. */
+  pharmacyId?: string;
+  /** Le collaborateur qui a conseillé (fondateur, 19 nov. 2026) : son prénom et son métier, pour que le patient connaisse son
+   *  conseiller et puisse lui laisser un avis. Absent si personne n'est rattaché à la vente. */
+  advisor?: { userId: string; firstName: string; roleLabel: string } | null;
 };
 
 export function isBilanContent(value: unknown): value is BilanContent {

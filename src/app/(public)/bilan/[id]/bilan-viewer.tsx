@@ -6,6 +6,7 @@ import { Robot } from "@/components/robot";
 import { isBilanContent, type BilanContent } from "@/core/documents/bilan";
 import { unsealJson } from "@/lib/sealed-client";
 import { curesCalendar, saveBilan } from "@/lib/patient-bilans";
+import { AdvisorLine } from "@/components/patient-app/advisor-line";
 
 type State = { kind: "loading" } | { kind: "missing" } | { kind: "locked" } | { kind: "ready"; content: BilanContent };
 
@@ -69,6 +70,7 @@ export function BilanViewer({ id, appLive }: { id: string; appLive: boolean }) {
           <p className="text-[18px] font-extrabold text-[#0F2B26]">{content.pharmacy.name}</p>
         </div>
       </div>
+      <AdvisorLine advisor={content.advisor} withReview={appLive} />
 
       <div className="mt-5 space-y-3">
         {content.products.map((product) => (

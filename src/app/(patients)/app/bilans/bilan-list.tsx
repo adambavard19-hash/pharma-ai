@@ -3,6 +3,7 @@
 import { useState, useSyncExternalStore } from "react";
 import { CalendarClock, ChevronDown, QrCode, Trash2 } from "lucide-react";
 import { readBilans, removeBilan, type SavedBilan } from "@/lib/patient-bilans";
+import { AdvisorLine } from "@/components/patient-app/advisor-line";
 
 const dayLabel = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
 const subscribe = () => () => undefined;
@@ -34,13 +35,14 @@ export function BilanList() {
               <span className="min-w-0 flex-1">
                 <span className="block text-[15px] font-bold text-[#0F2B26]">{bilan.content.pharmacy.name}</span>
                 <span className="block text-[12.5px] text-[#4B6A62]">
-                  {dayLabel(bilan.content.date)} · {bilan.content.products.length} conseil{bilan.content.products.length > 1 ? "s" : ""}
+                  {dayLabel(bilan.content.date)} · {bilan.content.products.length} conseil{bilan.content.products.length > 1 ? "s" : ""}{bilan.content.advisor ? ` · avec ${bilan.content.advisor.firstName}` : ""}
                 </span>
               </span>
               <ChevronDown className={`size-5 text-[#4B6A62] transition-transform ${expanded ? "rotate-180" : ""}`} aria-hidden="true" />
             </button>
             {expanded && (
               <div className="mt-3 space-y-2 border-t border-[#E3EEEA] pt-3">
+                <AdvisorLine advisor={bilan.content.advisor} />
                 {bilan.content.products.map((product) => (
                   <div key={product.name}>
                     <p className="text-[14px] font-semibold text-[#0F2B26]">{product.name}</p>
