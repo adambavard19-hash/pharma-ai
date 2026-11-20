@@ -6272,6 +6272,18 @@ model AppMember {
   @@map("app_members")
 }
 
+/// Le code à 6 chiffres envoyé avec le lien de connexion de l'appli (20 nov. 2026) : sur iPhone le lien s'ouvre dans Safari,
+/// le code se tape dans l'appli. Un seul code vivant par adresse, 30 minutes, 5 essais. Jamais le code en clair.
+model AppLoginCode {
+  emailHash String   @id
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@map("app_login_codes")
+}
+
 /// Une offre de l'appli : une campagne d'une pharmacie (ses patients), ou d'un laboratoire (tout le réseau). Parapharmacie et
 /// produits conseil seulement, jamais un médicament.
 model PatientOffer {

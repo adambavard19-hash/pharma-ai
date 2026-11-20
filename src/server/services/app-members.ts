@@ -4,7 +4,9 @@ import { prisma } from "@/server/db/client";
 import { getMessagingProvider } from "@/server/ai/registry";
 import { publicUrl } from "@/server/public-url";
 import { encryptField, decryptField } from "@/server/security/encryption";
-import { hashEmail, maskEmail, openToken, sealToken } from "@/server/security/tokens";
+import { createHmac } from "node:crypto";
+import { getEnv } from "@/config/env";
+import { hashEmail, maskEmail, openToken, safeCompare, sealToken } from "@/server/security/tokens";
 import { buildOfferAlertEmail } from "@/core/patient-app/offer-alert-email";
 import { newsUnsubscribeHeaders } from "@/core/patient-news/email";
 import {
@@ -86,28 +88,41 @@ function view(row: MemberRow): AppMemberView {
  * Envoie le lien de connexion. Toujours la même réponse, que l'adresse soit connue ou non. Hors production, le lien est
  * aussi rendu à l'écran (aperçu sans boîte e-mail).
  */
-export async function requestAppLogin(email: string): Promise<{ ok: true; previewUrl: string | null } | { ok: false; error: string }> {
+export async function requestAppLogin(email: string, now = new Date()): Promise<{ ok: true; previewUrl: string | null; previewCode: string | null } | { ok: false; error: string }> {
   const clean = email.trim().toLowerCase();
   if (!EMAIL.test(clean)) return { ok: false, error: "Cette adresse e-mail ne semble pas valide." };
   const url = publicUrl(`/app/connexion/${sealToken(LOGIN_PURPOSE, { e: clean }, LOGIN_TTL_MS)}`);
   // Le compte de l'examen Apple : aucune boîte e-mail à ouvrir, le lien s'affiche à l'écran. Compte vide, sans donnée réelle.
-  if (clean === APP_REVIEW_EMAIL) return { ok: true, previewUrl: url };
-  const text = `Bonjour,\n\nVoici votre lien pour ouvrir l'appli PharmaBoost (valable 30 minutes) :\n${url}\n\nSi vous n'avez rien demandé, ignorez ce message.\n\nPharmaBoost`;
-  const html = `<p>Bonjour,</p><p>Voici votre lien pour ouvrir l'appli PharmaBoost (valable 30 minutes) :</p><p><a href="${url}" style="display:inline-block;padding:12px 20px;border-radius:12px;background:#0E8A7B;color:#fff;font-weight:700;text-decoration:none">Ouvrir PharmaBoost</a></p><p style="color:#64748b;font-size:13px">Si vous n'avez rien demandé, ignorez ce message.</p>`;
+  if (clean === APP_REVIEW_EMAIL) return { ok: true, previewUrl: url, previewCode: null };
+  // Le code à taper dans l'appli (sur iPhone, le lien de l'e-mail s'ouvre dans Safari, pas dans l'appli).
+  const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+  const emailHash = hashEmail(clean);
+  const expiresAt = new Date(now.getTime() + LOGIN_TTL_MS);
+  await prisma.appLoginCode.upsert({
+    where: { emailHash },
+    create: { emailHash, codeHash: loginCodeHash(emailHash, code), expiresAt },
+    update: { codeHash: loginCodeHash(emailHash, code), expiresAt, attempts: 0, createdAt: now },
+  });
+  const text = `Bonjour,\n\nVotre code pour ouvrir l'appli PharmaBoost : ${code}\nTapez-le dans l'appli (valable 30 minutes).\n\nOu ouvrez ce lien :\n${url}\n\nSi vous n'avez rien demandé, ignorez ce message.\n\nPharmaBoost`;
+  const html = `<p>Bonjour,</p><p>Votre code pour ouvrir l'appli PharmaBoost :</p><p style="font-size:32px;font-weight:800;letter-spacing:8px;color:#0F2F2A;margin:8px 0">${code}</p><p>Tapez-le dans l'appli. Il reste valable 30 minutes.</p><p style="color:#64748b;font-size:13px;margin-top:20px">Ou bien, sur ordinateur :</p><p><a href="${url}" style="display:inline-block;padding:10px 18px;border-radius:12px;background:#0E8A7B;color:#fff;font-weight:700;text-decoration:none">Ouvrir PharmaBoost</a></p><p style="color:#64748b;font-size:13px">Si vous n'avez rien demandé, ignorez ce message.</p>`;
   try {
-    await getMessagingProvider().sendEmail({ to: clean, fromName: "PharmaBoost", subject: "Votre lien PharmaBoost", text, html });
+    await getMessagingProvider().sendEmail({ to: clean, fromName: "PharmaBoost", subject: `${code} est votre code PharmaBoost`, text, html });
   } catch (error) {
     console.error("[appli patients] envoi du lien de connexion", error);
-    if (process.env.NODE_ENV === "production") return { ok: false, error: "Le lien n'a pas pu être envoyé. Réessayez dans un instant." };
+    if (process.env.NODE_ENV === "production") return { ok: false, error: "Le code n'a pas pu être envoyé. Réessayez dans un instant." };
   }
-  return { ok: true, previewUrl: process.env.NODE_ENV === "production" ? null : url };
+  const preview = process.env.NODE_ENV !== "production";
+  return { ok: true, previewUrl: preview ? url : null, previewCode: preview ? code : null };
 }
 
-/** Le lien de connexion ouvert : l'inscrit est créé à la première fois ; renvoie le jeton de session à poser en cookie. */
-export async function openAppLogin(token: string): Promise<string | null> {
-  const payload = openToken<{ e?: unknown }>(LOGIN_PURPOSE, token);
-  const email = typeof payload?.e === "string" ? payload.e : null;
-  if (!email || !EMAIL.test(email)) return null;
+const MAX_CODE_ATTEMPTS = 5;
+
+function loginCodeHash(emailHash: string, code: string): string {
+  return createHmac("sha256", getEnv().AUTH_SESSION_SECRET).update(`app-login-code:${emailHash}:${code}`).digest("hex");
+}
+
+/** La session de l'inscrit de cette adresse ; il est créé à la première connexion. */
+async function sessionForEmail(email: string): Promise<string> {
   const emailHash = hashEmail(email);
   const member = await prisma.appMember.upsert({
     where: { emailHash },
@@ -116,6 +131,36 @@ export async function openAppLogin(token: string): Promise<string | null> {
     select: { id: true },
   });
   return sealToken(SESSION_PURPOSE, { m: member.id }, APP_SESSION_TTL_MS);
+}
+
+/** Le lien de connexion ouvert : l'inscrit est créé à la première fois ; renvoie le jeton de session à poser en cookie. */
+export async function openAppLogin(token: string): Promise<string | null> {
+  const payload = openToken<{ e?: unknown }>(LOGIN_PURPOSE, token);
+  const email = typeof payload?.e === "string" ? payload.e : null;
+  if (!email || !EMAIL.test(email)) return null;
+  await prisma.appLoginCode.deleteMany({ where: { emailHash: hashEmail(email) } });
+  return sessionForEmail(email);
+}
+
+/** Le code à 6 chiffres tapé dans l'appli : 30 minutes, 5 essais, une seule fois. */
+export async function verifyAppLoginCode(email: string, code: string, now = new Date()): Promise<{ ok: true; session: string } | { ok: false; error: string }> {
+  const clean = email.trim().toLowerCase();
+  const digits = code.replace(/\D/g, "");
+  if (!EMAIL.test(clean) || digits.length !== 6) return { ok: false, error: "Tapez les 6 chiffres reçus par e-mail." };
+  const emailHash = hashEmail(clean);
+  const row = await prisma.appLoginCode.findUnique({ where: { emailHash } });
+  const expired = { ok: false as const, error: "Ce code a expiré. Demandez-en un nouveau." };
+  if (!row || row.expiresAt <= now || row.attempts >= MAX_CODE_ATTEMPTS) return expired;
+  if (!safeCompare(row.codeHash, loginCodeHash(emailHash, digits))) {
+    // Compté de façon atomique : deux essais simultanés ne passent pas sous la limite.
+    const bumped = await prisma.appLoginCode.updateMany({ where: { emailHash, attempts: { lt: MAX_CODE_ATTEMPTS } }, data: { attempts: { increment: 1 } } });
+    const left = MAX_CODE_ATTEMPTS - row.attempts - 1;
+    return bumped.count === 0 || left <= 0 ? expired : { ok: false, error: `Code incorrect. Encore ${left} essai${left > 1 ? "s" : ""}.` };
+  }
+  // Une seule fois : celui qui le supprime ouvre la session.
+  const used = await prisma.appLoginCode.deleteMany({ where: { emailHash, codeHash: row.codeHash } });
+  if (used.count === 0) return expired;
+  return { ok: true, session: await sessionForEmail(clean) };
 }
 
 /**

@@ -7,6 +7,7 @@ import { rateLimited } from "@/server/http/rate-limit";
 import {
   activatePlusPreview,
   APP_SESSION_COOKIE,
+  APP_SESSION_TTL_MS,
   cancelPlus,
   chooseHomePharmacy,
   deleteAppMember,
@@ -16,6 +17,7 @@ import {
   offerCodeState,
   requestAppLogin,
   setOffersConsent,
+  verifyAppLoginCode,
   type AppMemberView,
 } from "@/server/services/app-members";
 import { PATIENT_APP_LIVE } from "@/core/patient-app/offers";
@@ -34,13 +36,26 @@ function refresh() {
   revalidatePath("/app", "layout");
 }
 
-export async function requestAppLoginAction(email: string): Promise<ActionResult<{ previewUrl: string | null }>> {
+export async function requestAppLoginAction(email: string): Promise<ActionResult<{ previewUrl: string | null; previewCode: string | null }>> {
   if (!PATIENT_APP_LIVE) return fail("L'appli PharmaBoost ouvre bientôt.");
   const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
   if (rateLimited(`app-login:${ip}`, 8, 60 * 60 * 1000)) return fail("Trop de demandes. Réessayez dans une heure.");
   const result = await requestAppLogin(String(email ?? "").slice(0, 254));
   if (!result.ok) return fail(result.error);
-  return ok({ previewUrl: result.previewUrl }, "Lien envoyé : ouvrez l'e-mail sur ce téléphone.");
+  return ok({ previewUrl: result.previewUrl, previewCode: result.previewCode }, "Code envoyé : regardez vos e-mails.");
+}
+
+/** Le code à 6 chiffres tapé dans l'appli : ouvre la session dans l'appli même (le lien, lui, s'ouvre dans Safari). */
+export async function verifyAppLoginCodeAction(email: string, code: string): Promise<ActionResult<null>> {
+  if (!PATIENT_APP_LIVE) return fail("L'appli PharmaBoost ouvre bientôt.");
+  const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
+  if (rateLimited(`app-login-code:${ip}`, 20, 60 * 60 * 1000)) return fail("Trop d'essais. Réessayez dans une heure.");
+  const result = await verifyAppLoginCode(String(email ?? "").slice(0, 254), String(code ?? "").slice(0, 20));
+  if (!result.ok) return fail(result.error);
+  const secure = process.env.NODE_ENV === "production";
+  (await cookies()).set(APP_SESSION_COOKIE, result.session, { httpOnly: true, sameSite: "lax", secure, path: "/", maxAge: Math.floor(APP_SESSION_TTL_MS / 1000) });
+  refresh();
+  return ok(null, "Bienvenue !");
 }
 
 export async function logoutAppAction(): Promise<void> {
