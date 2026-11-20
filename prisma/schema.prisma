@@ -6260,6 +6260,12 @@ model AppMember {
   /// L'accord pour recevoir les offres, donné dans l'appli.
   offersConsentAt DateTime?
   lastSeenAt      DateTime?
+  /// L'e-mail de bienvenue (20 nov. 2026), puis les relances de temps en temps (scanner, prise de sang, sa pharmacie…).
+  welcomeSentAt   DateTime?
+  nurtureStep     Int           @default(0)
+  nurtureLastAt   DateTime?
+  /// « Ne plus recevoir ces conseils » : plus aucune relance.
+  nurtureOffAt    DateTime?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
@@ -6269,6 +6275,7 @@ model AppMember {
   reviews      PatientReview[]
 
   @@index([homePharmacyId])
+  @@index([createdAt])
   @@map("app_members")
 }
 

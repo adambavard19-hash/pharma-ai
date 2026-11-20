@@ -177,6 +177,7 @@ export const ADMIN_NAV: AdminNavSpace[] = [
         label: "Partenaires",
         items: [
           { href: "/admin/partenaires", label: "Partenaires", description: "Candidatures, marques, catalogues, commandes." },
+          ...(PATIENT_APP_LIVE ? [{ href: "/admin/appli-patients", label: "Appli patients", description: "Les inscrits de l'appli : par jour, pharmacie choisie, avis, retours, mails de bienvenue et relances." }] : []),
           ...(PATIENT_APP_LIVE ? [{ href: "/admin/offres-laboratoires", label: "Offres laboratoires", description: "Les offres de l'appli des patients payées par les laboratoires, dans tout le réseau : boîtes vendues et montant à facturer." }] : []),
         ],
       },

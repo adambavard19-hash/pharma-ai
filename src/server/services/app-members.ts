@@ -1,5 +1,7 @@
 import "server-only";
 import { randomInt } from "node:crypto";
+import { after } from "next/server";
+import { alertNewMember, sendWelcome } from "@/server/services/app-member-emails";
 import { prisma } from "@/server/db/client";
 import { getMessagingProvider } from "@/server/ai/registry";
 import { publicUrl } from "@/server/public-url";
@@ -116,6 +118,7 @@ export async function requestAppLogin(email: string, now = new Date()): Promise<
 }
 
 const MAX_CODE_ATTEMPTS = 5;
+const SEEN_EVERY_MS = 6 * 60 * 60 * 1000;
 
 function loginCodeHash(emailHash: string, code: string): string {
   return createHmac("sha256", getEnv().AUTH_SESSION_SECRET).update(`app-login-code:${emailHash}:${code}`).digest("hex");
@@ -128,8 +131,15 @@ async function sessionForEmail(email: string): Promise<string> {
     where: { emailHash },
     create: { emailHash, emailCipher: encryptField(email) ?? "", emailMasked: maskEmail(email), lastSeenAt: new Date() },
     update: { lastSeenAt: new Date() },
-    select: { id: true },
+    select: { id: true, emailMasked: true, welcomeSentAt: true, createdAt: true },
   });
+  // Première connexion : le mail de bienvenue et l'alerte à PharmaBoost partent après la réponse (la connexion n'attend pas).
+  if (!member.welcomeSentAt && Date.now() - member.createdAt.getTime() < 60_000) {
+    after(async () => {
+      await sendWelcome(member.id);
+      await alertNewMember(member.emailMasked);
+    });
+  }
   return sealToken(SESSION_PURPOSE, { m: member.id }, APP_SESSION_TTL_MS);
 }
 
@@ -176,8 +186,14 @@ export async function memberFromSession(token: string | null | undefined): Promi
   if (!token) return null;
   const payload = openToken<{ m?: unknown }>(SESSION_PURPOSE, token);
   if (typeof payload?.m !== "string") return null;
-  const row = await prisma.appMember.findUnique({ where: { id: payload.m }, select: MEMBER_SELECT });
-  return row ? view(row as MemberRow) : null;
+  const row = await prisma.appMember.findUnique({ where: { id: payload.m }, select: { ...MEMBER_SELECT, lastSeenAt: true } });
+  if (!row) return null;
+  // « Dernière visite », pour le suivi des retours dans l'appli : écrite au plus toutes les 6 heures.
+  const now = Date.now();
+  if (!row.lastSeenAt || now - row.lastSeenAt.getTime() > SEEN_EVERY_MS) {
+    await prisma.appMember.updateMany({ where: { id: row.id }, data: { lastSeenAt: new Date(now) } }).catch(() => undefined);
+  }
+  return view(row as MemberRow);
 }
 
 /** L'adresse de l'inscrit, en clair, pour lui écrire (jamais affichée ailleurs que masquée). */
