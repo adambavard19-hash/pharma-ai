@@ -48,82 +48,96 @@ export type AppEmailInput = {
   unsubscribeUrl: string;
 };
 
-type Content = { subject: string; heading: string; intro: string; points: string[]; cta: { label: string; path: string } };
+type Point = { icon: string; title: string; text: string };
+type Content = { subject: string; preheader: string; kicker: string; heading: string; intro: string; points: Point[]; cta: { label: string; path: string }; tip?: string };
 
 function content(kind: AppEmailKind, input: AppEmailInput): Content {
   const pharmacy = input.pharmacyName;
   switch (kind) {
     case "welcome":
       return {
-        subject: "Bienvenue dans PharmaBoost",
-        heading: "Bienvenue ! Votre espace est prêt",
-        intro: "Merci d'avoir rejoint PharmaBoost. Voici ce que l'appli fait pour vous, gratuitement :",
+        subject: "Bienvenue dans PharmaBoost 👋",
+        preheader: "Votre espace est prêt : scannez, comprenez, retrouvez votre pharmacie.",
+        kicker: "Bienvenue",
+        heading: "Votre pharmacie, maintenant dans votre poche",
+        intro: "Merci d'avoir rejoint PharmaBoost ! L'appli est gratuite et faite pour vous simplifier la santé au quotidien. Voici par où commencer :",
         points: [
-          "Scanner une boîte : la fiche officielle du médicament, expliquée simplement, et les conseils de votre pharmacien.",
-          "Comprendre votre prise de sang : prenez vos résultats en photo, chaque valeur est expliquée en mots simples.",
+          { icon: "📷", title: "Scannez une boîte", text: "Visez le code-barres : à quoi sert le médicament, comment le prendre, et les bons conseils qui vont avec." },
+          { icon: "🩸", title: "Comprenez votre prise de sang", text: "Une photo de vos résultats, et chaque valeur est expliquée en mots simples." },
           pharmacy
-            ? `Retrouver ${pharmacy} : vos bilans remis au comptoir, ses offres, et votre conseiller.`
-            : "Choisir votre pharmacie PharmaBoost : vos bilans remis au comptoir, ses offres, et votre conseiller.",
+            ? { icon: "💚", title: `Retrouvez ${pharmacy}`, text: "Vos bilans remis au comptoir, ses offres, et votre conseiller, toujours à portée de main." }
+            : { icon: "💚", title: "Choisissez votre pharmacie", text: "Vos bilans remis au comptoir, ses offres, et votre conseiller, toujours à portée de main." },
         ],
         cta: { label: "Ouvrir PharmaBoost", path: "/app" },
+        tip: "Astuce : gardez l'appli sur votre écran d'accueil, elle sera là au bon moment.",
       };
     case "scan":
       return {
-        subject: "Une boîte à la maison ? Scannez-la",
+        subject: "📷 Une boîte à la maison ? Scannez-la",
+        preheader: "2 secondes pour tout savoir sur un médicament.",
+        kicker: "Le geste du jour",
         heading: "Scannez une boîte, en 2 secondes",
-        intro: "Prenez une boîte de votre armoire et visez son code-barres avec l'appli.",
+        intro: "Prenez n'importe quelle boîte de votre armoire et visez son code-barres avec l'appli. C'est tout.",
         points: [
-          "Le nom, à quoi il sert et comment le prendre, tirés de la base officielle des médicaments.",
-          "Les conseils de votre pharmacien qui vont avec.",
-          "Rien n'est enregistré : le scan reste sur votre téléphone.",
+          { icon: "📖", title: "La fiche officielle, en clair", text: "À quoi il sert et comment le prendre, tirés de la base officielle des médicaments." },
+          { icon: "💡", title: "Les conseils qui vont avec", text: "Ce que votre pharmacien vous recommanderait, pour que tout se passe bien." },
+          { icon: "🔒", title: "Rien n'est enregistré", text: "Le scan reste sur votre téléphone. Personne d'autre ne le voit." },
         ],
         cta: { label: "Scanner une boîte", path: "/app/scanner" },
       };
     case "blood":
       return {
-        subject: "Votre prise de sang, enfin claire",
+        subject: "🩸 Votre prise de sang, enfin claire",
+        preheader: "Une photo, et chaque valeur expliquée simplement.",
+        kicker: "Nouveau dans l'appli",
         heading: "Votre prise de sang, expliquée simplement",
-        intro: "Des chiffres, des flèches, des abréviations… L'appli vous aide à y voir clair.",
+        intro: "Des chiffres, des flèches, des abréviations… Pas toujours facile de s'y retrouver. L'appli vous aide à y voir clair.",
         points: [
-          "Prenez vos résultats en photo.",
-          "Chaque valeur est expliquée en mots simples : ce que c'est, et pourquoi on la mesure.",
-          "Votre médecin et votre pharmacien restent là pour en parler avec vous.",
+          { icon: "📸", title: "Une photo suffit", text: "Prenez vos résultats en photo, l'appli lit les valeurs." },
+          { icon: "🧭", title: "Chaque valeur expliquée", text: "Ce que c'est, pourquoi on la mesure, et où vous vous situez." },
+          { icon: "🤝", title: "Vos soignants restent là", text: "Votre médecin et votre pharmacien sont là pour en parler avec vous." },
         ],
         cta: { label: "Comprendre ma prise de sang", path: "/app/prise-de-sang" },
       };
     case "pharmacy":
       return pharmacy
         ? {
-            subject: `${pharmacy} dans votre poche`,
-            heading: `${pharmacy}, dans votre poche`,
-            intro: "Votre pharmacie PharmaBoost vous suit dans l'appli :",
+            subject: `💚 ${pharmacy}, dans votre poche`,
+            preheader: "Vos bilans, ses offres et votre conseiller au même endroit.",
+            kicker: "Votre pharmacie",
+            heading: `${pharmacy}, toujours avec vous`,
+            intro: "Votre pharmacie PharmaBoost vous suit dans l'appli, entre deux passages au comptoir :",
             points: [
-              "Vos bilans remis au comptoir, toujours à portée de main.",
-              "Ses offres sur la parapharmacie, avec un code à montrer au comptoir.",
-              "Votre conseiller, que vous pouvez remercier en laissant un avis.",
+              { icon: "📋", title: "Vos bilans du comptoir", text: "Les conseils remis par votre pharmacien, à relire quand vous voulez." },
+              { icon: "🏷️", title: "Ses offres", text: "Des remises sur la parapharmacie, avec un code à montrer au comptoir." },
+              { icon: "⭐", title: "Votre conseiller", text: "Vous avez été bien conseillé ? Dites-le-lui en laissant un avis." },
             ],
             cta: { label: "Voir ma pharmacie", path: "/app/ma-pharmacie" },
           }
         : {
-            subject: "Votre pharmacie est-elle PharmaBoost ?",
+            subject: "💚 Votre pharmacie est-elle PharmaBoost ?",
+            preheader: "Choisissez-la en un geste et profitez de ses offres.",
+            kicker: "Votre pharmacie",
             heading: "Choisissez votre pharmacie",
-            intro: "Dites à l'appli où vous allez d'habitude :",
+            intro: "Dites à l'appli où vous allez d'habitude, et tout devient plus simple :",
             points: [
-              "Vos bilans remis au comptoir s'y retrouvent.",
-              "Vous profitez de ses offres sur la parapharmacie.",
-              "Votre pharmacie n'y est pas encore ? Indiquez-la : nous lui proposerons de nous rejoindre.",
+              { icon: "📋", title: "Vos bilans du comptoir", text: "Les conseils remis par votre pharmacien s'y retrouvent." },
+              { icon: "🏷️", title: "Ses offres", text: "Des remises sur la parapharmacie, rien que pour vous." },
+              { icon: "📍", title: "Pas encore PharmaBoost ?", text: "Indiquez-la quand même : nous lui proposerons de nous rejoindre." },
             ],
             cta: { label: "Choisir ma pharmacie", path: "/app/pharmacies" },
           };
     case "cabinet":
       return {
-        subject: "Votre armoire à pharmacie, rangée",
+        subject: "🧺 Votre armoire à pharmacie, rangée en 5 minutes",
+        preheader: "Les boîtes périmées repérées d'un coup d'œil.",
+        kicker: "Petit rangement",
         heading: "Rangez votre armoire à pharmacie",
-        intro: "Gardez la liste de vos boîtes dans l'appli : elle reste sur votre téléphone, nulle part ailleurs.",
+        intro: "Gardez la liste de vos boîtes dans l'appli. Elle reste sur votre téléphone, nulle part ailleurs.",
         points: [
-          "Retrouvez d'un coup d'œil ce que vous avez à la maison.",
-          "Notez la date de péremption : l'appli vous montre les boîtes périmées ou bientôt périmées.",
-          "Rapportez les boîtes périmées à votre pharmacie, elle s'en occupe.",
+          { icon: "👀", title: "Tout voir d'un coup d'œil", text: "Ce que vous avez à la maison, sans fouiller les tiroirs." },
+          { icon: "⏰", title: "Les dates de péremption", text: "L'appli vous montre les boîtes périmées ou bientôt périmées." },
+          { icon: "♻️", title: "Un geste simple", text: "Rapportez les boîtes périmées à votre pharmacie, elle s'en occupe." },
         ],
         cta: { label: "Ouvrir mon armoire", path: "/app/armoire" },
       };
@@ -132,50 +146,79 @@ function content(kind: AppEmailKind, input: AppEmailInput): Content {
 
 const REASON = "Vous recevez cet e-mail parce que vous avez créé votre espace dans l'appli PharmaBoost.";
 const NO_HEALTH = "Ce message ne contient aucune information sur votre santé.";
+const INK = "#0F2F2A";
+const GREEN = "#0E8A7B";
+const MUTED = "#4B6A62";
 
 export function buildAppEmail(kind: AppEmailKind, input: AppEmailInput): EmailMessage {
   const c = content(kind, input);
   const ctaUrl = input.appUrl(c.cta.path);
+  const logo = input.appUrl("/logo-256.png");
+  const dna = input.appUrl("/poste/adn-helice.jpg");
   const text = [
     "Bonjour,",
     "",
+    c.heading,
+    "",
     c.intro,
     "",
-    ...c.points.map((point) => `• ${point}`),
+    ...c.points.map((point) => `• ${point.title} : ${point.text}`),
     "",
     `${c.cta.label} : ${ctaUrl}`,
     `Sur iPhone, l'appli PharmaBoost : ${input.appStoreUrl}`,
+    ...(c.tip ? ["", c.tip] : []),
     "",
-    "À bientôt,",
+    "À très vite,",
     "L'équipe PharmaBoost",
     "",
     REASON,
     `Ne plus recevoir ces conseils : ${input.unsubscribeUrl}`,
     NO_HEALTH,
   ].join("\n");
+  const cards = c.points
+    .map(
+      (point) => `<tr><td style="padding:0 0 10px">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F3F8F6;border-radius:16px"><tr>
+          <td width="64" style="padding:16px 0 16px 16px;vertical-align:top"><div style="width:44px;height:44px;border-radius:14px;background:#ffffff;text-align:center;line-height:44px;font-size:22px">${point.icon}</div></td>
+          <td style="padding:16px 16px 16px 12px;vertical-align:top">
+            <div style="font-size:16px;line-height:22px;font-weight:800;color:${INK}">${escapeHtml(point.title)}</div>
+            <div style="margin-top:3px;font-size:14px;line-height:21px;color:${MUTED}">${escapeHtml(point.text)}</div>
+          </td>
+        </tr></table>
+      </td></tr>`,
+    )
+    .join("");
   const html = `<!doctype html>
-<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(c.subject)}</title></head>
-<body style="margin:0;background:#F4F7F6;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#0F2B26">
-  <div style="max-width:520px;margin:0 auto;padding:24px 16px">
-    <div style="background:#0E8A7B;border-radius:16px 16px 0 0;padding:22px 24px">
-      <div style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.85);font-weight:700">PharmaBoost</div>
-      <div style="margin-top:6px;font-size:22px;line-height:28px;font-weight:800;color:#fff">${escapeHtml(c.heading)}</div>
-    </div>
-    <div style="background:#fff;border-radius:0 0 16px 16px;padding:22px 24px">
-      <p style="margin:0;font-size:15px;line-height:23px;color:#374151">${escapeHtml(c.intro)}</p>
-      <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:12px">
-        ${c.points
-          .map(
-            (point) =>
-              `<tr><td style="vertical-align:top;padding:6px 10px 6px 0;color:#0E8A7B;font-weight:800;font-size:16px">✓</td><td style="padding:6px 0;font-size:15px;line-height:22px;color:#374151">${escapeHtml(point)}</td></tr>`,
-          )
-          .join("")}
-      </table>
-      <p style="margin:20px 0 0"><a href="${escapeHtml(ctaUrl)}" style="display:inline-block;padding:13px 22px;border-radius:12px;background:#0E8A7B;color:#fff;font-weight:700;text-decoration:none">${escapeHtml(c.cta.label)}</a></p>
-      <p style="margin:14px 0 0;font-size:13px;line-height:19px;color:#64748B">Sur iPhone : <a href="${escapeHtml(input.appStoreUrl)}" style="color:#0E8A7B">l'appli PharmaBoost sur l'App Store</a></p>
-    </div>
-    <p style="margin:16px 0 0;text-align:center;font-size:12px;line-height:18px;color:#94A3A0">${escapeHtml(REASON)}<br><a href="${escapeHtml(input.unsubscribeUrl)}" style="color:#94A3A0">Ne plus recevoir ces conseils</a> · ${escapeHtml(NO_HEALTH)}</p>
-  </div>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>${escapeHtml(c.subject)}</title></head>
+<body style="margin:0;padding:0;background:#E9F0EE;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:${INK}">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0">${escapeHtml(c.preheader)}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#E9F0EE;padding:24px 12px"><tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:24px;overflow:hidden">
+  <tr><td background="${escapeHtml(dna)}" style="background-color:#EEF3F1;background-image:url('${escapeHtml(dna)}');background-size:cover;background-position:70% 40%;padding:28px 28px 30px">
+    <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+      <td style="vertical-align:middle"><img src="${escapeHtml(logo)}" width="48" height="48" alt="PharmaBoost" style="display:block;border-radius:14px;border:0"></td>
+      <td style="vertical-align:middle;padding-left:10px;font-size:19px;font-weight:800;color:${INK};letter-spacing:-.01em">PharmaBoost</td>
+    </tr></table>
+    <div style="margin-top:26px;display:inline-block;padding:5px 12px;border-radius:999px;background:${GREEN};color:#ffffff;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase">${escapeHtml(c.kicker)}</div>
+    <div style="margin-top:12px;font-size:28px;line-height:34px;font-weight:800;color:${INK};letter-spacing:-.02em;max-width:400px">${escapeHtml(c.heading)}</div>
+  </td></tr>
+  <tr><td style="padding:24px 28px 8px">
+    <p style="margin:0 0 18px;font-size:16px;line-height:25px;color:#374151">${escapeHtml(c.intro)}</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${cards}</table>
+  </td></tr>
+  <tr><td align="center" style="padding:14px 28px 6px">
+    <a href="${escapeHtml(ctaUrl)}" style="display:inline-block;padding:16px 34px;border-radius:999px;background:${GREEN};background-image:linear-gradient(135deg,#12A38F,#0B7467);color:#ffffff;font-size:16px;font-weight:800;text-decoration:none;box-shadow:0 10px 24px -12px rgba(14,138,123,.8)">${escapeHtml(c.cta.label)} →</a>
+  </td></tr>
+  <tr><td align="center" style="padding:12px 28px 4px">
+    <a href="${escapeHtml(input.appStoreUrl)}" style="display:inline-block;padding:9px 16px;border-radius:12px;background:#111111;color:#ffffff;font-size:13px;font-weight:700;text-decoration:none">Télécharger l'appli sur l'App Store</a>
+  </td></tr>
+  ${c.tip ? `<tr><td align="center" style="padding:14px 28px 0;font-size:13px;line-height:19px;color:${MUTED}">${escapeHtml(c.tip)}</td></tr>` : ""}
+  <tr><td style="padding:22px 28px 26px">
+    <div style="border-top:1px solid #E3ECE9;padding-top:16px;font-size:14px;line-height:21px;color:#374151">À très vite,<br><strong style="color:${INK}">L'équipe PharmaBoost</strong></div>
+  </td></tr>
+</table>
+<p style="margin:16px auto 0;max-width:520px;text-align:center;font-size:12px;line-height:18px;color:#7C948E">${escapeHtml(REASON)}<br><a href="${escapeHtml(input.unsubscribeUrl)}" style="color:#7C948E">Ne plus recevoir ces conseils</a> · ${escapeHtml(NO_HEALTH)}</p>
+</td></tr></table>
 </body></html>`;
   return { subject: c.subject, text, html };
 }
