@@ -53,7 +53,7 @@ const FORM_PATTERNS: [DrugRoute, RegExp][] = [
   ["INHALED", /\b(inhal\w*|aerosol)\b/],
   ["RECTAL_VAGINAL", /\b(suppositoire|ovule|rectal[e]?|vaginal[e]?|lavement|capsule vaginale)\b/],
   ["MOUTH", /\b(bain de bouche|gingival[e]?|collutoire|buccal[e]?)\b/],
-  ["INJECTABLE", /\b(injectable|injection|seringue|stylo|perfusion)\b/],
+  ["INJECTABLE", /\b(injectable|injection|inj|seringue|stylo|perfusion)\b/],
   ["SKIN", /\b(gel|creme|pommade|patch|emplatre|lotion|cutane[e]?|dispositif transdermique|pate|mousse|spray|solution pour application)\b/],
   ["ORAL", /\b(comprime|gelule|capsule|sachet|sirop|buvable|suspension buvable|granules|poudre pour solution buvable|lyophilisat|pastille|cp|gel\b.*\bbuv)\b/],
 ];

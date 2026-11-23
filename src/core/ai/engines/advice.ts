@@ -1,3 +1,4 @@
+import { drugRoutesOf } from "@/core/associations/routes";
 import type { PopulationVigilanceRule } from "./population-vigilance";
 import { applyPriorityRankings, type PriorityRankings } from "../priority-ranking";
 import { SKIN_SERIES_2_ADVICE_RULES } from "./conseil-peau-serie-2";
@@ -286,6 +287,12 @@ export type AdviceRule = {
    * traitement, elle ne doit jamais écarter la règle pour ces préfixes.
    */
   durationGate?: { atcPrefixes: string[]; minDays: number };
+  /**
+   * Pour ces préfixes ATC, seule la forme À AVALER ouvre la règle : une injection unique de corticoïde (Diprostène, infiltration)
+   * n'est pas une corticothérapie orale au long cours (fondateur, 23 nov. 2026 : « Pediakid vitamine D3 pour un Diprostène ? »).
+   * Forme connue et autre qu'à avaler : la ligne est écartée. Forme inconnue : la règle reste, la question tranche.
+   */
+  oralOnlyAtcPrefixes?: string[];
   /**
    * Les règles qui se TAISENT pour le médicament qui ouvre celle-ci par son code ATC, et pour lui seul : le conseil écrit pour
    * ce médicament remplace le conseil générique. Après une métopimazine, le pharmacien fondateur veut les huiles essentielles
@@ -666,10 +673,13 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
     basePriority: 55,
     matchingTags: ["vitamine d", "os", "calcium"],
     excludeTags: [],
+    // Un contexte osseux d'adulte : jamais une référence pour enfant (Pediakid gommes, « enfant », « bébé »…).
+    productExclude: [String.raw`pediakid`, String.raw`enfant`, String.raw`\bkids?\b`, String.raw`junior`, String.raw`bebe`, String.raw`bébé`, String.raw`nourr?iss`, String.raw`\bbb\b`],
     // Une cure de corticoïde de moins de 3 mois (le cas ORL le plus courant) n'est pas un contexte
     // osseux. Seul le préfixe H02 est concerné : la durée d'une boîte de biphosphonate (M05B) ou
     // d'hormone parathyroïdienne (H05) n'est pas celle du traitement.
     durationGate: { atcPrefixes: ["H02"], minDays: 90 },
+    oralOnlyAtcPrefixes: ["H02"],
     shortReasonTemplate:
       "Contexte osseux ({drug}) : le statut en vitamine D mérite d'être évoqué.",
     rationaleTemplate:
@@ -2111,6 +2121,7 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
     // La recommandation vise plus de 3 mois : une durée connue plus courte écarte la règle (Solupred
     // 5 jours : aucune question). Durée inconnue : la question reste, c'est elle qui tranche.
     durationGate: { atcPrefixes: ["H02"], minDays: 90 },
+    oralOnlyAtcPrefixes: ["H02"],
     matchingTags: ["calcium"],
     excludeTags: [],
     // Le produit visé par la recommandation est un calcium, le plus souvent associé à la vitamine
@@ -2125,7 +2136,7 @@ const CORE_ADVICE_RULES: AdviceRule[] = [
     // Les sels et injectables que le mot « calcium » seul ramenait : le citrate de bétaïne est un
     // digestif (7 jours au plus), le fluorure un produit dentaire, le chlorure et le gluconate des
     // solutés ou des perfusions, le folinate de calcium un antidote de chimiothérapie.
-    productExclude: [String.raw`betaine`, String.raw`fluorure`, String.raw`chlorure`, String.raw`gluconate`, String.raw`folinate`, String.raw`injectable`, String.raw`perfusion`, String.raw`solute`],
+    productExclude: [String.raw`betaine`, String.raw`fluorure`, String.raw`chlorure`, String.raw`gluconate`, String.raw`folinate`, String.raw`injectable`, String.raw`perfusion`, String.raw`solute`, String.raw`pediakid`, String.raw`enfant`, String.raw`\bkids?\b`, String.raw`junior`, String.raw`bebe`, String.raw`bébé`],
     benefits: ["Pour la solidité des os", "Avec la vitamine D", "Selon l'alimentation"],
     shortReasonTemplate: "Corticoïde oral ({drug}) : au-delà de 3 mois, l'os se fragilise et l'apport en calcium compte.",
     rationaleTemplate:
@@ -2282,6 +2293,13 @@ function isTooShortForRule(rule: AdviceRule, atcCode: string, durationDays: numb
   return durationDays < gate.minDays;
 }
 
+/** Vrai si la ligne porte l'un des préfixes `oralOnlyAtcPrefixes` et que sa forme, connue, n'est pas à avaler. */
+function isNonOralForRule(rule: AdviceRule, atcCode: string, drug: { drugName: string; officialName?: string | null; knowledge?: { form?: string | null } | null }): boolean {
+  if (!rule.oralOnlyAtcPrefixes?.some((prefix) => atcCode.startsWith(prefix))) return false;
+  const routes = drugRoutesOf({ form: drug.knowledge?.form ?? null, name: `${drug.drugName} ${drug.officialName ?? ""}` });
+  return routes.size > 0 && !routes.has("ORAL");
+}
+
 /**
  * Détermine les opportunités pertinentes pour un traitement donné.
  * Aucun produit n'est consulté à ce stade — c'est volontaire.
@@ -2384,6 +2402,7 @@ export function detectAdviceOpportunities(params: {
       // Une cure plus courte que celle que la règle suppose n'ouvre pas la règle (corticoïde de
       // 5 jours et ostéoporose). Une durée inconnue ou un autre préfixe : la règle reste.
       if (classHitAny && isTooShortForRule(rule, atc, drug.durationDays)) continue;
+      if (classHitAny && isNonOralForRule(rule, atc, drug)) continue;
 
       // Une règle qui affirme quelque chose sur la classe du médicament ne peut
       // pas se déclencher sur un simple effet indésirable partagé : cela
@@ -2426,6 +2445,7 @@ export function detectAdviceOpportunities(params: {
       const pool = (cited.length > 0 ? cited : drugs).filter(
         (drug) =>
           !isTooShortForRule(rule, drug.knowledge?.atcCode ?? "", drug.durationDays) &&
+          !isNonOralForRule(rule, drug.knowledge?.atcCode ?? "", drug) &&
           !rule.excludeAtcPrefixes?.some((prefix) => (drug.knowledge?.atcCode ?? "").startsWith(prefix)) &&
           !(rule.systemicOnly && isLocalDrug(drug)) &&
           // Le texte nomme la classe : un médicament dont la classe est connue et n'est pas la sienne n'y entre jamais.
